@@ -1,0 +1,50 @@
+{
+  "name": "platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Modular business operating platform for small and growing businesses.",
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "build:packages": "pnpm --filter \"./packages/*\" build",
+    "dev": "pnpm build:packages && concurrently -n api,web -c blue,magenta \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:api": "pnpm --filter @platform/api dev",
+    "dev:web": "pnpm --filter @platform/web dev",
+    "db:up": "docker compose up -d",
+    "db:down": "docker compose down",
+    "db:reset": "docker compose down -v && docker compose up -d",
+    "db:generate": "prisma generate --schema packages/db/prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema packages/db/prisma/schema.prisma",
+    "db:studio": "prisma studio --schema packages/db/prisma/schema.prisma",
+    "setup": "pnpm install && pnpm db:up && pnpm db:generate && pnpm db:migrate && pnpm build:packages",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test",
+    "test:e2e": "pnpm --filter @platform/api test:e2e",
+    "verify": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.17.0",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.17.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.4.2",
+    "prisma": "^6.2.1",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.19.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "@swc/core",
+      "esbuild"
+    ]
+  }
+}

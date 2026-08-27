@@ -1,0 +1,22 @@
+# Local development infrastructure only. Production uses managed PostgreSQL.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: platform-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: platform
+      POSTGRES_PASSWORD: platform_dev_password
+      POSTGRES_DB: platform_dev
+    ports:
+      - '5432:5432'
+    volumes:
+      - platform-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U platform -d platform_dev']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  platform-postgres-data:

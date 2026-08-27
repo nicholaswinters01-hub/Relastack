@@ -1,0 +1,24 @@
+// Platform database schema.
+//
+// Phase 0 deliberately defines NO domain models. This phase exists to prove
+// that the connection, the client generator, and the migration pipeline all
+// work end to end. Domain models arrive with the phases that own them:
+//
+//   Phase 1 — User, Session
+//   Phase 2 — Organization, OrganizationMembership
+//   Phase 3 — Location, LocationMembership
+//   Phase 4 — Role, Permission
+//   Phase 5 — Module, OrganizationModule
+//   Phase 6 — Plan, Subscription, Entitlement
+//
+// RULE: every schema change ships as a tracked migration. Never edit a
+// migration that has already been applied to a shared environment.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
