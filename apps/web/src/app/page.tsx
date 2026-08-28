@@ -1,8 +1,10 @@
+import Link from 'next/link';
 import { healthResponseSchema, type HealthResponse } from '@platform/shared';
+import { getCurrentUser } from '@/lib/api';
 
-// Phase 0 status page. Its only job is to prove the full stack is wired up:
-// browser -> Next.js server -> API -> PostgreSQL. It is replaced by the real
-// dashboard in Phase 10.
+// Foundation status page. Confirms the full stack is wired together:
+// browser -> Next.js -> API -> PostgreSQL. Replaced by the real dashboard in
+// Phase 10.
 
 export const dynamic = 'force-dynamic';
 
@@ -40,12 +42,12 @@ function Row({ label, value, tone }: { label: string; value: string; tone?: 'ok'
 }
 
 export default async function StatusPage() {
-  const probe = await probeApi();
+  const [probe, user] = await Promise.all([probeApi(), getCurrentUser()]);
 
   return (
     <main className="mx-auto max-w-2xl px-6 py-16">
       <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-        Phase 0 — Project Setup
+        Phase 1 — Authentication
       </p>
       <h1 className="mt-2 text-3xl font-semibold tracking-tight">Platform</h1>
       <p className="mt-3 text-[var(--color-muted)]">
@@ -82,7 +84,6 @@ export default async function StatusPage() {
                 }
               />
               <Row label="Environment" value={probe.data.environment} />
-              <Row label="API uptime" value={`${probe.data.uptimeSeconds}s`} />
             </>
           ) : (
             <>
@@ -90,6 +91,12 @@ export default async function StatusPage() {
               <Row label="Database" value="unknown" tone="bad" />
             </>
           )}
+
+          <Row
+            label="Authentication"
+            value={user ? `signed in as ${user.email}` : 'signed out'}
+            tone={user ? 'ok' : undefined}
+          />
         </dl>
 
         {!probe.ok && (
@@ -99,9 +106,31 @@ export default async function StatusPage() {
         )}
       </section>
 
-      <p className="mt-8 text-sm text-[var(--color-muted)]">
-        All three rows green means Phase 0 is working end to end.
-      </p>
+      <div className="mt-6 flex flex-wrap gap-3">
+        {user ? (
+          <Link
+            href="/account"
+            className="rounded-lg bg-[var(--color-ink)] px-4 py-2.5 text-sm font-medium text-[var(--color-canvas)] transition-opacity hover:opacity-90"
+          >
+            Go to your account
+          </Link>
+        ) : (
+          <>
+            <Link
+              href="/login"
+              className="rounded-lg bg-[var(--color-ink)] px-4 py-2.5 text-sm font-medium text-[var(--color-canvas)] transition-opacity hover:opacity-90"
+            >
+              Sign in
+            </Link>
+            <Link
+              href="/register"
+              className="rounded-lg border border-[var(--color-line)] px-4 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface)]"
+            >
+              Create an account
+            </Link>
+          </>
+        )}
+      </div>
     </main>
   );
 }

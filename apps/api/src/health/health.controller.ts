@@ -1,5 +1,6 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import type { HealthResponse } from '@platform/shared';
+import { Public } from '../auth/auth.decorators';
 import { HealthService } from './health.service';
 
 /**
@@ -7,7 +8,10 @@ import { HealthService } from './health.service';
  *
  * Deliberately unauthenticated — load balancers and uptime monitors must be
  * able to reach them. They therefore expose no tenant or business data.
+ *
+ * `@Public()` is applied at the class level, so it covers every route here.
  */
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}

@@ -1,18 +1,11 @@
 // Platform database schema.
 //
-// Phase 0 deliberately defines NO domain models. This phase exists to prove
-// that the connection, the client generator, and the migration pipeline all
-// work end to end. Domain models arrive with the phases that own them:
-//
-//   Phase 1 — User, Session
-//   Phase 2 — Organization, OrganizationMembership
-//   Phase 3 — Location, LocationMembership
-//   Phase 4 — Role, Permission
-//   Phase 5 — Module, OrganizationModule
-//   Phase 6 — Plan, Subscription, Entitlement
-//
 // RULE: every schema change ships as a tracked migration. Never edit a
 // migration that has already been applied to a shared environment.
+//
+//   Phase 4 — Role, Permission, Invitation
+//   Phase 5 — Module, OrganizationModule
+//   Phase 6 — Plan, Subscription, Entitlement
 
 generator client {
   provider = "prisma-client-js"
@@ -21,4 +14,627 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("user_status")
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
+
+  @@map("organization_status")
+}
+
+/// Legacy membership role, superseded by MembershipRole in Phase 4.
+///
+/// Retained because the Phase 4 migration derives the new scoped assignments
+/// from it, and because dropping a column in the same migration that reads it
+/// is how data gets lost. A later migration removes it once nothing reads it.
+/// Application code must use the permission service, never this column.
+enum OrganizationRole {
+  OWNER
+  MEMBER
+
+  @@map("organization_role")
+}
+
+/// A person who can sign in. Distinct from an Employee record (Phase 9) —
+/// an employee may exist without a login, and a login may exist without an
+/// employee record.
+///
+/// NOT tenant-owned: a user is a global identity that may hold membership in
+/// more than one organization. Tenant scoping lives on the membership.
+model User {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Citext so that "Nick@example.com" and "nick@example.com" cannot become
+  /// two separate accounts. Enforced by the database, not by application code
+  /// remembering to lowercase.
+  email        String     @unique @db.Citext
+  passwordHash String     @map("password_hash")
+  firstName    String?    @map("first_name")
+  lastName     String?    @map("last_name")
+  status       UserStatus @default(ACTIVE)
+
+  lastLoginAt DateTime? @map("last_login_at")
+
+  /// Consecutive failed sign-in attempts. Reset to zero on success.
+  ///
+  /// Rate limiting alone is per-IP, which a credential-stuffing attacker
+  /// defeats simply by rotating addresses — the attack that actually happens
+  /// in the wild. Counting per account closes that.
+  failedLoginAttempts Int @default(0) @map("failed_login_attempts")
+
+  /// Set when the failure threshold is crossed. Sign-in is refused until it
+  /// passes, with the same generic message as any other failure so that
+  /// probing cannot distinguish a locked account from a wrong password.
+  lockedUntil DateTime? @map("locked_until")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sessions    Session[]
+  memberships OrganizationMembership[]
+
+  @@map("users")
+}
+
+/// An authenticated browser session.
+///
+/// Only the SHA-256 hash of the token is stored. The token itself exists in
+/// exactly two places: the user's cookie, and the response that created it.
+/// A stolen database dump therefore grants no sessions.
+///
+/// Deliberately carries no organization: the caller's organization is resolved
+/// from membership on every request, so removing someone from an organization
+/// takes effect immediately rather than when their session eventually expires.
+model Session {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId    String @map("user_id") @db.Uuid
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt DateTime  @default(now()) @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  /// Captured for audit and for showing users their active sessions.
+  /// Never used for authorization — both are trivially spoofed.
+  ipAddress String? @map("ip_address")
+  userAgent String? @map("user_agent")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// A customer business. THE tenant boundary — the unit of isolation.
+///
+/// Protected by row-level security: see the migration that adds
+/// `organization_isolation`. Every row is visible only when the transaction's
+/// `app.current_organization_id` matches.
+model Organization {
+  id String @id @default(uuid()) @db.Uuid
+
+  name   String
+  /// URL-safe identifier. Unique across the platform, so it is derived from
+  /// the name with a random suffix rather than taken from user input directly.
+  slug   String             @unique
+  status OrganizationStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  memberships OrganizationMembership[]
+  locations   Location[]
+  roles       Role[]
+  invitations Invitation[]
+  modules      OrganizationModule[]
+  subscription Subscription?
+
+  @@map("organizations")
+}
+
+/// Joins a global user to an organization.
+///
+/// The join table (rather than a column on User) exists so that a single
+/// person can eventually belong to several organizations — a consultant, or an
+/// owner of two businesses. Retrofitting that after launch would mean migrating
+/// live authentication, which is the worst migration there is.
+model OrganizationMembership {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId         String           @map("user_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  role           OrganizationRole @default(MEMBER)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  locationMemberships LocationMembership[]
+  roleAssignments     MembershipRole[]
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
+enum LocationStatus {
+  ACTIVE
+  INACTIVE
+
+  @@map("location_status")
+}
+
+/// A physical place of business.
+///
+/// THE BILLING UNIT. The commercial model prices by location rather than by
+/// user, so Phase 6 counts rows here. Nothing about this table may make user
+/// count a billing input.
+///
+/// Also the first entity that is *owned by* a tenant rather than *being* one,
+/// so it is the template every business module follows: a non-nullable
+/// organization_id, an RLS policy keyed on it, and a service that takes tenant
+/// context as its first argument.
+model Location {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  name String
+  /// Unique within the organization, not globally — two businesses may each
+  /// have a "Downtown" without conflicting.
+  slug String
+
+  addressLine1 String? @map("address_line1")
+  addressLine2 String? @map("address_line2")
+  city         String?
+  region       String?
+  postalCode   String? @map("postal_code")
+  country      String?
+
+  phone String?
+  email String?
+
+  /// Appointment times are meaningless without it (Phase 9).
+  timezone String         @default("UTC")
+  status   LocationStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization        Organization             @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  memberships         LocationMembership[]
+  roleAssignments     MembershipRoleLocation[]
+  invitationLocations InvitationLocation[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@map("locations")
+}
+
+/// Assigns a member of an organization to one of its locations.
+///
+/// Links to OrganizationMembership rather than directly to User: location
+/// access only means anything inside an organization. Removing someone from
+/// the company therefore removes them from every location automatically,
+/// through one cascade rather than a cleanup routine that can be forgotten.
+model LocationMembership {
+  id String @id @default(uuid()) @db.Uuid
+
+  membershipId String @map("membership_id") @db.Uuid
+  locationId   String @map("location_id") @db.Uuid
+
+  /// Denormalised from the location so the RLS policy is a direct column
+  /// comparison rather than a subquery. Policies are evaluated on every row of
+  /// every query; a join there is a tax on everything the platform does.
+  organizationId String @map("organization_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  membership OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  location   Location               @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, locationId])
+  @@index([locationId])
+  @@index([organizationId])
+  @@map("location_memberships")
+}
+
+/// How far a role assignment reaches.
+///
+/// The heart of the permission model. A permission is never a plain yes/no —
+/// it is a permission PLUS a scope, because a Location Manager manages
+/// *specific* locations. A flat role cannot express that, and expressing it in
+/// application code instead would mean re-deriving it in every module.
+enum RoleScope {
+  /// Applies across the whole organization.
+  ORGANIZATION
+  /// Applies only at explicitly linked locations.
+  LOCATION
+
+  @@map("role_scope")
+}
+
+/// A named bundle of permissions.
+///
+/// System roles are seeded and shared by every organization (organizationId
+/// null). Custom, organization-defined roles are a higher-tier subscription
+/// feature: the column exists so Phase 5 can gate creating them without a
+/// schema change, but nothing writes it yet.
+model Role {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Null for system roles. Set for organization-defined roles (gated by
+  /// entitlement from Phase 5).
+  organizationId String? @map("organization_id") @db.Uuid
+
+  /// Stable machine identifier — 'org_admin', 'location_manager', 'employee'.
+  /// Code refers to this, never to the display name.
+  key         String
+  name        String
+  description String?
+
+  /// The scope this role is normally assigned at. An assignment may still
+  /// narrow it, but never widen it beyond this.
+  defaultScope RoleScope @default(ORGANIZATION) @map("default_scope")
+
+  /// System roles cannot be edited or deleted by customers.
+  isSystem Boolean @default(false) @map("is_system")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization?    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  permissions  RolePermission[]
+  assignments  MembershipRole[]
+  invitations  Invitation[]     @relation("InvitationRole")
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@map("roles")
+}
+
+/// A capability that can be granted.
+///
+/// Seeded from a constant in code and keyed by string ('customer.write'), so a
+/// module can declare the permissions it needs without a migration. Not
+/// tenant-owned: the catalogue is identical for every organization.
+model Permission {
+  key         String  @id
+  module      String
+  description String
+
+  roles RolePermission[]
+
+  @@index([module])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId        String @map("role_id") @db.Uuid
+  permissionKey String @map("permission_key")
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+  @@map("role_permissions")
+}
+
+/// Grants a role to an organization member, at a scope.
+///
+/// Replaces the placeholder OrganizationMembership.role from Phase 2. A member
+/// may hold several: organization-wide Employee plus Location Manager at two
+/// branches is a normal arrangement.
+model MembershipRole {
+  id String @id @default(uuid()) @db.Uuid
+
+  membershipId String    @map("membership_id") @db.Uuid
+  roleId       String    @map("role_id") @db.Uuid
+  scope        RoleScope @default(ORGANIZATION)
+
+  /// Denormalised for the RLS policy, as on location_memberships. Policies run
+  /// against every row of every query; a subquery there taxes everything.
+  organizationId String @map("organization_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  membership OrganizationMembership   @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  role       Role                     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  locations  MembershipRoleLocation[]
+
+  @@unique([membershipId, roleId, scope])
+  @@index([organizationId])
+  @@index([membershipId])
+  @@map("membership_roles")
+}
+
+/// Which locations a LOCATION-scoped role assignment applies to.
+///
+/// Empty for ORGANIZATION-scoped assignments. This table is what makes
+/// "manages Downtown and Northside, but not Warehouse" expressible.
+model MembershipRoleLocation {
+  membershipRoleId String @map("membership_role_id") @db.Uuid
+  locationId       String @map("location_id") @db.Uuid
+  organizationId   String @map("organization_id") @db.Uuid
+
+  membershipRole MembershipRole @relation(fields: [membershipRoleId], references: [id], onDelete: Cascade)
+  location       Location       @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([membershipRoleId, locationId])
+  @@index([organizationId])
+  @@index([locationId])
+  @@map("membership_role_locations")
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+
+  @@map("invitation_status")
+}
+
+/// An invitation for someone to join an organization.
+///
+/// This is how employees get in: self-registration always creates a new
+/// business, so there is no path by which someone joins an existing one
+/// uninvited.
+///
+/// The token is treated exactly like a session token — 256 bits of randomness,
+/// only its SHA-256 hash stored, single use, and expiring. An invitation link
+/// grants access to a company's data, so it deserves the same care as a
+/// password reset.
+model Invitation {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  email          String @db.Citext
+  tokenHash      String @unique @map("token_hash")
+
+  roleId String    @map("role_id") @db.Uuid
+  scope  RoleScope @default(ORGANIZATION)
+
+  status    InvitationStatus @default(PENDING)
+  expiresAt DateTime         @map("expires_at")
+
+  invitedByMembershipId String? @map("invited_by_membership_id") @db.Uuid
+
+  acceptedAt DateTime? @map("accepted_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  role         Role                 @relation("InvitationRole", fields: [roleId], references: [id], onDelete: Cascade)
+  locations    InvitationLocation[]
+
+  // Deliberately no unique constraint on (organization, email). A partial
+  // unique index over PENDING rows is what this wants, and Prisma cannot
+  // express one; a full constraint would forbid a second revoked invitation
+  // to the same address. InvitationsService supersedes any prior pending
+  // invitation instead, which is also the behaviour a user expects from
+  // "invite again".
+  @@index([organizationId, email])
+  @@index([organizationId])
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+/// Locations a LOCATION-scoped invitation will grant on acceptance.
+model InvitationLocation {
+  invitationId   String @map("invitation_id") @db.Uuid
+  locationId     String @map("location_id") @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  invitation Invitation @relation(fields: [invitationId], references: [id], onDelete: Cascade)
+  location   Location   @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([invitationId, locationId])
+  @@index([organizationId])
+  @@map("invitation_locations")
+}
+
+/// Mirror of the code-defined module registry.
+///
+/// The registry in `@platform/shared` is the source of truth — modules ship
+/// with the build. This table exists so per-organization state can reference a
+/// module by foreign key, and so an operator can query what exists without
+/// reading the source.
+model Module {
+  key         String  @id
+  name        String
+  description String
+  isCore      Boolean @default(false) @map("is_core")
+
+  /// Module keys that must be enabled first. Denormalised from the registry.
+  dependencies String[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organizations OrganizationModule[]
+  plans         PlanModule[]
+  addOns        SubscriptionAddOn[]
+
+  @@map("modules")
+}
+
+/// Whether one organization may use one module.
+///
+/// A row's absence means "not enabled" — the default is off for everything
+/// except core, so a new module shipped in a later release does not silently
+/// become available to every existing customer.
+///
+/// Phase 6 replaces manual toggling with plan-derived entitlement. Nothing
+/// outside this table's own service should care which it was, which is the
+/// point of resolving entitlement behind one interface.
+model OrganizationModule {
+  organizationId String @map("organization_id") @db.Uuid
+  moduleKey      String @map("module_key")
+
+  enabled Boolean @default(true)
+
+  enabledAt  DateTime? @map("enabled_at")
+  disabledAt DateTime? @map("disabled_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  module       Module       @relation(fields: [moduleKey], references: [key], onDelete: Cascade)
+
+  @@id([organizationId, moduleKey])
+  @@index([organizationId])
+  @@map("organization_modules")
+}
+
+/// Where a subscription stands commercially.
+///
+/// Drives access in three bands. The middle one is the grace period: a failed
+/// payment must not lock a landscaping company out mid-job, so PAST_DUE keeps
+/// full access while the customer is chased. Only after grace does access
+/// narrow to read-only — never to nothing, because a customer who cannot reach
+/// their own data cannot decide to come back.
+enum SubscriptionStatus {
+  /// Evaluating. Full access.
+  TRIALING
+  /// Paid and current. Full access.
+  ACTIVE
+  /// Payment failed, grace period running. Full access.
+  PAST_DUE
+  /// Grace expired. READ-ONLY.
+  SUSPENDED
+  /// Ended by the customer. READ-ONLY, so they can still export.
+  CANCELLED
+
+  @@map("subscription_status")
+}
+
+/// A commercial package.
+///
+/// Plans are DATA, not code. Repackaging, repricing, or introducing a new tier
+/// is an insert here — business logic never reads a price and never branches on
+/// a plan name (see docs/adr/0003).
+model Plan {
+  key         String  @id
+  name        String
+  description String
+
+  /// Monthly price in the smallest currency unit, charged regardless of size.
+  basePriceCents Int @default(0) @map("base_price_cents")
+
+  /// Monthly price per location. THE pricing model: customers are billed by
+  /// location, never by user count.
+  perLocationPriceCents Int @default(0) @map("per_location_price_cents")
+
+  /// Locations included before per-location charges apply.
+  includedLocations Int @default(1) @map("included_locations")
+
+  /// Hard ceiling on locations. Null means no limit.
+  maxLocations Int? @map("max_locations")
+
+  /// Unlimited by design. The platform is never priced per user.
+  maxUsers Int? @map("max_users")
+
+  /// Offered to new customers. Retired plans stay for existing subscribers.
+  isPublic Boolean @default(true) @map("is_public")
+
+  /// Days of full access after a failed payment, before read-only.
+  gracePeriodDays Int @default(14) @map("grace_period_days")
+
+  trialDays Int @default(14) @map("trial_days")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  modules       PlanModule[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+/// Modules included in a plan at no extra charge.
+model PlanModule {
+  planKey   String @map("plan_key")
+  moduleKey String @map("module_key")
+
+  plan   Plan   @relation(fields: [planKey], references: [key], onDelete: Cascade)
+  module Module @relation(fields: [moduleKey], references: [key], onDelete: Cascade)
+
+  @@id([planKey, moduleKey])
+  @@map("plan_modules")
+}
+
+/// What one organization currently pays for.
+///
+/// Exactly one per organization. Changing plan updates this row rather than
+/// creating another, so there is never ambiguity about which subscription is
+/// in force.
+model Subscription {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @unique @map("organization_id") @db.Uuid
+  planKey        String @map("plan_key")
+
+  status SubscriptionStatus @default(TRIALING)
+
+  /// Current billing period. Phase 18 syncs these from the payment provider.
+  periodStartsAt DateTime  @map("period_starts_at")
+  periodEndsAt   DateTime  @map("period_ends_at")
+  trialEndsAt    DateTime? @map("trial_ends_at")
+
+  /// When full access stops and read-only begins. Set on payment failure.
+  graceEndsAt DateTime? @map("grace_ends_at")
+
+  cancelledAt DateTime? @map("cancelled_at")
+
+  /// Opaque identifier from the payment provider. Null while billing is
+  /// mocked; Phase 18 fills it. Deliberately provider-agnostic — nothing here
+  /// mentions Stripe.
+  providerCustomerId     String? @map("provider_customer_id")
+  providerSubscriptionId String? @map("provider_subscription_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan                   @relation(fields: [planKey], references: [key])
+  addOns       SubscriptionAddOn[]
+
+  @@index([status])
+  @@index([graceEndsAt])
+  @@map("subscriptions")
+}
+
+/// A module purchased beyond what the plan includes.
+model SubscriptionAddOn {
+  subscriptionId String @map("subscription_id") @db.Uuid
+  moduleKey      String @map("module_key")
+
+  /// Monthly price at the time of purchase, so a later price change does not
+  /// silently reprice an existing customer.
+  priceCents Int @default(0) @map("price_cents")
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  module       Module       @relation(fields: [moduleKey], references: [key], onDelete: Cascade)
+
+  @@id([subscriptionId, moduleKey])
+  @@index([organizationId])
+  @@map("subscription_add_ons")
 }

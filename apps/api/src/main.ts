@@ -13,6 +13,7 @@ import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fa
 import helmet from '@fastify/helmet';
 import { loadServerEnv } from '@platform/config';
 import { AppModule } from './app.module';
+import { fastifyCookiePlugin } from './common/fastify-cookie';
 
 async function bootstrap(): Promise<void> {
   // Validate configuration before building the application. A misconfigured
@@ -25,9 +26,40 @@ async function bootstrap(): Promise<void> {
     { logger: logLevelsFor(env.LOG_LEVEL) },
   );
 
-  // Baseline security headers. Full hardening (CSP, HSTS tuning) lands in
-  // Phase 20 once the real deployment topology is known.
-  await app.register(helmet, { contentSecurityPolicy: false });
+  // Security headers.
+  //
+  // The API serves JSON and nothing else — no HTML, no scripts, no styles, no
+  // images. So its Content-Security-Policy can be the strictest one there is:
+  // deny everything. If a response ever did manage to render as a document
+  // (a reflected-content bug, a browser sniffing the type), the policy leaves
+  // nothing for an attacker to execute.
+  //
+  // frame-ancestors 'none' additionally forbids embedding the API in a frame,
+  // which is the clickjacking defence that X-Frame-Options only approximates.
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        'default-src': ["'none'"],
+        'frame-ancestors': ["'none'"],
+        'base-uri': ["'none'"],
+        'form-action': ["'none'"],
+      },
+    },
+    // Browsers must not guess a content type. Combined with the CSP above this
+    // closes the "JSON response rendered as HTML" class of bug.
+    noSniff: true,
+    // Keeps the API out of a cross-origin page's process.
+    crossOriginResourcePolicy: { policy: 'same-site' },
+    referrerPolicy: { policy: 'no-referrer' },
+  });
+
+  // Parses incoming Cookie headers and adds reply.setCookie/clearCookie.
+  // No `secret` is configured: session tokens are 256-bit random values whose
+  // hash is checked against the database, so a signature would add nothing —
+  // an attacker cannot forge a token that exists in the sessions table.
+  // See common/fastify-cookie.ts for why the plugin is imported via a helper.
+  await app.getHttpAdapter().getInstance().register(fastifyCookiePlugin);
 
   // Explicit allow-list. `credentials: true` is required because sessions
   // (Phase 1) will be carried in httpOnly cookies.

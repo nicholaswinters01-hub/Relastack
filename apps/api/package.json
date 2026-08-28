@@ -11,16 +11,20 @@
     "test:e2e": "vitest run --config vitest.e2e.config.ts"
   },
   "dependencies": {
+    "@fastify/cookie": "^11.1.2",
     "@fastify/helmet": "^13.0.0",
     "@nestjs/common": "^11.0.1",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-fastify": "^11.0.1",
+    "@nestjs/throttler": "^6.5.0",
+    "@node-rs/argon2": "^2.1.0",
     "@platform/config": "workspace:*",
     "@platform/db": "workspace:*",
     "@platform/shared": "workspace:*",
     "dotenv": "^16.4.7",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",

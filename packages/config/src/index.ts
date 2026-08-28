@@ -20,24 +20,133 @@ const commaSeparatedList = z
   )
   .pipe(z.array(z.string().url()));
 
-export const serverEnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+const booleanFromString = z
+  .enum(['true', 'false'])
+  .transform((value) => value === 'true')
+  .or(z.boolean());
 
-  DATABASE_URL: z
-    .string()
-    .min(1, 'DATABASE_URL is required')
-    .refine(
-      (value) => value.startsWith('postgresql://') || value.startsWith('postgres://'),
-      'DATABASE_URL must be a PostgreSQL connection string',
-    ),
+export const serverEnvSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
 
-  API_PORT: z.coerce.number().int().positive().max(65535).default(4000),
-  API_HOST: z.string().min(1).default('0.0.0.0'),
+    /**
+     * Privileged connection. Owns the schema and runs migrations.
+     *
+     * This role is a superuser and therefore BYPASSES row-level security.
+     * It must never serve application requests — use DATABASE_URL_APP.
+     */
+    DATABASE_URL: z
+      .string()
+      .min(1, 'DATABASE_URL is required')
+      .refine(
+        (value) => value.startsWith('postgresql://') || value.startsWith('postgres://'),
+        'DATABASE_URL must be a PostgreSQL connection string',
+      ),
 
-  CORS_ORIGINS: commaSeparatedList.default('http://localhost:3000'),
+    /**
+     * Application connection. Unprivileged, and subject to every RLS policy.
+     *
+     * Every query serving a request goes through this. Defaults to
+     * DATABASE_URL only so that tooling which needs no isolation still works;
+     * production is forbidden from that below, because running the app as the
+     * migration role would silently disable tenant isolation entirely.
+     */
+    DATABASE_URL_APP: z
+      .string()
+      .optional()
+      .refine(
+        (value) =>
+          value === undefined ||
+          value.startsWith('postgresql://') ||
+          value.startsWith('postgres://'),
+        'DATABASE_URL_APP must be a PostgreSQL connection string',
+      ),
 
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
-});
+    API_PORT: z.coerce.number().int().positive().max(65535).default(4000),
+    API_HOST: z.string().min(1).default('0.0.0.0'),
+
+    CORS_ORIGINS: commaSeparatedList.default('http://localhost:3000'),
+
+    LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace']).default('info'),
+
+    // --- Sessions ---------------------------------------------------------
+    /** How long a session remains valid without renewal. */
+    SESSION_TTL_DAYS: z.coerce.number().int().positive().max(365).default(7),
+
+    /**
+     * Sets the `Secure` flag on the session cookie, restricting it to HTTPS.
+     * Must be true in production; defaults false so local HTTP development
+     * works without ceremony. Enforced below.
+     */
+    COOKIE_SECURE: booleanFromString.default(false),
+
+    /** Cookie domain. Leave unset for host-only cookies (the safer default). */
+    COOKIE_DOMAIN: z.string().optional(),
+
+    // --- Rate limiting ----------------------------------------------------
+    /**
+     * Master switch. Defaults on, and production is forbidden from turning it
+     * off below — an unthrottled login endpoint is both a credential-stuffing
+     * target and, because Argon2 is deliberately expensive, a DoS vector.
+     *
+     * Exists for load testing and for suites that issue far more requests than
+     * a real user would.
+     */
+    RATE_LIMIT_ENABLED: booleanFromString.default(true),
+
+    /** Requests per minute allowed per IP against general endpoints. */
+    RATE_LIMIT_GLOBAL_PER_MINUTE: z.coerce.number().int().positive().default(120),
+
+    /** Login attempts allowed per minute per IP. Deliberately small. */
+    RATE_LIMIT_LOGIN_PER_MINUTE: z.coerce.number().int().positive().default(5),
+
+    /** Registrations allowed per hour per IP. */
+    RATE_LIMIT_REGISTER_PER_HOUR: z.coerce.number().int().positive().default(10),
+
+    // --- Account lockout --------------------------------------------------
+    /**
+     * Consecutive failed sign-ins before an account is locked.
+     *
+     * Separate from rate limiting, which counts per IP and is therefore
+     * defeated by an attacker rotating addresses — the shape credential
+     * stuffing actually takes.
+     */
+    LOGIN_MAX_FAILED_ATTEMPTS: z.coerce.number().int().positive().max(100).default(8),
+
+    /**
+     * How long a lock lasts.
+     *
+     * Deliberately minutes rather than "until an administrator clears it".
+     * A permanent lock hands an attacker a denial-of-service: knowing someone's
+     * email would be enough to keep them out indefinitely. A short window stops
+     * automated guessing while leaving a real user only briefly inconvenienced.
+     */
+    LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().max(1440).default(15),
+  })
+  // A production deployment serving session cookies over plaintext HTTP would
+  // expose every session to anyone on the network path. Refuse to start.
+  .refine((env) => env.NODE_ENV !== 'production' || env.COOKIE_SECURE, {
+    message: 'COOKIE_SECURE must be true when NODE_ENV=production',
+    path: ['COOKIE_SECURE'],
+  })
+  .refine((env) => env.NODE_ENV !== 'production' || env.RATE_LIMIT_ENABLED, {
+    message: 'RATE_LIMIT_ENABLED must be true when NODE_ENV=production',
+    path: ['RATE_LIMIT_ENABLED'],
+  })
+  // Serving requests as the migration role would leave every RLS policy in
+  // place but inert, because superusers bypass row-level security. The system
+  // would look correctly configured and isolate nothing.
+  .refine(
+    (env) =>
+      env.NODE_ENV !== 'production' ||
+      (env.DATABASE_URL_APP !== undefined && env.DATABASE_URL_APP !== env.DATABASE_URL),
+    {
+      message:
+        'DATABASE_URL_APP must be set and different from DATABASE_URL when NODE_ENV=production ' +
+        '(the migration role bypasses row-level security)',
+      path: ['DATABASE_URL_APP'],
+    },
+  );
 
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 

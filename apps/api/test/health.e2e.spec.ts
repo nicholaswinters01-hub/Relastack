@@ -4,11 +4,12 @@ import { config as loadDotenv } from 'dotenv';
 
 loadDotenv({ path: resolve(__dirname, '../../../.env') });
 
-import { Test } from '@nestjs/testing';
-import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
+process.env.RATE_LIMIT_ENABLED = 'false';
+
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { healthResponseSchema } from '@platform/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { AppModule } from '../src/app.module';
+import { createTestApp } from './create-test-app';
 
 /**
  * End-to-end health checks.
@@ -21,13 +22,7 @@ describe('Health (e2e)', () => {
   let app: NestFastifyApplication;
 
   beforeAll(async () => {
-    const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
-
-    app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
-    app.setGlobalPrefix('api/v1');
-
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    ({ app } = await createTestApp());
   });
 
   afterAll(async () => {

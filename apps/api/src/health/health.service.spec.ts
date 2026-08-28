@@ -1,17 +1,11 @@
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SERVER_ENV, type ServerEnv } from '../config.provider';
+import { SERVER_ENV } from '../config.provider';
+import { makeTestEnv } from '../test-support/test-env';
 import { PrismaService } from '../prisma/prisma.service';
 import { HealthService } from './health.service';
 
-const testEnv = {
-  NODE_ENV: 'test',
-  DATABASE_URL: 'postgresql://user:pass@localhost:5432/db',
-  API_PORT: 4000,
-  API_HOST: '0.0.0.0',
-  CORS_ORIGINS: ['http://localhost:3000'],
-  LOG_LEVEL: 'error',
-} satisfies ServerEnv;
+const testEnv = makeTestEnv();
 
 /**
  * Unit tests for health reporting. The database is mocked, so these run

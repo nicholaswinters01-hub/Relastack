@@ -1,6 +1,21 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { AuthModule } from './auth/auth.module';
+import { AuthGuard } from './auth/auth.guard';
+import { InvitationsModule } from './invitations/invitations.module';
+import { LocationsModule } from './locations/locations.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { TenantModule } from './tenancy/tenant.module';
+import { TenantGuard } from './tenancy/tenant.guard';
+import { ModulesModule } from './modules/modules.module';
+import { EntitlementGuard } from './modules/entitlement.guard';
+import { RbacModule } from './rbac/rbac.module';
+import { PermissionGuard } from './rbac/permission.guard';
+import { AppThrottlerGuard } from './common/app-throttler.guard';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { SERVER_ENV, type ServerEnv } from './config.provider';
 
 /**
  * Application root.
@@ -8,11 +23,8 @@ import { PrismaModule } from './prisma/prisma.module';
  * PrismaModule and configuration are platform infrastructure — always loaded.
  * Feature modules are registered here as they arrive:
  *
- *   Phase 1 — AuthModule
  *   Phase 2 — OrganizationsModule
- *   Phase 3 — LocationsModule
  *   Phase 4 — RbacModule
- *   Phase 5 — ModuleRegistryModule
  *
  * Note that "registered here" is not the same as "enabled for a customer".
  * From Phase 5 onward a module being loaded into the process is independent of
@@ -20,6 +32,58 @@ import { PrismaModule } from './prisma/prisma.module';
  * request by the entitlement guard, not by what is compiled into the build.
  */
 @Module({
-  imports: [PrismaModule, HealthModule],
+  imports: [
+    PrismaModule,
+
+    // One baseline throttler covering every route. Endpoints needing a
+    // tighter limit override it with @Throttle — see AuthController.
+    //
+    // Deliberately NOT several named throttlers: with multiple names, every
+    // throttler applies to every route unless individually skipped, so the
+    // strict login limit would silently also govern ordinary reads.
+    ThrottlerModule.forRootAsync({
+      inject: [SERVER_ENV],
+      useFactory: (env: ServerEnv) => ({
+        throttlers: [{ name: 'default', ttl: 60_000, limit: env.RATE_LIMIT_GLOBAL_PER_MINUTE }],
+      }),
+    }),
+
+    TenantModule,
+    RbacModule,
+    ModulesModule,
+    AuthModule,
+    OrganizationsModule,
+    LocationsModule,
+    InvitationsModule,
+    HealthModule,
+  ],
+  providers: [
+    // ORDER MATTERS. Guards run in registration order, so rate limiting is
+    // evaluated before authentication. Otherwise an attacker could force
+    // unlimited Argon2 verifications — expensive by design — simply by sending
+    // wrong passwords, turning our own password hardening into a DoS vector.
+    { provide: APP_GUARD, useClass: AppThrottlerGuard },
+
+    // Authentication is global: every endpoint is protected unless it carries
+    // @Public(). Protection is the default; exposure is the explicit choice.
+    { provide: APP_GUARD, useClass: AuthGuard },
+
+    // Tenant context, also global and also fail-closed. Runs after AuthGuard,
+    // so the caller is already known. An endpoint that forgets to declare its
+    // intent gets no tenant context, and RLS policies then return nothing —
+    // an obviously broken endpoint rather than a quiet cross-tenant leak.
+    { provide: APP_GUARD, useClass: TenantGuard },
+
+    // Last: permissions are resolved by TenantGuard above, so this only reads
+    // what is already on the request. Endpoints without @RequirePermission
+    // pass through — see the note in PermissionGuard for why that is not a
+    // fail-open hole.
+    { provide: APP_GUARD, useClass: PermissionGuard },
+
+    // Last: module entitlement. Reads what TenantGuard resolved. This is what
+    // makes a disabled module unreachable rather than merely hidden —
+    // endpoints without @RequireModule belong to core, which is always on.
+    { provide: APP_GUARD, useClass: EntitlementGuard },
+  ],
 })
 export class AppModule {}

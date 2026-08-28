@@ -31,7 +31,13 @@ jobs:
 
     env:
       NODE_ENV: test
+      # Privileged: owns the schema, runs migrations, bypasses RLS.
       DATABASE_URL: postgresql://platform:platform_dev_password@localhost:5432/platform_test?schema=public
+      # Unprivileged: what the application uses, and what the isolation suite
+      # asserts against. Without this the suite would run as a superuser and
+      # pass while proving nothing. The role is created by the
+      # enable_row_level_security migration.
+      DATABASE_URL_APP: postgresql://platform_app:platform_app_dev_password@localhost:5432/platform_test?schema=public
       CORS_ORIGINS: http://localhost:3000
 
     steps:
@@ -67,10 +73,24 @@ jobs:
       - name: Typecheck
         run: pnpm typecheck
 
+      # Fails on AGPL, SSPL, GPL, BUSL and undeclared licences. AGPL is the
+      # one that genuinely matters for SaaS: its obligations trigger on
+      # network use, not distribution, so a single transitive package could
+      # create an obligation to publish this entire codebase.
+      - name: Licence check
+        run: pnpm licenses:check
+
+      # Known-vulnerable dependencies fail the build. Accepted advisories are
+      # listed with a reason in package.json under pnpm.auditConfig, so an
+      # exception is a reviewed decision rather than a warning nobody reads.
+      - name: Dependency vulnerability scan
+        run: pnpm audit --audit-level high
+
       - name: Unit tests
         run: pnpm test
 
-      # Runs against the real PostgreSQL service above. Tenant-isolation tests
-      # join this step from Phase 2 onward and must never be allowed to fail.
-      - name: End-to-end tests
+      # Runs against the real PostgreSQL service above, and includes the
+      # tenant-isolation suite. That suite protects the central promise of the
+      # product and must never be allowed to fail or be skipped.
+      - name: End-to-end tests (includes tenant isolation)
         run: pnpm test:e2e

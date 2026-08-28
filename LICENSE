@@ -1,0 +1,45 @@
+Copyright (c) 2026 Nicholas Winters. All rights reserved.
+
+PROPRIETARY AND CONFIDENTIAL
+
+This software, including its source code, documentation, database schemas,
+and all associated materials (the "Software"), is the proprietary and
+confidential property of Nicholas Winters.
+
+No part of the Software may be reproduced, distributed, published, displayed,
+transmitted, modified, reverse-engineered, or used to create derivative works,
+in any form or by any means, without the prior written permission of the
+copyright holder.
+
+Access to the Software does not convey any license, right, or interest in it.
+Any person granted access is bound by confidentiality obligations and may use
+the Software solely for purposes expressly authorised in writing by the
+copyright holder.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+---
+
+THIRD-PARTY SOFTWARE
+
+This product depends on open-source software that remains the property of its
+respective authors, licensed under permissive terms. Those dependencies are
+not covered by the terms above and are not redistributed as part of this
+repository. See THIRD-PARTY-LICENSES.md for the complete list.
+
+---
+
+NOTE ON AUTHORSHIP
+
+Portions of this codebase were produced with AI assistance. United States
+copyright law does not currently extend protection to material lacking human
+authorship, and registration of a work combining human and AI contribution
+requires disclosing the AI-generated portions and claiming only the human
+ones. This notice records that fact; it is not legal advice, and the
+provisions above should be reviewed by qualified counsel before being relied
+upon commercially.

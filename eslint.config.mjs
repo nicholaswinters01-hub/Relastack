@@ -17,6 +17,20 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Build/config files run in Node before any bundler is involved, so they
+    // legitimately use Node globals. TypeScript files get these from
+    // @types/node instead, which is why this is scoped to plain JS configs.
+    files: ['**/*.mjs', '**/*.cjs', '**/*.config.js'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        __dirname: 'readonly',
+        module: 'writable',
+      },
+    },
+  },
+  {
     rules: {
       // Unused args prefixed with _ are intentional (e.g. NestJS lifecycle signatures).
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
