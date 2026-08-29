@@ -69,6 +69,14 @@ export const organizationResponseSchema = z.object({
    * rules regardless of what the browser renders.
    */
   permissions: resolvedPermissionsSchema,
+  /**
+   * The caller's own membership id.
+   *
+   * Sent so the interface can tell which notes and records are theirs. Neither
+   * secret nor an authorization input — the API decides authorship, and this
+   * only changes what the browser offers.
+   */
+  membershipId: z.string().uuid(),
 });
 
 export type OrganizationResponse = z.infer<typeof organizationResponseSchema>;

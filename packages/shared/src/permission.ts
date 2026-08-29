@@ -17,6 +17,14 @@ export const PERMISSIONS = {
   LOCATION_READ: 'location.read',
   LOCATION_WRITE: 'location.write',
   LOCATION_ASSIGN: 'location.assign',
+  CUSTOMER_READ: 'customer.read',
+  CUSTOMER_WRITE: 'customer.write',
+  CUSTOMER_DELETE: 'customer.delete',
+  /**
+   * Defining a custom field or renaming a tag changes the shape of the data
+   * for everyone in the company, so it is separated from day-to-day writing.
+   */
+  CUSTOMER_CONFIGURE: 'customer.configure',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

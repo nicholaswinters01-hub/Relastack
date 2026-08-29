@@ -21,6 +21,7 @@ export const MODULES = {
   REPORTING: 'reporting',
   AUTOMATION: 'automation',
   CUSTOM_ROLES: 'custom_roles',
+  SHARED_CUSTOMERS: 'shared_customers',
 } as const;
 
 export type ModuleKey = (typeof MODULES)[keyof typeof MODULES];
@@ -99,6 +100,14 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: false,
     dependencies: [],
     availableFrom: 'Phase 5',
+  },
+  {
+    key: MODULES.SHARED_CUSTOMERS,
+    name: 'Shared Customers',
+    description: 'Serve one customer from several locations, instead of just their home branch.',
+    isCore: false,
+    dependencies: [MODULES.CRM],
+    availableFrom: 'Phase 7',
   },
 ];
 

@@ -9,7 +9,11 @@ import {
 } from '@platform/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import type { PermissionSet } from '../rbac/permission-set';
-import { CurrentPermissions, RequirePermission } from '../rbac/rbac.decorators';
+import {
+  CurrentMembershipId,
+  CurrentPermissions,
+  RequirePermission,
+} from '../rbac/rbac.decorators';
 import { CurrentTenant } from '../tenancy/tenant.decorators';
 import { OrganizationsService } from './organizations.service';
 
@@ -28,11 +32,13 @@ export class OrganizationsController {
   async current(
     @CurrentTenant() tenant: TenantContext,
     @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
   ): Promise<OrganizationResponse> {
     return {
       organization: await this.organizations.getCurrent(tenant),
       roles: [...permissions.roleKeys],
       permissions: permissions.toJSON(),
+      membershipId,
     };
   }
 
@@ -41,6 +47,7 @@ export class OrganizationsController {
   async update(
     @CurrentTenant() tenant: TenantContext,
     @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
     @Body(new ZodValidationPipe(updateOrganizationRequestSchema))
     body: UpdateOrganizationRequest,
   ): Promise<OrganizationResponse> {
@@ -48,6 +55,7 @@ export class OrganizationsController {
       organization: await this.organizations.update(tenant, permissions, body),
       roles: [...permissions.roleKeys],
       permissions: permissions.toJSON(),
+      membershipId,
     };
   }
 
@@ -68,12 +76,14 @@ export class OrganizationsController {
   async byId(
     @CurrentTenant() tenant: TenantContext,
     @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
     @Param('id') id: string,
   ): Promise<OrganizationResponse> {
     return {
       organization: await this.organizations.getById(tenant, id),
       roles: [...permissions.roleKeys],
       permissions: permissions.toJSON(),
+      membershipId,
     };
   }
 }

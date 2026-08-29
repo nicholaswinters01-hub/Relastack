@@ -10,12 +10,19 @@ businesses. Priced by **business location**, not per user. Organizations
 activate modules (CRM, Scheduling, Employees, Inventory, …) at the company
 level.
 
-**Current phase: 6 complete (Plans, subscriptions, add-ons).** Entitlement now
+**Current phase: 7 complete (CRM).** The first business data the platform
+holds: customers, contacts, notes, tags and customer-defined fields. Entitlement
 derives from a plan plus purchased add-ons, and a lapsed subscription narrows
 the account to read-only rather than locking it. Business logic still asks only
-"is this organization entitled to this module?" — the Phase 5 interface did not
-change, which is what let plans arrive without touching a single module. Custom
-Roles is the first gated capability. No business data yet.
+"is this organization entitled to this module?"
+
+A lead and a customer are **one record at different stages**, never two tables.
+Converting is a status change, so notes, contacts and tags survive it and
+nothing is copied. Customers carry a nullable primary `locationId`; Shared
+Customers (an Enterprise module) adds extra locations through
+`customer_locations`. Visibility is a three-way OR — organization-wide,
+primary location in scope, or shared location in scope — and a customer with
+no location is reachable only organization-wide.
 
 Three bands, not on/off: `TRIALING`/`ACTIVE`/`PAST_DUE` keep full access,
 `SUSPENDED`/`CANCELLED` are read-only. `PAST_DUE` is the grace period and is
@@ -100,6 +107,20 @@ Recorded because each one cost real time and none is obvious.
 - **Migrations can be checked from empty without `db:reset`.** Create a
   throwaway database and point `DATABASE_URL` at it for one
   `prisma migrate deploy`. No reason to destroy local data to prove this.
+- **`has()` where `hasAnywhere()` belongs locks scoped users out entirely.**
+  A Location Manager holds `customer.read` only at their branches, so an
+  organization-wide `has()` refuses them before the visibility filter ever
+  runs. Rule 7 exists because of this; it was still got backwards in Phase 7.
+  Reads use `hasAnywhere` and let the filter narrow; writes use `hasAt`.
+- **A PATCH of a JSONB column replaces it.** Sending one custom field wiped
+  every other field on the record. Merge existing values with incoming ones
+  INSIDE the transaction, then validate the merged result — validating only
+  the incoming keys makes a required field mean "this request mentioned it"
+  rather than "the record has it".
+- **A test cleanup that filters on mutable data does not run after a failure.**
+  A suite deleting `WHERE name LIKE 'X%'` leaked an organization once a
+  sabotage let a rename through. Fixtures should rename within the prefix the
+  cleanup matches.
 
 ## Commands
 
@@ -125,8 +146,8 @@ next phase without it.
 | 4     | Roles and scoped permissions                                | Complete |
 | 5     | Module registry and entitlement enforcement                 | Complete |
 | 6     | Plans, subscriptions, add-ons                               | Complete |
-| 7     | CRM: leads, customers, contacts, notes, tags, custom fields | **Next** |
-| 8     | Tasks and basic workflow infrastructure                     |          |
+| 7     | CRM: leads, customers, contacts, notes, tags, custom fields | Complete |
+| 8     | Tasks and basic workflow infrastructure                     | **Next** |
 | 9     | Scheduling                                                  |          |
 | 10    | Reporting and dashboards                                    |          |
 | 11    | Notifications and the event system                          |          |

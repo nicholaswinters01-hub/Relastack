@@ -133,12 +133,16 @@ model Organization {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  memberships OrganizationMembership[]
-  locations   Location[]
-  roles       Role[]
-  invitations Invitation[]
+  memberships  OrganizationMembership[]
+  locations    Location[]
+  roles        Role[]
+  invitations  Invitation[]
   modules      OrganizationModule[]
   subscription Subscription?
+
+  customers              Customer[]
+  tags                   Tag[]
+  customFieldDefinitions CustomFieldDefinition[]
 
   @@map("organizations")
 }
@@ -159,10 +163,13 @@ model OrganizationMembership {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  user               User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  organization       Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   locationMemberships LocationMembership[]
   roleAssignments     MembershipRole[]
+
+  ownedCustomers Customer[]
+  authoredNotes  CustomerNote[]
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -218,6 +225,9 @@ model Location {
   memberships         LocationMembership[]
   roleAssignments     MembershipRoleLocation[]
   invitationLocations InvitationLocation[]
+
+  customers       Customer[]
+  sharedCustomers CustomerLocation[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -312,7 +322,7 @@ model Role {
 /// module can declare the permissions it needs without a migration. Not
 /// tenant-owned: the catalogue is identical for every organization.
 model Permission {
-  key         String  @id
+  key         String @id
   module      String
   description String
 
@@ -528,7 +538,7 @@ enum SubscriptionStatus {
 /// is an insert here — business logic never reads a price and never branches on
 /// a plan name (see docs/adr/0003).
 model Plan {
-  key         String  @id
+  key         String @id
   name        String
   description String
 
@@ -609,8 +619,8 @@ model Subscription {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  plan         Plan                   @relation(fields: [planKey], references: [key])
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan         Plan                @relation(fields: [planKey], references: [key])
   addOns       SubscriptionAddOn[]
 
   @@index([status])
@@ -637,4 +647,280 @@ model SubscriptionAddOn {
   @@id([subscriptionId, moduleKey])
   @@index([organizationId])
   @@map("subscription_add_ons")
+}
+
+// ---------------------------------------------------------------------------
+// CRM (Phase 7)
+// ---------------------------------------------------------------------------
+
+/// Where a customer sits in their lifecycle.
+///
+/// One record moves through these rather than a Lead table graduating into a
+/// Customer table. Converting is a status change, so every note, contact and
+/// tag written while they were a lead survives it, and "how many leads
+/// converted" is one query rather than a reconciliation across two tables.
+enum CustomerStage {
+  LEAD
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+/// A household or a business. Determines which name fields are meaningful.
+enum CustomerType {
+  PERSON
+  COMPANY
+}
+
+model Customer {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  stage CustomerStage @default(LEAD)
+  type  CustomerType  @default(PERSON)
+
+  /// Denormalised so lists and search do not have to branch on type. Derived
+  /// on write from the company name or the person name.
+  displayName String  @map("display_name")
+  companyName String? @map("company_name")
+  firstName   String? @map("first_name")
+  lastName    String? @map("last_name")
+
+  email String?
+  phone String?
+
+  addressLine1 String? @map("address_line1")
+  addressLine2 String? @map("address_line2")
+  city         String?
+  region       String?
+  postalCode   String? @map("postal_code")
+  country      String?
+
+  /// Free text, not an enum: every business describes its own lead sources,
+  /// and forcing them into ours would make the field useless.
+  source String?
+
+  /// The branch that primarily serves this customer. Nullable because a
+  /// single-location business has no meaningful answer, and because a lead
+  /// often arrives before anyone has decided who handles it.
+  ///
+  /// Visibility follows this. A customer with no location is visible only to
+  /// organization-wide roles — the same rule Phase 3 applies to an unassigned
+  /// location, and for the same reason.
+  locationId String? @map("location_id") @db.Uuid
+
+  /// Who is responsible. An OrganizationMembership, not a User, so removing
+  /// someone from the company cleans this up through one cascade.
+  ownerMembershipId String? @map("owner_membership_id") @db.Uuid
+
+  /// Values for this organization's custom field definitions.
+  ///
+  /// JSONB rather than an entity-attribute-value table: values are always
+  /// read as part of the customer and never queried across customers, and EAV
+  /// would turn every read into a join whose row count varies by tenant.
+  /// Validation happens at the boundary, built from the definitions.
+  customFields Json @default("{}") @map("custom_fields")
+
+  /// When the stage last moved to ACTIVE. Stored rather than derived, because
+  /// a customer can lapse and come back.
+  convertedAt     DateTime? @map("converted_at")
+  lastContactedAt DateTime? @map("last_contacted_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization    Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location        Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  ownerMembership OrganizationMembership? @relation(fields: [ownerMembershipId], references: [id], onDelete: SetNull)
+
+  contacts        Contact[]
+  notes           CustomerNote[]
+  tags            CustomerTag[]
+  sharedLocations CustomerLocation[]
+
+  @@index([organizationId, stage])
+  @@index([organizationId, locationId])
+  @@index([organizationId, displayName])
+  @@index([organizationId, ownerMembershipId])
+  @@map("customers")
+}
+
+/// Shares a customer with a location beyond their primary one.
+///
+/// Gated by the Shared Customers module, which higher plans include. A
+/// commercial client served by three branches is a bigger-business problem, so
+/// the capability is priced accordingly — but the table is always present, and
+/// rows already here keep working if a plan is downgraded. Withdrawing sight
+/// of data someone can already see is the one thing a lapse must never do.
+model CustomerLocation {
+  customerId String @map("customer_id") @db.Uuid
+  locationId String @map("location_id") @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, locationId])
+  @@index([organizationId])
+  @@index([locationId])
+  @@map("customer_locations")
+}
+
+/// A person at a customer.
+///
+/// Separate from Customer because a COMPANY has several, and because the
+/// person who signs the contract is often not the person who answers the door.
+model Contact {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  customerId     String @map("customer_id") @db.Uuid
+
+  firstName String  @map("first_name")
+  lastName  String? @map("last_name")
+  title     String?
+
+  email String?
+  phone String?
+
+  /// At most one per customer, enforced in the service rather than by a
+  /// constraint: a partial unique index cannot express "at most one true"
+  /// without also forbidding a second false.
+  isPrimary Boolean @default(false) @map("is_primary")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([customerId])
+  @@map("contacts")
+}
+
+/// A dated note against a customer.
+model CustomerNote {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  customerId     String @map("customer_id") @db.Uuid
+
+  /// Nullable so a note survives the author leaving the company. The record of
+  /// what was said to a customer outlives any one employee.
+  authorMembershipId String? @map("author_membership_id") @db.Uuid
+
+  body String
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  customer Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  author   OrganizationMembership? @relation(fields: [authorMembershipId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([customerId, createdAt])
+  @@map("customer_notes")
+}
+
+/// A label defined once per organization and applied to many customers.
+///
+/// A table rather than a string array on the customer, so correcting a
+/// misspelled tag is one update instead of a scan, and so a tag can carry a
+/// colour without every row repeating it.
+model Tag {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  name  String
+  /// A palette name, not a hex value — the interface owns what the colours
+  /// actually are, and a stored hex would outlive the design that chose it.
+  color String @default("neutral")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customers    CustomerTag[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("tags")
+}
+
+model CustomerTag {
+  customerId String @map("customer_id") @db.Uuid
+  tagId      String @map("tag_id") @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([customerId, tagId])
+  @@index([organizationId])
+  @@map("customer_tags")
+}
+
+/// What a custom field may hold.
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  BOOLEAN
+  SELECT
+}
+
+/// Which record a custom field is attached to.
+///
+/// An enum with one member today. Phase 8 adds tasks and Phase 9 scheduling,
+/// and both will want the same mechanism — a column here is cheaper now than a
+/// second parallel table later.
+enum CustomFieldEntity {
+  CUSTOMER
+}
+
+/// One organization's definition of a field the platform did not ship.
+///
+/// Definitions are rows; values live in the record's JSONB column. This is
+/// what "prefer configuration over customer-specific branches" means in
+/// practice: a business needing a "Gate code" field is data, not a fork.
+model CustomFieldDefinition {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  entity CustomFieldEntity @default(CUSTOMER)
+
+  /// Stable machine key. Renaming the label must not orphan the values, so the
+  /// key is fixed once created.
+  key   String
+  label String
+
+  type CustomFieldType @default(TEXT)
+
+  /// Choices for a SELECT field, ignored otherwise.
+  options Json @default("[]")
+
+  isRequired Boolean @default(false) @map("is_required")
+  position   Int     @default(0)
+
+  /// Retired rather than deleted. The values stay in place, so re-adding the
+  /// field brings the history back instead of a column of blanks.
+  archivedAt DateTime? @map("archived_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, entity, key])
+  @@index([organizationId, entity])
+  @@map("custom_field_definitions")
 }

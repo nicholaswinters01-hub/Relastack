@@ -4,10 +4,17 @@ import {
   modulesResponseSchema,
   locationsResponseSchema,
   organizationMembersResponseSchema,
+  customFieldsResponseSchema,
+  customerResponseSchema,
+  customersResponseSchema,
   organizationResponseSchema,
   plansResponseSchema,
   publicUserSchema,
   subscriptionResponseSchema,
+  tagsResponseSchema,
+  type CustomerDetail,
+  type CustomFieldsResponse,
+  type CustomersResponse,
   type InvitationsResponse,
   type LocationsResponse,
   type ModulesResponse,
@@ -16,6 +23,7 @@ import {
   type PlansResponse,
   type PublicUser,
   type SubscriptionResponse,
+  type TagsResponse,
 } from '@platform/shared';
 
 /**
@@ -157,6 +165,79 @@ export async function getSubscription(): Promise<SubscriptionResponse | null> {
     return parsed.success ? parsed.data : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Customers the caller may see.
+ *
+ * The server decides which those are. This helper passes the filters through
+ * and never narrows anything itself — the browser is not where scoping is
+ * enforced, and pretending otherwise is how a filter becomes mistaken for a
+ * permission.
+ */
+export async function getCustomers(
+  params: Record<string, string | undefined> = {},
+): Promise<CustomersResponse> {
+  const query = new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
+
+  try {
+    const response = await serverFetch(`/api/v1/customers?${query.toString()}`);
+    if (!response.ok) return { customers: [], nextCursor: null };
+
+    const parsed = customersResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data : { customers: [], nextCursor: null };
+  } catch {
+    return { customers: [], nextCursor: null };
+  }
+}
+
+/** One customer with their contacts and notes. Null if out of reach. */
+export async function getCustomer(id: string): Promise<CustomerDetail | null> {
+  try {
+    const response = await serverFetch(`/api/v1/customers/${id}`);
+    if (!response.ok) return null;
+
+    const parsed = customerResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data.customer : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The organization's tag vocabulary. */
+export async function getTags(): Promise<TagsResponse['tags']> {
+  try {
+    const response = await serverFetch('/api/v1/tags');
+    if (!response.ok) return [];
+
+    const parsed = tagsResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data.tags : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Custom field definitions. Pass true to include retired ones. */
+export async function getCustomFields(
+  includeArchived = false,
+): Promise<CustomFieldsResponse['fields']> {
+  try {
+    const response = await serverFetch(
+      includeArchived ? '/api/v1/custom-fields/all' : '/api/v1/custom-fields',
+    );
+    if (!response.ok) return [];
+
+    const parsed = customFieldsResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data.fields : [];
+  } catch {
+    return [];
   }
 }
 
