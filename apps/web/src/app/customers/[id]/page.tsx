@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppNav } from '@/components/app-nav';
 import { notFound, redirect } from 'next/navigation';
 import { PERMISSIONS } from '@platform/shared';
 import { CustomerDetailView } from '@/components/customer-detail';
@@ -33,20 +34,23 @@ export default async function CustomerPage({ params }: Props) {
       : canAt(organization.permissions, PERMISSIONS.CUSTOMER_WRITE, customer.locationId);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
-      <p className="text-sm">
-        <Link href="/customers" className="underline underline-offset-4">
-          Back to customers
-        </Link>
-      </p>
+    <>
+      <AppNav current="customers" />
+      <main className="mx-auto max-w-3xl px-6 py-16">
+        <p className="text-sm">
+          <Link href="/customers" className="underline underline-offset-4">
+            Back to customers
+          </Link>
+        </p>
 
-      <CustomerDetailView
-        customer={customer}
-        tags={tags}
-        fields={fields}
-        canWrite={canWrite}
-        membershipId={organization.membershipId}
-      />
-    </main>
+        <CustomerDetailView
+          customer={customer}
+          tags={tags}
+          fields={fields}
+          canWrite={canWrite}
+          membershipId={organization.membershipId}
+        />
+      </main>
+    </>
   );
 }

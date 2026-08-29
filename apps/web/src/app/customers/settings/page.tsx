@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
 import { PERMISSIONS } from '@platform/shared';
 import { CrmSettings } from '@/components/crm-settings';
@@ -16,37 +17,43 @@ export default async function CrmSettingsPage() {
   // every colleague at every branch sees.
   if (!can(organization.permissions, PERMISSIONS.CUSTOMER_CONFIGURE)) {
     return (
-      <main className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="text-3xl font-semibold tracking-tight">Tags and fields</h1>
-        <p className="mt-3 text-[var(--color-muted)]">
-          Changing these affects everyone in the company, so it needs an organization-wide role.
-        </p>
-        <p className="mt-6 text-sm">
-          <Link href="/customers" className="underline underline-offset-4">
-            Back to customers
-          </Link>
-        </p>
-      </main>
+      <>
+        <AppNav current="customers" />
+        <main className="mx-auto max-w-3xl px-6 py-16">
+          <h1 className="text-3xl font-semibold tracking-tight">Tags and fields</h1>
+          <p className="mt-3 text-[var(--color-muted)]">
+            Changing these affects everyone in the company, so it needs an organization-wide role.
+          </p>
+          <p className="mt-6 text-sm">
+            <Link href="/customers" className="underline underline-offset-4">
+              Back to customers
+            </Link>
+          </p>
+        </main>
+      </>
     );
   }
 
   const [tags, fields] = await Promise.all([getTags(), getCustomFields(true)]);
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
-      <p className="text-sm">
-        <Link href="/customers" className="underline underline-offset-4">
-          Back to customers
-        </Link>
-      </p>
+    <>
+      <AppNav current="customers" />
+      <main className="mx-auto max-w-3xl px-6 py-16">
+        <p className="text-sm">
+          <Link href="/customers" className="underline underline-offset-4">
+            Back to customers
+          </Link>
+        </p>
 
-      <h1 className="mt-6 text-3xl font-semibold tracking-tight">Tags and fields</h1>
-      <p className="mt-3 text-[var(--color-muted)]">
-        Fields you define here appear on every customer. Retiring one hides it without touching
-        anything already recorded, so bringing it back brings the history with it.
-      </p>
+        <h1 className="mt-6 text-3xl font-semibold tracking-tight">Tags and fields</h1>
+        <p className="mt-3 text-[var(--color-muted)]">
+          Fields you define here appear on every customer. Retiring one hides it without touching
+          anything already recorded, so bringing it back brings the history with it.
+        </p>
 
-      <CrmSettings tags={tags} fields={fields} />
-    </main>
+        <CrmSettings tags={tags} fields={fields} />
+      </main>
+    </>
   );
 }

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
 import { getCurrentOrganization, getCurrentUser } from '@/lib/api';
 import { roleLabel } from '@/lib/permissions';
@@ -22,77 +23,85 @@ export default async function AccountPage() {
   const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
 
   return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-        Phase 4 — Roles and permissions
-      </p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-        {organization?.organization.name ?? 'Your account'}
-      </h1>
-      <p className="mt-3 text-[var(--color-muted)]">
-        {organization
-          ? `Signed in as ${user.email}.`
-          : 'You are signed in but belong to no organization.'}
-      </p>
+    <>
+      <AppNav current="account" />
+      <main className="mx-auto max-w-2xl px-6 py-16">
+        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+          Phase 4 — Roles and permissions
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          {organization?.organization.name ?? 'Your account'}
+        </h1>
+        <p className="mt-3 text-[var(--color-muted)]">
+          {organization
+            ? `Signed in as ${user.email}.`
+            : 'You are signed in but belong to no organization.'}
+        </p>
 
-      {organization && (
-        <section className="mt-10 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+        {organization && (
+          <section className="mt-10 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+              Organization
+            </h2>
+
+            <dl className="mt-4">
+              <Row label="Name" value={organization.organization.name} />
+              <Row label="Slug" value={organization.organization.slug} />
+              <Row label="Status" value={organization.organization.status} />
+              <Row
+                label="Your role"
+                value={organization.roles.map(roleLabel).join(', ') || 'None'}
+              />
+              <Row
+                label="Created"
+                value={new Date(organization.organization.createdAt).toLocaleDateString()}
+              />
+            </dl>
+
+            <p className="mt-4 flex gap-4 text-sm">
+              <Link href="/locations" className="underline underline-offset-4">
+                Manage locations
+              </Link>
+              <Link href="/team" className="underline underline-offset-4">
+                Your team
+              </Link>
+              <Link href="/modules" className="underline underline-offset-4">
+                Modules
+              </Link>
+              <Link href="/billing" className="underline underline-offset-4">
+                Billing
+              </Link>
+            </p>
+          </section>
+        )}
+
+        <section className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-            Organization
+            Account
           </h2>
 
           <dl className="mt-4">
-            <Row label="Name" value={organization.organization.name} />
-            <Row label="Slug" value={organization.organization.slug} />
-            <Row label="Status" value={organization.organization.status} />
-            <Row label="Your role" value={organization.roles.map(roleLabel).join(', ') || 'None'} />
+            <Row label="Email" value={user.email} />
+            <Row label="Name" value={fullName || '—'} />
+            <Row label="Status" value={user.status} />
             <Row
-              label="Created"
-              value={new Date(organization.organization.createdAt).toLocaleDateString()}
+              label="Last sign-in"
+              value={
+                user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'This session'
+              }
             />
+            <Row label="Member since" value={new Date(user.createdAt).toLocaleDateString()} />
           </dl>
-
-          <p className="mt-4 flex gap-4 text-sm">
-            <Link href="/locations" className="underline underline-offset-4">
-              Manage locations
-            </Link>
-            <Link href="/team" className="underline underline-offset-4">
-              Your team
-            </Link>
-            <Link href="/modules" className="underline underline-offset-4">
-              Modules
-            </Link>
-            <Link href="/billing" className="underline underline-offset-4">
-              Billing
-            </Link>
-          </p>
         </section>
-      )}
 
-      <section className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-          Account
-        </h2>
+        <SignOutButtons />
 
-        <dl className="mt-4">
-          <Row label="Email" value={user.email} />
-          <Row label="Name" value={fullName || '—'} />
-          <Row label="Status" value={user.status} />
-          <Row
-            label="Last sign-in"
-            value={user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString() : 'This session'}
-          />
-          <Row label="Member since" value={new Date(user.createdAt).toLocaleDateString()} />
-        </dl>
-      </section>
-
-      <SignOutButtons />
-
-      <p className="mt-8 text-sm text-[var(--color-muted)]">
-        Your organization&apos;s data is isolated at the database level, not just in this interface
-        — another company cannot read it even if application code asks for it.
-      </p>
-    </main>
+        <p className="mt-8 text-sm text-[var(--color-muted)]">
+          Your organization&apos;s data is isolated at the database level, not just in this
+          interface — another company cannot read it even if application code asks for it.
+        </p>
+      </main>
+    </>
   );
 }
 

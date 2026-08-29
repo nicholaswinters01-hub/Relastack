@@ -1,3 +1,4 @@
+import { cache } from 'react';
 import { cookies } from 'next/headers';
 import {
   invitationsResponseSchema,
@@ -79,7 +80,7 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
  * suspended organization, API unreachable. The page decides what to show; it
  * should not have to distinguish causes it cannot act on.
  */
-export async function getCurrentOrganization(): Promise<OrganizationResponse | null> {
+const loadCurrentOrganization = async (): Promise<OrganizationResponse | null> => {
   try {
     const response = await serverFetch('/api/v1/organizations/current');
     if (!response.ok) return null;
@@ -90,7 +91,17 @@ export async function getCurrentOrganization(): Promise<OrganizationResponse | n
   } catch {
     return null;
   }
-}
+};
+
+/**
+ * Deduplicated for the render pass.
+ *
+ * Every signed-in page needs this, and so does the navigation rendered
+ * alongside it. Without `cache` that is two identical HTTP calls per page
+ * view, growing by one for every component that needs to know who is signed
+ * in.
+ */
+export const getCurrentOrganization = cache(loadCurrentOrganization);
 
 /** Locations the caller can see. Empty on any failure — the page decides. */
 export async function getLocations(): Promise<LocationsResponse['locations']> {
@@ -135,7 +146,7 @@ export async function getInvitations(): Promise<InvitationsResponse['invitations
 }
 
 /** Every module, with this organization's enabled state. */
-export async function getModules(): Promise<ModulesResponse['modules']> {
+const loadModules = async (): Promise<ModulesResponse['modules']> => {
   try {
     const response = await serverFetch('/api/v1/modules');
     if (!response.ok) return [];
@@ -146,7 +157,10 @@ export async function getModules(): Promise<ModulesResponse['modules']> {
   } catch {
     return [];
   }
-}
+};
+
+/** Deduplicated for the render pass — see getCurrentOrganization. */
+export const getModules = cache(loadModules);
 
 /**
  * The organization's subscription and what it will be charged.

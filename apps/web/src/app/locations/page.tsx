@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
 import { LocationsManager } from '@/components/locations-manager';
 import { PERMISSIONS } from '@platform/shared';
@@ -26,40 +26,34 @@ export default async function LocationsPage() {
   const activeCount = locations.filter((location) => location.status === 'ACTIVE').length;
 
   return (
-    <main className="mx-auto max-w-3xl px-6 py-16">
-      <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-        Phase 4 — Roles and permissions
-      </p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">
-        {organization.organization.name}
-      </h1>
-      <p className="mt-3 text-[var(--color-muted)]">
-        {canCreate
-          ? 'Every location your business operates. This count is what the subscription will be priced on.'
-          : 'The locations you can access.'}
-      </p>
-
-      {canCreate && (
-        <p className="mt-4 inline-block rounded-lg bg-[var(--color-surface)] px-3 py-1.5 font-mono text-sm">
-          {activeCount} active {activeCount === 1 ? 'location' : 'locations'}
+    <>
+      <AppNav current="locations" />
+      <main className="mx-auto max-w-3xl px-6 py-16">
+        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+          Phase 4 — Roles and permissions
         </p>
-      )}
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          {organization.organization.name}
+        </h1>
+        <p className="mt-3 text-[var(--color-muted)]">
+          {canCreate
+            ? 'Every location your business operates. This count is what the subscription will be priced on.'
+            : 'The locations you can access.'}
+        </p>
 
-      <LocationsManager
-        locations={locations}
-        members={members}
-        permissions={organization.permissions}
-        canCreate={canCreate}
-      />
+        {canCreate && (
+          <p className="mt-4 inline-block rounded-lg bg-[var(--color-surface)] px-3 py-1.5 font-mono text-sm">
+            {activeCount} active {activeCount === 1 ? 'location' : 'locations'}
+          </p>
+        )}
 
-      <p className="mt-10 flex flex-wrap gap-4 text-sm">
-        <Link href="/account" className="underline underline-offset-4">
-          Back to your account
-        </Link>
-        <Link href="/billing" className="underline underline-offset-4">
-          Billing
-        </Link>
-      </p>
-    </main>
+        <LocationsManager
+          locations={locations}
+          members={members}
+          permissions={organization.permissions}
+          canCreate={canCreate}
+        />
+      </main>
+    </>
   );
 }
