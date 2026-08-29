@@ -24,14 +24,26 @@ const FALLBACK_ORIGIN = 'http://localhost:3001';
  * typo still gets noticed.
  */
 function resolveSiteUrl(): URL {
-  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  /*
+   * SITE_URL, not NEXT_PUBLIC_SITE_URL.
+   *
+   * The NEXT_PUBLIC_ prefix means "inline this into the JavaScript sent to
+   * every browser". This value is only ever read here, in a server component,
+   * so the prefix bought nothing and shipped the value to the client for no
+   * reason. Harmless for a public domain name — and a habit worth not having,
+   * because the next variable someone copies the pattern onto might be a key.
+   *
+   * The prefixed name is still accepted so that renaming it in the hosting
+   * dashboard and deploying this change can happen in either order.
+   */
+  const configured = (process.env.SITE_URL ?? process.env.NEXT_PUBLIC_SITE_URL)?.trim();
 
   if (configured) {
     try {
       return new URL(configured);
     } catch {
       console.warn(
-        `[marketing] NEXT_PUBLIC_SITE_URL is not a valid URL (${JSON.stringify(configured)}). ` +
+        `[marketing] SITE_URL is not a valid URL (${JSON.stringify(configured)}). ` +
           `Falling back to ${FALLBACK_ORIGIN}; social preview images will not resolve.`,
       );
     }

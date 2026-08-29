@@ -105,14 +105,14 @@ nginx.
 In the host's project settings, for the Production environment:
 
 ```
-NEXT_PUBLIC_SITE_URL   https://bizfoundry.com
+SITE_URL               https://bizfoundry.net
 WAITLIST_PROVIDER      buttondown
 WAITLIST_API_KEY       <the key from step 3>
 ```
 
 `WAITLIST_LIST_ID` is only needed for ConvertKit or Resend.
 
-`NEXT_PUBLIC_SITE_URL` matters more than it looks. It is what turns the social
+`SITE_URL` matters more than it looks. It is what turns the social
 card image into an absolute URL; without it every link anyone shares carries an
 image URL pointing at `localhost`, which fails silently and looks like nothing
 is wrong.
