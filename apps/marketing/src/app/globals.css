@@ -1,24 +1,51 @@
 @import 'tailwindcss';
 
+/*
+ * The marketing site keeps its own copy of the palette rather than importing
+ * the product's. They serve different jobs: the product is a neutral surface
+ * you stare at all day, and this is a first impression. Sharing one file would
+ * mean every brand tweak here landed in the application too.
+ *
+ * --color-brand and --color-accent are sampled from the logo, so the mark and
+ * the page cannot drift apart. The accent carries the primary action and the
+ * second half of the wordmark, and nothing else — an accent used everywhere
+ * stops being one.
+ */
+
 @theme {
-  --color-canvas: #f6f7f9;
+  --color-canvas: #f7f8fa;
   --color-surface: #ffffff;
-  --color-ink: #111827;
-  --color-muted: #6b7280;
-  --color-line: #e5e7eb;
+  --color-ink: #1a2233;
+  --color-muted: #626b7d;
+  --color-line: #e3e6ec;
   --color-ok: #059669;
   --color-bad: #dc2626;
+
+  --color-brand: #24304b;
+  --color-accent: #f4791f;
+  /* Darkened for anything text-shaped. The logo orange on white measures
+     2.76:1, which fails WCAG AA — fine for a mark, not for words. This
+     variant measures 4.76:1 on the canvas and 5.06:1 behind white button
+     text. Use --color-accent for fills the eye only has to see, and
+     --color-accent-ink wherever something has to be read. */
+  --color-accent-ink: #b4520c;
 }
 
 @media (prefers-color-scheme: dark) {
   @theme {
-    --color-canvas: #0b0f16;
-    --color-surface: #151b24;
-    --color-ink: #e8eaed;
-    --color-muted: #9aa3af;
-    --color-line: #262e3a;
+    --color-canvas: #0d1220;
+    --color-surface: #161d2e;
+    --color-ink: #e8eaf0;
+    --color-muted: #99a1b3;
+    --color-line: #273044;
     --color-ok: #34d399;
     --color-bad: #f87171;
+
+    /* The navy is the page in dark mode, so the mark needs a light form of
+       itself to stay legible. */
+    --color-brand: #e8eaf0;
+    --color-accent: #ff8c3a;
+    --color-accent-ink: #ff9d55;
   }
 }
 

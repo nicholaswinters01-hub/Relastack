@@ -1,4 +1,4 @@
-# Marketing site
+# BizFoundry — marketing site
 
 The public landing page and waitlist. Deliberately **not** part of `apps/web`.
 
@@ -15,19 +15,27 @@ pnpm dev:marketing    # http://localhost:3001
 
 ## Before this goes live
 
-1. **Name the product.** `src/lib/brand.ts` holds every name-shaped string, all
-   of them placeholders. `PRODUCT_NAME` appears on the page, in the tab title
-   and in the privacy notice.
-2. **Fill in the legal entity and a monitored contact address**, same file. A
-   privacy notice naming nobody gives a visitor no one to exercise their rights
-   against.
+1. **Add the logo file** at `public/logo.png`. The header uses a text
+   wordmark by design — crisp at any size, correct in dark mode, never a
+   broken image — but the favicon and the social card need the raster.
+2. **Fill in the legal entity and a monitored contact address** in
+   `src/lib/brand.ts`. Both are still placeholders. A privacy notice naming
+   nobody gives a visitor no one to exercise their rights against, and the
+   legal entity is not necessarily the product name — if you trade through a
+   company, that company's registered name belongs there.
 3. **Have the privacy notice reviewed.** It accurately describes what the form
    does, which is the necessary starting point, but it has not been read by a
    lawyer.
-4. **Remove the `robots: noindex`** in `src/app/layout.tsx`. It is there so a
-   placeholder brand cannot get indexed.
+4. **Remove the `robots: noindex`** in `src/app/layout.tsx`, once 2 is done.
 5. **Check the pricing claims.** The page states the model — per location,
    users free — and no figures. If figures are added, they become a promise.
+
+## Colour
+
+`--color-accent` is the logo orange. It measures 2.76:1 on white, which is
+fine for a mark and fails WCAG AA for anything read as text. Use
+`--color-accent-ink` (4.76:1 on the canvas, 5.06:1 behind white button text)
+wherever the orange has to carry words.
 
 ## Configuring the email service
 

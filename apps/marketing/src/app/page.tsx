@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { WaitlistForm } from '@/components/waitlist-form';
+import { Wordmark } from '@/components/wordmark';
 import { BRAND } from '@/lib/brand';
 
 /**
@@ -35,12 +36,15 @@ export default async function HomePage({ searchParams }: Props) {
     <main className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
       {/* ------------------------------------------------------------- */}
       <header>
-        <p className="font-mono text-xs uppercase tracking-widest text-[var(--color-muted)]">
-          {BRAND.productName} · in development
-        </p>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <Wordmark className="text-2xl" />
+          <span className="font-mono text-xs uppercase tracking-widest text-[var(--color-muted)]">
+            in development
+          </span>
+        </div>
 
-        <h1 className="mt-4 text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
-          The software your business actually runs on.
+        <h1 className="mt-8 text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
+          Business software, built around you.
         </h1>
 
         <p className="mt-5 text-lg leading-relaxed text-[var(--color-muted)]">

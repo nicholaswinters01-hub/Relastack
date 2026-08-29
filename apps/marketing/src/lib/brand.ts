@@ -1,28 +1,39 @@
 /**
  * Everything name-shaped, in one place.
  *
- * The product does not have a name yet — the codebase calls it "platform",
- * which is a codename rather than a brand. PRODUCT_NAME below is a PLACEHOLDER
- * and appears on the page, in the browser tab, and in the privacy notice.
- *
- * It lives here alone so naming it later is one edit rather than a search
- * across a dozen files. The same goes for the legal entity and contact
- * address, which must be real before the site is published: a privacy notice
- * naming nobody is not a privacy notice.
+ * Kept together so renaming is one edit rather than a search across a dozen
+ * files. Two of these are still placeholders and are marked as such — a
+ * privacy notice naming nobody, or pointing at an address no one reads, gives
+ * a visitor no way to exercise their rights.
  */
 
 export const BRAND = {
-  /** PLACEHOLDER — replace before publishing. */
-  productName: 'Fieldwork',
+  /**
+   * Cased to match the logo: capital B, capital F. Worth being consistent
+   * about from the first day, because it ends up in the domain, the email
+   * footer, the app title and every invoice.
+   */
+  productName: 'BizFoundry',
 
-  /** PLACEHOLDER — the legal entity that controls the data. */
-  legalEntity: 'Fieldwork Software',
+  tagline: 'Business software, built around you.',
 
-  /** PLACEHOLDER — a real, monitored address is required by law. */
-  contactEmail: 'hello@example.com',
+  /**
+   * PLACEHOLDER — the legal entity that controls the data, which is not
+   * necessarily the product name. If you trade through a company, that
+   * company's registered name belongs here.
+   */
+  legalEntity: 'BizFoundry',
+
+  /** PLACEHOLDER — must be a real, monitored address before publishing. */
+  contactEmail: 'hello@bizfoundry.example',
 
   /** PLACEHOLDER — the jurisdiction whose law governs the privacy notice. */
   jurisdiction: 'the United States',
-
-  tagline: 'The software your business actually runs on.',
 } as const;
+
+/**
+ * The logo's colours live in globals.css as `--color-brand` and
+ * `--color-accent`, not here. Defining them in both places is how a brand
+ * drifts: one gets updated, the other does not, and nobody notices until the
+ * logo and the buttons disagree.
+ */

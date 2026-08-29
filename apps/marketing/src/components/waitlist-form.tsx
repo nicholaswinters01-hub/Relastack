@@ -116,7 +116,12 @@ export function WaitlistForm() {
         <button
           type="submit"
           disabled={state.status === 'sending'}
-          className="mt-1 rounded-lg border border-transparent bg-[var(--color-ink)] px-4 py-2.5 text-sm font-medium text-[var(--color-canvas)] disabled:opacity-50"
+          /*
+           * The one place the logo orange appears as a fill. White on this
+           * orange clears 4.5:1, which the lighter logo orange does not — the
+           * mark can afford a tint that text cannot.
+           */
+          className="mt-1 rounded-lg border border-transparent bg-[var(--color-accent-ink)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {state.status === 'sending' ? 'Just a moment…' : 'Join the waitlist'}
         </button>
