@@ -60,14 +60,6 @@ export const metadata: Metadata = {
     images: ['/logo.png'],
   },
   twitter: { card: 'summary_large_image' },
-
-  /*
-   * Still noindex. The name is settled, but the legal entity and contact
-   * address in brand.ts are placeholders, and a privacy notice naming nobody
-   * should not be the first thing a search engine files away. Remove this line
-   * once those are real.
-   */
-  robots: { index: false, follow: false },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

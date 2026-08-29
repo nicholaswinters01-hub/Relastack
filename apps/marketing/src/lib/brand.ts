@@ -18,14 +18,24 @@ export const BRAND = {
   tagline: 'Business software, built around you.',
 
   /**
-   * PLACEHOLDER — the legal entity that controls the data, which is not
-   * necessarily the product name. If you trade through a company, that
-   * company's registered name belongs here.
+   * The legal entity that controls the data, which is not the product name.
+   *
+   * Trading as an individual until an LLC is formed, so the controller is a
+   * person. That is normal for a pre-launch project and it is the honest
+   * answer — naming a company that does not exist yet would make the privacy
+   * notice point at nobody.
+   *
+   * CHANGE THIS when the LLC is registered: the notice must name whoever
+   * actually holds the data at the time, and the copyright line below uses it
+   * too.
    */
-  legalEntity: 'BizFoundry',
+  legalEntity: 'Nicholas Winters',
 
-  /** PLACEHOLDER — must be a real, monitored address before publishing. */
-  contactEmail: 'hello@bizfoundry.example',
+  /**
+   * Published in the privacy notice as the address to write to. It has to
+   * actually reach someone — this is where deletion requests arrive.
+   */
+  contactEmail: 'hello@bizfoundry.net',
 
   /** PLACEHOLDER — the jurisdiction whose law governs the privacy notice. */
   jurisdiction: 'the United States',

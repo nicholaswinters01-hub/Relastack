@@ -18,16 +18,13 @@ pnpm dev:marketing    # http://localhost:3001
 1. **Add the logo file** at `public/logo.png`. The header uses a text
    wordmark by design — crisp at any size, correct in dark mode, never a
    broken image — but the favicon and the social card need the raster.
-2. **Fill in the legal entity and a monitored contact address** in
-   `src/lib/brand.ts`. Both are still placeholders. A privacy notice naming
-   nobody gives a visitor no one to exercise their rights against, and the
-   legal entity is not necessarily the product name — if you trade through a
-   company, that company's registered name belongs there.
+2. **Revisit `legalEntity` in `src/lib/brand.ts` when the LLC is formed.**
+   It currently names an individual, which is correct while trading as one.
+   The privacy notice must name whoever actually holds the data at the time.
 3. **Have the privacy notice reviewed.** It accurately describes what the form
    does, which is the necessary starting point, but it has not been read by a
    lawyer.
-4. **Remove the `robots: noindex`** in `src/app/layout.tsx`, once 2 is done.
-5. **Check the pricing claims.** The page states the model — per location,
+4. **Check the pricing claims.** The page states the model — per location,
    users free — and no figures. If figures are added, they become a promise.
 
 ## Colour
