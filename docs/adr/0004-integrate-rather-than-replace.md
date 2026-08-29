@@ -33,10 +33,10 @@ question, not a legal one.
 **Own operations. Integrate with the systems of record for accounting and
 mail.**
 
-| Concern      | Position                                                          |
-| ------------ | ----------------------------------------------------------------- |
-| Bookkeeping  | Never built. Invoices push to QuickBooks; payment status pulls back. |
-| Mail sending | Built. Notifications and documents go out from the platform.        |
+| Concern      | Position                                                                   |
+| ------------ | -------------------------------------------------------------------------- |
+| Bookkeeping  | Never built. Invoices push to QuickBooks; payment status pulls back.       |
+| Mail sending | Built. Notifications and documents go out from the platform.               |
 | Mail history | Integrated. Messages are read from the provider and shown on the customer. |
 
 The commercial position that follows: the accountant keeps QuickBooks, the
