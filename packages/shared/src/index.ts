@@ -18,3 +18,4 @@ export * from './invitation';
 export * from './module';
 export * from './subscription';
 export * from './customer';
+export * from './task';

@@ -39,6 +39,8 @@ const ENTRIES: Entry[] = [
     permission: PERMISSIONS.CUSTOMER_READ,
     module: MODULES.CRM,
   },
+  // Core, so no module gate — tasks are on every plan.
+  { href: '/tasks', label: 'Tasks', permission: PERMISSIONS.TASK_READ },
   { href: '/locations', label: 'Locations', permission: PERMISSIONS.LOCATION_READ },
   { href: '/team', label: 'Team', permission: PERMISSIONS.MEMBER_READ },
   { href: '/modules', label: 'Modules', permission: PERMISSIONS.ORGANIZATION_READ },

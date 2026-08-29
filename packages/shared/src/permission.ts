@@ -25,6 +25,9 @@ export const PERMISSIONS = {
    * for everyone in the company, so it is separated from day-to-day writing.
    */
   CUSTOMER_CONFIGURE: 'customer.configure',
+  TASK_READ: 'task.read',
+  TASK_WRITE: 'task.write',
+  TASK_DELETE: 'task.delete',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

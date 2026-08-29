@@ -13,6 +13,7 @@ import {
   publicUserSchema,
   subscriptionResponseSchema,
   tagsResponseSchema,
+  tasksResponseSchema,
   type CustomerDetail,
   type CustomFieldsResponse,
   type CustomersResponse,
@@ -25,6 +26,7 @@ import {
   type PublicUser,
   type SubscriptionResponse,
   type TagsResponse,
+  type TasksResponse,
 } from '@platform/shared';
 
 /**
@@ -266,5 +268,30 @@ export async function getPlans(): Promise<PlansResponse['plans']> {
     return parsed.success ? parsed.data.plans : [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * Tasks the caller may see.
+ *
+ * Filters are passed through untouched. Which tasks come back, and whether
+ * each one names the customer it concerns, are both decided by the server.
+ */
+export async function getTasks(
+  params: Record<string, string | undefined> = {},
+): Promise<TasksResponse> {
+  const query = new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
+
+  try {
+    const response = await serverFetch(`/api/v1/tasks?${query.toString()}`);
+    if (!response.ok) return { tasks: [], nextCursor: null };
+
+    const parsed = tasksResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data : { tasks: [], nextCursor: null };
+  } catch {
+    return { tasks: [], nextCursor: null };
   }
 }

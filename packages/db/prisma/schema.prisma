@@ -142,6 +142,7 @@ model Organization {
 
   customers              Customer[]
   tags                   Tag[]
+  tasks                  Task[]
   customFieldDefinitions CustomFieldDefinition[]
 
   @@map("organizations")
@@ -170,6 +171,8 @@ model OrganizationMembership {
 
   ownedCustomers Customer[]
   authoredNotes  CustomerNote[]
+  assignedTasks  Task[]         @relation("TaskAssignee")
+  createdTasks   Task[]         @relation("TaskCreator")
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -228,6 +231,7 @@ model Location {
 
   customers       Customer[]
   sharedCustomers CustomerLocation[]
+  tasks           Task[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -736,6 +740,7 @@ model Customer {
 
   contacts        Contact[]
   notes           CustomerNote[]
+  tasks           Task[]
   tags            CustomerTag[]
   sharedLocations CustomerLocation[]
 
@@ -923,4 +928,94 @@ model CustomFieldDefinition {
   @@unique([organizationId, entity, key])
   @@index([organizationId, entity])
   @@map("custom_field_definitions")
+}
+
+// ---------------------------------------------------------------------------
+// Tasks (Phase 8)
+// ---------------------------------------------------------------------------
+
+/// Where a piece of work has got to.
+///
+/// BLOCKED is a first-class state rather than a flag, because "waiting on the
+/// customer" is the most common reason work stalls in a service business and
+/// it is not the same as nobody having started.
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  BLOCKED
+  DONE
+  CANCELLED
+
+  @@map("task_status")
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+
+  @@map("task_priority")
+}
+
+/// Something that needs doing.
+///
+/// Part of core, not a module: a platform that cannot record "ring Mrs Patel
+/// back on Thursday" looks unfinished on any plan, and Scheduling and
+/// Automation are both built on top of this.
+///
+/// Deliberately NOT a CRM sub-record. It can hang off a customer or stand
+/// alone, and Phase 9 jobs will attach to the same table through a second
+/// nullable reference rather than a parallel one. That is what "workflow
+/// infrastructure" means here — the shape other modules attach to.
+model Task {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  title       String
+  description String?
+
+  status   TaskStatus   @default(TODO)
+  priority TaskPriority @default(NORMAL)
+
+  dueAt       DateTime? @map("due_at")
+  /// Set when status first becomes DONE, and left alone afterwards so
+  /// reopening and completing again keeps the original date.
+  completedAt DateTime? @map("completed_at")
+
+  /// Which branch the work belongs to. Nullable for company-wide work, which
+  /// is then visible only to organization-wide roles — the same rule Phase 3
+  /// applies to an unassigned location and Phase 7 to an unassigned customer.
+  locationId String? @map("location_id") @db.Uuid
+
+  /// Who is doing it. Whoever is assigned can always see and complete the
+  /// task, even at a location they do not otherwise work at: someone chose to
+  /// give them this specific piece of work, and a task the assignee cannot
+  /// find is a silent failure.
+  assigneeMembershipId String? @map("assignee_membership_id") @db.Uuid
+
+  /// Who asked for it. Nullable so a task survives its author leaving.
+  createdByMembershipId String? @map("created_by_membership_id") @db.Uuid
+
+  /// What it is about. Null for standalone work.
+  customerId String? @map("customer_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  assignee     OrganizationMembership? @relation("TaskAssignee", fields: [assigneeMembershipId], references: [id], onDelete: SetNull)
+  createdBy    OrganizationMembership? @relation("TaskCreator", fields: [createdByMembershipId], references: [id], onDelete: SetNull)
+  /// Cascade: a task about a customer is meaningless once the customer is
+  /// permanently deleted, and that delete already requires customer.delete.
+  customer     Customer?               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, assigneeMembershipId])
+  @@index([organizationId, dueAt])
+  @@index([organizationId, locationId])
+  @@index([customerId])
+  @@map("tasks")
 }

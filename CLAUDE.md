@@ -10,11 +10,22 @@ businesses. Priced by **business location**, not per user. Organizations
 activate modules (CRM, Scheduling, Employees, Inventory, …) at the company
 level.
 
-**Current phase: 7 complete (CRM).** The first business data the platform
+**Current phase: 8 complete (Tasks).** The first business data the platform
 holds: customers, contacts, notes, tags and customer-defined fields. Entitlement
 derives from a plan plus purchased add-ons, and a lapsed subscription narrows
 the account to read-only rather than locking it. Business logic still asks only
 "is this organization entitled to this module?"
+
+Tasks are part of **core**, not a module: Scheduling and Automation both build
+on them, and gating the foundation would gate everything standing on it. A task
+hangs off a customer or stands alone, and Phase 9 jobs attach through a second
+nullable reference rather than a parallel table.
+
+Two task rules that are easy to get wrong. Whoever a task is **assigned to** can
+see it wherever it sits and may always move its status, whatever their role —
+authority from the row, not the role, and narrowed to the status alone. And a
+task **never reveals a customer the reader may not see**: visibility of the task
+says nothing about visibility of the customer it concerns.
 
 A lead and a customer are **one record at different stages**, never two tables.
 Converting is a status change, so notes, contacts and tags survive it and
@@ -117,6 +128,15 @@ Recorded because each one cost real time and none is obvious.
   INSIDE the transaction, then validate the merged result — validating only
   the incoming keys makes a required field mean "this request mentioned it"
   rather than "the record has it".
+- **Prisma drops hand-written SQL objects it does not model.** The Phase 8
+  migration was generated with two `DROP INDEX` lines in it, silently removing
+  the trigram indexes Phase 7 added by hand. Read every generated migration
+  before applying it, and delete drops you did not ask for.
+- **A trigger that re-validates unchanged columns breaks cascades.** A task
+  references a membership twice; deleting a person nulls both columns as two
+  separate updates, so while one is being nulled the other still points at a
+  row that has gone. Validate only what changed:
+  `TG_OP = 'INSERT' OR NEW.x IS DISTINCT FROM OLD.x`.
 - **A test cleanup that filters on mutable data does not run after a failure.**
   A suite deleting `WHERE name LIKE 'X%'` leaked an organization once a
   sabotage let a rename through. Fixtures should rename within the prefix the
@@ -147,8 +167,8 @@ next phase without it.
 | 5     | Module registry and entitlement enforcement                 | Complete |
 | 6     | Plans, subscriptions, add-ons                               | Complete |
 | 7     | CRM: leads, customers, contacts, notes, tags, custom fields | Complete |
-| 8     | Tasks and basic workflow infrastructure                     | **Next** |
-| 9     | Scheduling                                                  |          |
+| 8     | Tasks and basic workflow infrastructure                     | Complete |
+| 9     | Scheduling                                                  | **Next** |
 | 10    | Reporting and dashboards                                    |          |
 | 11    | Notifications and the event system                          |          |
 | 12    | Automation engine (trigger → condition → action)            |          |
