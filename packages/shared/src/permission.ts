@@ -28,6 +28,9 @@ export const PERMISSIONS = {
   TASK_READ: 'task.read',
   TASK_WRITE: 'task.write',
   TASK_DELETE: 'task.delete',
+  JOB_READ: 'job.read',
+  JOB_WRITE: 'job.write',
+  JOB_DELETE: 'job.delete',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

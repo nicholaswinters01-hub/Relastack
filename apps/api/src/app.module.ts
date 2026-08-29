@@ -6,6 +6,7 @@ import { AuthGuard } from './auth/auth.guard';
 import { InvitationsModule } from './invitations/invitations.module';
 import { CrmModule } from './crm/crm.module';
 import { TasksModule } from './tasks/tasks.module';
+import { SchedulingModule } from './scheduling/scheduling.module';
 import { LocationsModule } from './locations/locations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TenantModule } from './tenancy/tenant.module';
@@ -62,6 +63,7 @@ import { SERVER_ENV, type ServerEnv } from './config.provider';
     InvitationsModule,
     CrmModule,
     TasksModule,
+    SchedulingModule,
     HealthModule,
   ],
   providers: [

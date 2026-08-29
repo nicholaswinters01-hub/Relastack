@@ -10,11 +10,18 @@ businesses. Priced by **business location**, not per user. Organizations
 activate modules (CRM, Scheduling, Employees, Inventory, …) at the company
 level.
 
-**Current phase: 8 complete (Tasks).** The first business data the platform
-holds: customers, contacts, notes, tags and customer-defined fields. Entitlement
-derives from a plan plus purchased add-ons, and a lapsed subscription narrows
-the account to read-only rather than locking it. Business logic still asks only
-"is this organization entitled to this module?"
+**Current phase: 9 complete (Scheduling).** Customers, the work to be done
+about them, and the work booked into a day. Entitlement derives from a plan
+plus purchased add-ons, and a lapsed subscription narrows the account to
+read-only rather than locking it. Business logic still asks only "is this
+organization entitled to this module?"
+
+A **job** is a customer, a place, a window and a _crew_ — plural, which is the
+structural difference from a task. Times are stored as instants and rendered in
+the branch's timezone. Conflicts **warn and can be overridden**: refusing
+outright gets worked around by booking the wrong slot, which is worse than the
+overlap. Touching windows do not clash, because back-to-back is how a day is
+filled. Recurrence is deliberately not built yet.
 
 Tasks are part of **core**, not a module: Scheduling and Automation both build
 on them, and gating the foundation would gate everything standing on it. A task
@@ -137,6 +144,12 @@ Recorded because each one cost real time and none is obvious.
   separate updates, so while one is being nulled the other still points at a
   row that has gone. Validate only what changed:
   `TG_OP = 'INSERT' OR NEW.x IS DISTINCT FROM OLD.x`.
+- **A Zod `.default()` makes a field present on every parsed body.** The rule
+  "an assignee may change only the status" counted keys in the payload, and
+  `acknowledgeConflicts` defaults to false — so the count never reached one and
+  the crew could never complete their own job. The rule was dead on arrival and
+  only a test caught it. Count the fields being CHANGED, listing control flags
+  explicitly so the next one has to be considered.
 - **A test cleanup that filters on mutable data does not run after a failure.**
   A suite deleting `WHERE name LIKE 'X%'` leaked an organization once a
   sabotage let a rename through. Fixtures should rename within the prefix the
@@ -168,8 +181,9 @@ next phase without it.
 | 6     | Plans, subscriptions, add-ons                               | Complete |
 | 7     | CRM: leads, customers, contacts, notes, tags, custom fields | Complete |
 | 8     | Tasks and basic workflow infrastructure                     | Complete |
-| 9     | Scheduling                                                  | **Next** |
-| 10    | Reporting and dashboards                                    |          |
+| 9     | Scheduling: jobs, crews, conflicts                          | Complete |
+| 9b    | Recurring jobs                                              |          |
+| 10    | Reporting and dashboards                                    | **Next** |
 | 11    | Notifications and the event system                          |          |
 | 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers |          |
 | 12    | Automation engine (trigger → condition → action)            |          |

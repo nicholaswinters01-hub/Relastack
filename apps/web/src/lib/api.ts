@@ -13,6 +13,7 @@ import {
   publicUserSchema,
   subscriptionResponseSchema,
   tagsResponseSchema,
+  jobsResponseSchema,
   tasksResponseSchema,
   type CustomerDetail,
   type CustomFieldsResponse,
@@ -26,6 +27,7 @@ import {
   type PublicUser,
   type SubscriptionResponse,
   type TagsResponse,
+  type JobsResponse,
   type TasksResponse,
 } from '@platform/shared';
 
@@ -293,5 +295,30 @@ export async function getTasks(
     return parsed.success ? parsed.data : { tasks: [], nextCursor: null };
   } catch {
     return { tasks: [], nextCursor: null };
+  }
+}
+
+/**
+ * Jobs the caller may see, within whatever window is asked for.
+ *
+ * Which jobs come back, and whether each names the customer it is for, are
+ * both decided by the server.
+ */
+export async function getJobs(
+  params: Record<string, string | undefined> = {},
+): Promise<JobsResponse> {
+  const query = new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
+
+  try {
+    const response = await serverFetch(`/api/v1/jobs?${query.toString()}`);
+    if (!response.ok) return { jobs: [], nextCursor: null };
+
+    const parsed = jobsResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data : { jobs: [], nextCursor: null };
+  } catch {
+    return { jobs: [], nextCursor: null };
   }
 }

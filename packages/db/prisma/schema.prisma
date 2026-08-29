@@ -143,6 +143,7 @@ model Organization {
   customers              Customer[]
   tags                   Tag[]
   tasks                  Task[]
+  jobs                   Job[]
   customFieldDefinitions CustomFieldDefinition[]
 
   @@map("organizations")
@@ -171,8 +172,10 @@ model OrganizationMembership {
 
   ownedCustomers Customer[]
   authoredNotes  CustomerNote[]
-  assignedTasks  Task[]         @relation("TaskAssignee")
-  createdTasks   Task[]         @relation("TaskCreator")
+  assignedTasks  Task[]          @relation("TaskAssignee")
+  createdTasks   Task[]          @relation("TaskCreator")
+  jobAssignments JobAssignment[] @relation("JobAssignee")
+  createdJobs    Job[]           @relation("JobCreator")
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -232,6 +235,7 @@ model Location {
   customers       Customer[]
   sharedCustomers CustomerLocation[]
   tasks           Task[]
+  jobs            Job[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -741,6 +745,7 @@ model Customer {
   contacts        Contact[]
   notes           CustomerNote[]
   tasks           Task[]
+  jobs            Job[]
   tags            CustomerTag[]
   sharedLocations CustomerLocation[]
 
@@ -1001,6 +1006,11 @@ model Task {
   /// What it is about. Null for standalone work.
   customerId String? @map("customer_id") @db.Uuid
 
+  /// Which booked job it belongs to, if any. The second nullable reference
+  /// promised when tasks were built: a job checklist is tasks, not a parallel
+  /// table with its own permissions to get wrong.
+  jobId String? @map("job_id") @db.Uuid
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -1011,11 +1021,127 @@ model Task {
   /// Cascade: a task about a customer is meaningless once the customer is
   /// permanently deleted, and that delete already requires customer.delete.
   customer     Customer?               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  job          Job?                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([organizationId, status])
   @@index([organizationId, assigneeMembershipId])
   @@index([organizationId, dueAt])
   @@index([organizationId, locationId])
   @@index([customerId])
+  @@index([jobId])
   @@map("tasks")
+}
+
+// ---------------------------------------------------------------------------
+// Scheduling (Phase 9)
+// ---------------------------------------------------------------------------
+
+/// Where a booked piece of work has got to.
+///
+/// NO_SHOW is separate from CANCELLED because they mean different things to a
+/// business: one is a customer who changed their mind in advance, the other is
+/// a crew that drove there for nothing. Collapsing them loses the number that
+/// decides whether to start taking deposits.
+enum JobStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+
+  @@map("job_status")
+}
+
+/// Work booked into a slot in the calendar.
+///
+/// Gated by the Scheduling module, which depends on CRM.
+///
+/// Times are stored as instants and rendered in the branch's timezone. The
+/// `timezone` column on Location has been carrying a note since Phase 3 saying
+/// appointment times are meaningless without it; this is the phase that
+/// collects on that.
+model Job {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  title       String
+  description String?
+
+  status JobStatus @default(SCHEDULED)
+
+  /// The booked window. A CHECK constraint refuses an end before a start,
+  /// because a negative-length appointment corrupts every calendar and
+  /// conflict query that reads it afterwards.
+  startsAt DateTime @map("starts_at")
+  endsAt   DateTime @map("ends_at")
+
+  /// Set when the status first becomes COMPLETED, and left alone afterwards.
+  completedAt DateTime? @map("completed_at")
+
+  /// Which branch runs the work. Nullable for company-wide jobs, which are
+  /// then visible only to organization-wide roles — the rule locations,
+  /// customers and tasks all already follow.
+  locationId String? @map("location_id") @db.Uuid
+
+  /// Who the work is for. Nullable, because a business also schedules its own
+  /// van servicing and yard days.
+  customerId String? @map("customer_id") @db.Uuid
+
+  /// WHERE the work happens.
+  ///
+  /// Deliberately its own address rather than the customer's. A landscaping
+  /// firm mows a rental property while the customer lives elsewhere, and a
+  /// commercial client has several sites. Falling back to the customer address
+  /// sends the crew to a billing address, which is the classic field-service
+  /// failure.
+  addressLine1 String? @map("address_line1")
+  addressLine2 String? @map("address_line2")
+  city         String?
+  region       String?
+  postalCode   String? @map("postal_code")
+  country      String?
+
+  createdByMembershipId String? @map("created_by_membership_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  customer     Customer?               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy    OrganizationMembership? @relation("JobCreator", fields: [createdByMembershipId], references: [id], onDelete: SetNull)
+
+  assignments JobAssignment[]
+  tasks       Task[]
+
+  @@index([organizationId, startsAt])
+  @@index([organizationId, status])
+  @@index([organizationId, locationId])
+  @@index([customerId])
+  @@map("jobs")
+}
+
+/// Who is going.
+///
+/// A join table rather than a column, because a crew is the normal case: two
+/// people to a job, three on a big one. Tasks have a single assignee and jobs
+/// do not, which is the main structural difference between them.
+model JobAssignment {
+  jobId        String @map("job_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  job    Job                    @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  member OrganizationMembership @relation("JobAssignee", fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@id([jobId, membershipId])
+  @@index([organizationId])
+  /// The index the conflict check runs on: everything this person is booked
+  /// for, so an overlapping window is a range scan rather than a table scan.
+  @@index([membershipId])
+  @@map("job_assignments")
 }

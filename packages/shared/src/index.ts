@@ -19,3 +19,4 @@ export * from './module';
 export * from './subscription';
 export * from './customer';
 export * from './task';
+export * from './job';
