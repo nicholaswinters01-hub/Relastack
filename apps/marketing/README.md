@@ -37,18 +37,15 @@ fine for a mark and fails WCAG AA for anything read as text. Use
 `--color-accent-ink` (4.76:1 on the canvas, 5.06:1 behind white button text)
 wherever the orange has to carry words.
 
-## Configuring the email service
+## Where the list can go
 
-The list lives with an email provider, not in the product database. The reason
-is sending: there is no email infrastructure in the platform until Phase 11, so
-a self-hosted list could capture addresses but could not confirm them or mail
-them at launch.
-
-Set these where the site is deployed:
+`postgres` is the current destination — see **Where signups are stored** below.
+The email services stay wired up for when there is a list worth mailing, since
+nothing in the platform can send email until Phase 11.
 
 ```bash
-WAITLIST_PROVIDER=buttondown   # or convertkit | resend | log
-WAITLIST_API_KEY=...           # secret, server-side only
+WAITLIST_PROVIDER=postgres     # or buttondown | convertkit | resend | log
+WAITLIST_API_KEY=...           # the email services only; secret, server-side
 WAITLIST_LIST_ID=...           # ConvertKit form id / Resend audience id
 ```
 
@@ -101,3 +98,60 @@ JavaScript it swaps itself for a confirmation in place and never navigates.
 Both paths matter. The native `method="post"` in particular is what stops a
 browser falling back to GET and putting the visitor's email address in the URL,
 where every proxy and access log in the path would record it.
+
+## Where signups are stored
+
+A Postgres table you own, not a mailing-list vendor. Set:
+
+```bash
+WAITLIST_PROVIDER=postgres
+DATABASE_URL=postgresql://user:pass@host/db
+```
+
+The table is created on first use — there is no migration to run. One table
+that is never altered does not need the ceremony, and the product's own schema
+keeps its migrations separately.
+
+```
+waitlist_signups
+  id            uuid
+  email         text, unique
+  note          text        -- the "what do you do?" answer
+  source        text        -- 'waitlist'
+  consented_at  timestamptz -- when the box was ticked
+  created_at    timestamptz
+```
+
+TLS is negotiated based on the connection string: on unless `sslmode=disable`
+is set or the host is loopback. A Postgres in a local container usually offers
+no certificate at all and refuses the handshake, so hard-coding it on makes the
+thing untestable locally.
+
+### Turning these into real customers later
+
+The columns are shaped like a CRM lead on purpose. Once the product is
+deployed, they import in one statement rather than by hand:
+
+```sql
+INSERT INTO customers (id, organization_id, display_name, email, source, stage, type, created_at, updated_at)
+SELECT
+  gen_random_uuid(),
+  '<your-organization-id>',
+  w.email,          -- no name was collected, so the address stands in
+  w.email,
+  'Waitlist',
+  'LEAD',
+  'PERSON',
+  w.created_at,
+  now()
+FROM waitlist_signups w
+ON CONFLICT DO NOTHING;
+```
+
+`display_name`, `organization_id` and `updated_at` are the only columns the
+customers table requires beyond the id, which is why they are the only ones
+needing a value invented here.
+
+The `note` is worth reading before importing rather than after — it is the
+answer to "what do you do?", and it is the best signal available about which
+trade to build for first.

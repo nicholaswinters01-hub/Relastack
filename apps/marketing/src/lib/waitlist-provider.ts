@@ -1,38 +1,25 @@
 import { loadEnv } from './env';
+import { subscribeToPostgres } from './waitlist-postgres';
+import type { WaitlistProvider as Provider } from './waitlist-types';
 
 /**
- * An adapter over whichever email service holds the list.
+ * An adapter over wherever the list is kept.
  *
  * The same rule the working agreement sets for payments: do not scatter
- * vendor-specific logic through the application. Every provider quirk is
- * behind this one interface, so swapping Buttondown for ConvertKit is one
- * function and an environment variable, not a search across the codebase.
+ * vendor-specific logic through the application. Every destination sits behind
+ * this one interface, so changing where signups go is one environment
+ * variable, not a search across the codebase.
  *
- * It matters more than it looks. A waitlist is the first thing built and the
- * last thing migrated; whichever service is picked today will almost certainly
- * not be the one sending mail in two years.
+ * It has already earned itself. The first choice here was an email service
+ * whose API turned out to sit behind a paid plan; switching to a database we
+ * own cost one new file and one line in the registry below, and not a single
+ * change to the form, the route or the page.
+ *
+ * `postgres` is the current destination: signups land in a table shaped like a
+ * CRM lead, so they can be imported as real leads once the product is
+ * deployed. The email services remain wired up for when there is a list worth
+ * mailing.
  */
-
-export interface SubscribeInput {
-  email: string;
-  /** When the visitor ticked the consent box. Recorded, not inferred. */
-  consentedAt: string;
-  /** Free text, e.g. the trade they are in. Optional. */
-  note?: string;
-}
-
-export type SubscribeResult =
-  | { ok: true }
-  /**
-   * Already on the list. Reported separately so the caller can decide what to
-   * say — the route deliberately does NOT pass this on to the visitor.
-   */
-  | { ok: true; duplicate: true }
-  | { ok: false; reason: string };
-
-interface Provider {
-  subscribe(input: SubscribeInput): Promise<SubscribeResult>;
-}
 
 /**
  * Development and fallback.
@@ -136,8 +123,11 @@ const resend: Provider = {
   },
 };
 
+const postgres: Provider = { subscribe: subscribeToPostgres };
+
 const PROVIDERS: Record<string, Provider> = {
   log: logProvider,
+  postgres,
   buttondown,
   convertkit,
   resend,

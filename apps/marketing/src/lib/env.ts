@@ -21,13 +21,24 @@ const schema = z.object({
    * a third party, and it means a missing key in production degrades to
    * "captured nowhere" rather than a 500 in a visitor's face.
    */
-  WAITLIST_PROVIDER: z.enum(['log', 'buttondown', 'convertkit', 'resend']).default('log'),
+  WAITLIST_PROVIDER: z
+    .enum(['log', 'postgres', 'buttondown', 'convertkit', 'resend'])
+    .default('log'),
 
   /** Secret. Server-side only — never prefixed NEXT_PUBLIC. */
   WAITLIST_API_KEY: z.string().optional(),
 
   /** ConvertKit needs a form id; Resend needs an audience id. */
   WAITLIST_LIST_ID: z.string().optional(),
+
+  /**
+   * Postgres connection string, for the `postgres` provider.
+   *
+   * A plain connection string rather than a vendor SDK, so the same code runs
+   * against Neon today and against your own database later. Moving hosts is
+   * changing this one value.
+   */
+  DATABASE_URL: z.string().optional(),
 });
 
 export type MarketingEnv = z.infer<typeof schema>;
@@ -47,12 +58,16 @@ export function loadEnv(): MarketingEnv {
     throw new Error(`Marketing configuration is invalid — ${detail}`);
   }
 
-  // A provider that needs a key but has none would fail on the first real
-  // signup, in front of a visitor. Better to refuse at startup.
-  if (parsed.data.WAITLIST_PROVIDER !== 'log' && !parsed.data.WAITLIST_API_KEY) {
-    throw new Error(
-      `WAITLIST_PROVIDER is "${parsed.data.WAITLIST_PROVIDER}" but WAITLIST_API_KEY is not set`,
-    );
+  // A provider missing the thing it needs would fail on the first real signup,
+  // in front of a visitor. Better to say so at startup.
+  const { WAITLIST_PROVIDER, WAITLIST_API_KEY, DATABASE_URL } = parsed.data;
+
+  if (WAITLIST_PROVIDER === 'postgres' && !DATABASE_URL) {
+    throw new Error('WAITLIST_PROVIDER is "postgres" but DATABASE_URL is not set');
+  }
+
+  if (!['log', 'postgres'].includes(WAITLIST_PROVIDER) && !WAITLIST_API_KEY) {
+    throw new Error(`WAITLIST_PROVIDER is "${WAITLIST_PROVIDER}" but WAITLIST_API_KEY is not set`);
   }
 
   cached = parsed.data;
