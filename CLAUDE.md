@@ -171,15 +171,26 @@ next phase without it.
 | 9     | Scheduling                                                  | **Next** |
 | 10    | Reporting and dashboards                                    |          |
 | 11    | Notifications and the event system                          |          |
+| 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers |          |
 | 12    | Automation engine (trigger → condition → action)            |          |
 | 13    | Public website API                                          |          |
 | 14    | Website module                                              |          |
 | 15    | Customer portal                                             |          |
 | 16    | Inventory                                                   |          |
 | 17    | Custom module framework                                     |          |
-| 18    | Payment provider integration                                |          |
+| 18    | Payment provider integration, invoice sync to QuickBooks    |          |
 | 19    | Internal admin platform                                     |          |
 | 20    | Production hardening                                        |          |
+
+Accounting and mail are **integrated, never rebuilt** (docs/adr/0004).
+QuickBooks keeps the books; invoices push to it from Phase 18. Mail sending
+arrives with Phase 11; reading a customer history back from Microsoft 365 and
+Google Workspace comes with the integrations layer. Both mail providers are
+required — choosing one would exclude half the market.
+
+OAuth grants held on a customer's behalf are the most sensitive data the
+platform will ever store, more so than passwords, which are hashed and cannot
+be reversed. They are encrypted at rest, revocable by the customer, and audited.
 
 ## Phase completion checklist
 
