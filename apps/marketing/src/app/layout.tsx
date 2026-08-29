@@ -2,7 +2,19 @@ import type { Metadata } from 'next';
 import { BRAND } from '@/lib/brand';
 import './globals.css';
 
+/**
+ * The public origin, used to turn relative asset paths into absolute URLs.
+ *
+ * Open Graph images must be absolute — a crawler fetching the card has no
+ * page-relative context. Without this, Next resolves them against
+ * `localhost:3000`, so every shared link would carry an image URL pointing at
+ * the sharer's own machine. It builds and deploys perfectly; it just silently
+ * never shows a preview.
+ */
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3001';
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: `${BRAND.productName} — ${BRAND.tagline}`,
   description:
     'One system for running an independent business: customers, scheduling, staff and stock. Turn on the parts you need. Priced per location, never per user.',
