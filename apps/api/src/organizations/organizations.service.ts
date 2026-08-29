@@ -12,6 +12,7 @@ import {
   type OrganizationMember,
   type UpdateOrganizationRequest,
 } from '@platform/shared';
+import { BillingService } from '../billing/billing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
@@ -29,7 +30,10 @@ const NOT_FOUND = 'Organization not found';
 export class OrganizationsService {
   private readonly logger = new Logger(OrganizationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly billing: BillingService,
+  ) {}
 
   static toPublic(row: OrganizationRow): Organization {
     return {
@@ -100,6 +104,11 @@ export class OrganizationsService {
         enabledAt: new Date(),
       },
     });
+
+    // Entitlement is derived from the subscription, so an organization
+    // committed without one would resolve to no modules and be locked out of
+    // its own account.
+    await this.billing.createTrialForNewOrganization(tx, organization.id);
 
     // The assignment that actually grants anything from Phase 4 onward.
     // Organization-scoped, so it reaches every location including ones created

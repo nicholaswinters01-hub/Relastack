@@ -8,6 +8,8 @@ import {
 import { Reflector } from '@nestjs/core';
 import { IS_PUBLIC_KEY } from '../auth/auth.decorators';
 import type { FastifyRequest } from '../auth/fastify.types';
+import { BillingService } from '../billing/billing.service';
+import type { SubscriptionRequest } from '../billing/billing.decorators';
 import { EntitlementService } from '../modules/entitlement.service';
 import type { ModuleRequest } from '../modules/module.decorators';
 import { PermissionService } from '../rbac/permission.service';
@@ -37,6 +39,7 @@ export class TenantGuard implements CanActivate {
     private readonly tenants: TenantService,
     private readonly permissions: PermissionService,
     private readonly entitlements: EntitlementService,
+    private readonly billing: BillingService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -49,7 +52,9 @@ export class TenantGuard implements CanActivate {
 
     const request = context
       .switchToHttp()
-      .getRequest<FastifyRequest & TenantRequest & PermissionRequest & ModuleRequest>();
+      .getRequest<
+        FastifyRequest & TenantRequest & PermissionRequest & ModuleRequest & SubscriptionRequest
+      >();
     const session = request.session;
 
     if (!session) {
@@ -87,15 +92,19 @@ export class TenantGuard implements CanActivate {
     request.tenant = tenant;
     request.membershipId = membership.id;
 
-    // Both resolved once, here, and attached to the request. Independent
-    // queries, so they run together.
+    // The subscription is resolved first because entitlement depends on it —
+    // a module is available only if the customer both switched it on and pays
+    // for it.
+    const subscription = await this.billing.resolveFor(tenant);
+
     const [permissions, enabledModules] = await Promise.all([
       this.permissions.resolveFor(tenant, membership.id),
-      this.entitlements.resolveFor(tenant),
+      this.entitlements.resolveFor(tenant, subscription),
     ]);
 
     request.permissions = permissions;
     request.enabledModules = enabledModules;
+    request.subscription = subscription;
 
     return true;
   }

@@ -14,6 +14,7 @@ import type {
   LocationMember,
   UpdateLocationRequest,
 } from '@platform/shared';
+import { BillingService } from '../billing/billing.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
@@ -34,7 +35,10 @@ type LocationRow = Prisma.LocationGetPayload<{
 export class LocationsService {
   private readonly logger = new Logger(LocationsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly billing: BillingService,
+  ) {}
 
   static toPublic(row: LocationRow): Location {
     return {
@@ -133,6 +137,23 @@ export class LocationsService {
     // unit, so it is a company decision rather than something a Location
     // Manager does for their own branch.
     this.assertPermission(permissions, PERMISSIONS.LOCATION_WRITE, 'create locations');
+
+    // Locations are the billing unit, so the plan caps them. Checked before
+    // creating rather than after, so a refused request leaves nothing behind.
+    const subscription = await this.billing.resolveFor(context);
+
+    if (subscription?.maxLocations != null) {
+      const active = await this.countActive(context);
+
+      if (active >= subscription.maxLocations) {
+        throw new ForbiddenException({
+          statusCode: 403,
+          code: 'LOCATION_LIMIT_REACHED',
+          maxLocations: subscription.maxLocations,
+          message: `Your plan includes ${subscription.maxLocations} location${subscription.maxLocations === 1 ? '' : 's'}. Upgrade to add more.`,
+        });
+      }
+    }
 
     try {
       const location = await this.prisma.withTenant(context, (tx) =>

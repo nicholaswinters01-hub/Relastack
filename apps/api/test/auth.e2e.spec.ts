@@ -422,8 +422,16 @@ describe('Authentication (e2e)', () => {
       expect(response.statusCode).toBe(200);
       expect(JSON.parse(response.body)).toEqual({ success: true, sessionsRevoked: 1 });
 
-      const session = await prisma.client.session.findFirst();
-      expect(session?.revokedAt).not.toBeNull();
+      // Scoped to THIS fixture's user. An unfiltered findFirst() picks
+      // whichever session the database returns first, which may belong to
+      // another test entirely — it passed by luck until other suites started
+      // leaving sessions behind.
+      const user = await prisma.client.user.findUniqueOrThrow({ where: { email: EMAIL } });
+      const session = await prisma.client.session.findFirstOrThrow({
+        where: { userId: user.id },
+      });
+
+      expect(session.revokedAt).not.toBeNull();
     });
 
     it('makes the token unusable immediately', async () => {

@@ -1,0 +1,12 @@
+# Normalise line endings so a Windows checkout and a Linux CI runner agree.
+# Without this, every file Git touches on Windows produces a CRLF warning and
+# diffs can appear where nothing changed.
+* text=auto eol=lf
+
+# Binary or generated: never touched.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+pnpm-lock.yaml -diff

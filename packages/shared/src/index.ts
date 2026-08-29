@@ -16,3 +16,4 @@ export * from './location';
 export * from './permission';
 export * from './invitation';
 export * from './module';
+export * from './subscription';

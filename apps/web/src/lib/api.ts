@@ -5,13 +5,17 @@ import {
   locationsResponseSchema,
   organizationMembersResponseSchema,
   organizationResponseSchema,
+  plansResponseSchema,
   publicUserSchema,
+  subscriptionResponseSchema,
   type InvitationsResponse,
   type LocationsResponse,
   type ModulesResponse,
   type OrganizationMembersResponse,
   type OrganizationResponse,
+  type PlansResponse,
   type PublicUser,
+  type SubscriptionResponse,
 } from '@platform/shared';
 
 /**
@@ -131,6 +135,40 @@ export async function getModules(): Promise<ModulesResponse['modules']> {
     const parsed = modulesResponseSchema.safeParse(await response.json());
 
     return parsed.success ? parsed.data.modules : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The organization's subscription and what it will be charged.
+ *
+ * The billing page has to render for a lapsed organization — that is exactly
+ * when someone needs it — so nothing here may depend on a capability that a
+ * lapse turns off.
+ */
+export async function getSubscription(): Promise<SubscriptionResponse | null> {
+  try {
+    const response = await serverFetch('/api/v1/billing/subscription');
+    if (!response.ok) return null;
+
+    const parsed = subscriptionResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The public price list. */
+export async function getPlans(): Promise<PlansResponse['plans']> {
+  try {
+    const response = await serverFetch('/api/v1/billing/plans');
+    if (!response.ok) return [];
+
+    const parsed = plansResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data.plans : [];
   } catch {
     return [];
   }

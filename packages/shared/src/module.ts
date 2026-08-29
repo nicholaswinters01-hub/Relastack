@@ -160,7 +160,15 @@ export const moduleStateSchema = z.object({
   isCore: z.boolean(),
   dependencies: z.array(z.string()),
   availableFrom: z.string(),
+  /** Switched on by the customer. */
   enabled: z.boolean(),
+  /**
+   * Covered by their plan or an add-on.
+   *
+   * Separate from `enabled` so the interface can distinguish "turn this on"
+   * from "upgrade to get this" — very different messages to show someone.
+   */
+  entitled: z.boolean(),
 });
 
 export type ModuleState = z.infer<typeof moduleStateSchema>;

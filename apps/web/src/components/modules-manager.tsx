@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ModuleState } from '@platform/shared';
@@ -101,22 +102,34 @@ export function ModulesManager({ modules, canManage }: Props) {
                 module.enabled ? 'text-[var(--color-ok)]' : 'text-[var(--color-muted)]'
               }`}
             >
-              {module.enabled ? 'enabled' : 'off'}
+              {module.enabled ? 'enabled' : module.entitled ? 'off' : 'not in your plan'}
             </span>
 
-            {canManage && !module.isCore && (
-              <button
-                onClick={() => toggle(module)}
-                disabled={busy !== null}
-                className={`rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
-                  module.enabled
-                    ? 'border-[var(--color-line)]'
-                    : 'border-transparent bg-[var(--color-ink)] text-[var(--color-canvas)]'
-                }`}
-              >
-                {busy === module.key ? '…' : module.enabled ? 'Turn off' : 'Turn on'}
-              </button>
-            )}
+            {/* Two different messages, not one greyed-out button: "you have
+                this and chose not to use it" and "this costs more" are
+                different situations for a customer. */}
+            {canManage &&
+              !module.isCore &&
+              (module.entitled ? (
+                <button
+                  onClick={() => toggle(module)}
+                  disabled={busy !== null}
+                  className={`rounded-lg border px-3 py-1.5 text-xs font-medium disabled:opacity-50 ${
+                    module.enabled
+                      ? 'border-[var(--color-line)]'
+                      : 'border-transparent bg-[var(--color-ink)] text-[var(--color-canvas)]'
+                  }`}
+                >
+                  {busy === module.key ? '…' : module.enabled ? 'Turn off' : 'Turn on'}
+                </button>
+              ) : (
+                <Link
+                  href="/billing"
+                  className="rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium"
+                >
+                  Upgrade
+                </Link>
+              ))}
           </div>
         </div>
       ))}

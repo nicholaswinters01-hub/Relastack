@@ -10,11 +10,18 @@ businesses. Priced by **business location**, not per user. Organizations
 activate modules (CRM, Scheduling, Employees, Inventory, …) at the company
 level.
 
-**Current phase: 5 complete (Modules and entitlements).** A module registry
-with per-organization entitlements. Business logic asks only "is this
-organization entitled to this module?" — never about plans or prices, so
-Phase 6 can introduce those behind the same interface without touching a
-module. Custom Roles is the first gated capability. No business data yet.
+**Current phase: 6 complete (Plans, subscriptions, add-ons).** Entitlement now
+derives from a plan plus purchased add-ons, and a lapsed subscription narrows
+the account to read-only rather than locking it. Business logic still asks only
+"is this organization entitled to this module?" — the Phase 5 interface did not
+change, which is what let plans arrive without touching a single module. Custom
+Roles is the first gated capability. No business data yet.
+
+Three bands, not on/off: `TRIALING`/`ACTIVE`/`PAST_DUE` keep full access,
+`SUSPENDED`/`CANCELLED` are read-only. `PAST_DUE` is the grace period and is
+deliberately _full_ access — a failed card must not lock a business out
+mid-job. Access never becomes nothing: a customer who cannot reach their data
+has no reason to come back.
 
 ## Non-negotiable rules
 
@@ -47,6 +54,9 @@ module. Custom Roles is the first gated capability. No business data yet.
     architecture genuinely requires it.
 12. **Prefer configuration and reusable modules** over customer-specific
     branches in core code.
+13. **A lapsed subscription is read-only, never locked out.** Reads always
+    work. `@AllowsWhenReadOnly` belongs on billing endpoints and nowhere else
+    — a customer must always be able to pay their way out.
 
 ## Conventions
 
@@ -80,6 +90,16 @@ Recorded because each one cost real time and none is obvious.
 - **`overrideGuard` does not reach guards registered via `APP_GUARD`.**
 - **Bash heredocs break on apostrophes in prose.** Several file writes failed
   this way; use the file-write tool for content containing them.
+- **Asserting a flag is not asserting enforcement.** A test that checks
+  `entitled: false` came back in a list passes just as happily when the guard
+  is gone. Deleting the plan check broke exactly one test until a test was
+  added that CALLS the gated endpoint and expects 403. Gate tests hit routes.
+- **Guards run before validation.** A request refused by `ReadOnlyGuard`
+  returns 403 whatever the body contains, so an invalid payload in a test can
+  look like it proved enforcement. Use a payload that would otherwise succeed.
+- **Migrations can be checked from empty without `db:reset`.** Create a
+  throwaway database and point `DATABASE_URL` at it for one
+  `prisma migrate deploy`. No reason to destroy local data to prove this.
 
 ## Commands
 
@@ -104,8 +124,8 @@ next phase without it.
 | 3     | Locations, location membership                              | Complete |
 | 4     | Roles and scoped permissions                                | Complete |
 | 5     | Module registry and entitlement enforcement                 | Complete |
-| 6     | Plans, subscriptions, add-ons                               | **Next** |
-| 7     | CRM: leads, customers, contacts, notes, tags, custom fields |          |
+| 6     | Plans, subscriptions, add-ons                               | Complete |
+| 7     | CRM: leads, customers, contacts, notes, tags, custom fields | **Next** |
 | 8     | Tasks and basic workflow infrastructure                     |          |
 | 9     | Scheduling                                                  |          |
 | 10    | Reporting and dashboards                                    |          |

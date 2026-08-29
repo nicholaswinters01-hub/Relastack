@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -15,6 +16,7 @@ import {
   type ModuleKey,
   type ModuleState,
 } from '@platform/shared';
+import { BillingService, type ResolvedSubscription } from '../billing/billing.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -30,7 +32,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EntitlementService implements OnModuleInit {
   private readonly logger = new Logger(EntitlementService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly billing: BillingService,
+  ) {}
 
   /**
    * Validate the registry at startup.
@@ -55,26 +60,49 @@ export class EntitlementService implements OnModuleInit {
    * would make entitlement checks expensive, and expensive checks are the ones
    * developers quietly stop adding.
    */
-  async resolveFor(context: TenantContext): Promise<Set<string>> {
-    const rows = await this.prisma.withTenant(context, (tx) =>
-      tx.organizationModule.findMany({
-        where: { organizationId: context.organizationId, enabled: true },
-        select: { moduleKey: true },
-      }),
-    );
+  async resolveFor(
+    context: TenantContext,
+    subscription?: ResolvedSubscription | null,
+  ): Promise<Set<string>> {
+    const [rows, resolved] = await Promise.all([
+      this.prisma.withTenant(context, (tx) =>
+        tx.organizationModule.findMany({
+          where: { organizationId: context.organizationId, enabled: true },
+          select: { moduleKey: true },
+        }),
+      ),
+      // Passed in by TenantGuard, which already has it. Falling back to a
+      // lookup keeps the service usable from jobs and tests.
+      subscription !== undefined ? Promise.resolve(subscription) : this.billing.resolveFor(context),
+    ]);
 
-    const enabled = new Set(rows.map((row) => row.moduleKey));
+    const switchedOn = new Set(rows.map((row) => row.moduleKey));
 
-    // Core is implicit. An organization whose core row went missing would
-    // otherwise be locked out of its own account by a data problem.
-    enabled.add(MODULES.CORE);
+    // A module is available only if it is BOTH switched on by the customer and
+    // covered by what they pay for. Two separate questions:
+    //
+    //   entitled  — commercial. Their plan or an add-on includes it.
+    //   enabled   — operational. They chose to turn it on.
+    //
+    // Keeping them apart means a downgrade stops access without silently
+    // erasing the customer's choices, so an upgrade restores exactly what they
+    // had rather than a blank slate.
+    const entitled = resolved?.entitledModules;
+    const available = entitled
+      ? new Set([...switchedOn].filter((key) => entitled.has(key)))
+      : switchedOn;
 
-    return enabled;
+    // Core is implicit regardless. An organization whose core row went missing,
+    // or whose plan omits it, must never be locked out of its own account.
+    available.add(MODULES.CORE);
+
+    return available;
   }
 
   /** Every module, with this organization's state, for the settings screen. */
   async listFor(context: TenantContext): Promise<ModuleState[]> {
-    const enabled = await this.resolveFor(context);
+    const subscription = await this.billing.resolveFor(context);
+    const enabled = await this.resolveFor(context, subscription);
 
     return MODULE_REGISTRY.map((module) => ({
       key: module.key,
@@ -84,6 +112,10 @@ export class EntitlementService implements OnModuleInit {
       dependencies: [...module.dependencies],
       availableFrom: module.availableFrom,
       enabled: enabled.has(module.key),
+      // Whether the plan covers it. The interface uses this to distinguish
+      // "turn on" from "upgrade to get this", which are very different
+      // messages to show a customer.
+      entitled: module.isCore || (subscription?.entitledModules.has(module.key) ?? false),
     }));
   }
 
@@ -100,6 +132,30 @@ export class EntitlementService implements OnModuleInit {
     if (!definition) throw new NotFoundException('Unknown module');
 
     const toEnable = [...resolveDependencies(definition.key), definition.key];
+
+    // Checked before writing anything, so a partially-applied enable cannot
+    // leave dependencies switched on for a module the customer never got.
+    const subscription = await this.billing.resolveFor(context);
+
+    if (subscription) {
+      const missing = toEnable.filter(
+        (moduleKey) => moduleKey !== MODULES.CORE && !subscription.entitledModules.has(moduleKey),
+      );
+
+      if (missing.length > 0) {
+        const names = missing.map((moduleKey) => MODULE_BY_KEY.get(moduleKey)?.name ?? moduleKey);
+
+        // 403 with a machine-readable code rather than 404: the module plainly
+        // exists — it is on the pricing page — and the interface needs to be
+        // able to offer the upgrade rather than pretend nothing is there.
+        throw new ForbiddenException({
+          statusCode: 403,
+          code: 'REQUIRES_UPGRADE',
+          moduleKeys: missing,
+          message: `${names.join(' and ')} ${missing.length === 1 ? 'is' : 'are'} not included in your plan.`,
+        });
+      }
+    }
 
     await this.prisma.withTenant(context, async (tx) => {
       for (const moduleKey of toEnable) {

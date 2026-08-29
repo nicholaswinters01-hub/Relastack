@@ -52,6 +52,9 @@ export default async function TeamPage() {
         <Link href="/account" className="underline underline-offset-4">
           Your account
         </Link>
+        <Link href="/billing" className="underline underline-offset-4">
+          Billing
+        </Link>
       </p>
     </main>
   );

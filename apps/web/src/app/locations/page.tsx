@@ -52,9 +52,12 @@ export default async function LocationsPage() {
         canCreate={canCreate}
       />
 
-      <p className="mt-10 text-sm">
+      <p className="mt-10 flex flex-wrap gap-4 text-sm">
         <Link href="/account" className="underline underline-offset-4">
           Back to your account
+        </Link>
+        <Link href="/billing" className="underline underline-offset-4">
+          Billing
         </Link>
       </p>
     </main>

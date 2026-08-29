@@ -8,6 +8,8 @@ import { LocationsModule } from './locations/locations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TenantModule } from './tenancy/tenant.module';
 import { TenantGuard } from './tenancy/tenant.guard';
+import { BillingModule } from './billing/billing.module';
+import { ReadOnlyGuard } from './billing/read-only.guard';
 import { ModulesModule } from './modules/modules.module';
 import { EntitlementGuard } from './modules/entitlement.guard';
 import { RbacModule } from './rbac/rbac.module';
@@ -50,6 +52,7 @@ import { SERVER_ENV, type ServerEnv } from './config.provider';
 
     TenantModule,
     RbacModule,
+    BillingModule,
     ModulesModule,
     AuthModule,
     OrganizationsModule,
@@ -84,6 +87,11 @@ import { SERVER_ENV, type ServerEnv } from './config.provider';
     // makes a disabled module unreachable rather than merely hidden —
     // endpoints without @RequireModule belong to core, which is always on.
     { provide: APP_GUARD, useClass: EntitlementGuard },
+
+    // Last of all. A lapsed subscription narrows the account to read-only, and
+    // running this after the others means the more specific failures — not
+    // signed in, wrong organization, module not enabled — are reported first.
+    { provide: APP_GUARD, useClass: ReadOnlyGuard },
   ],
 })
 export class AppModule {}

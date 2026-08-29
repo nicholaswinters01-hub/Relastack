@@ -62,6 +62,9 @@ export default async function AccountPage() {
             <Link href="/modules" className="underline underline-offset-4">
               Modules
             </Link>
+            <Link href="/billing" className="underline underline-offset-4">
+              Billing
+            </Link>
           </p>
         </section>
       )}
