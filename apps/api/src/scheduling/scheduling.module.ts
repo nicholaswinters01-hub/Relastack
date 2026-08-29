@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { JobSeriesController } from './job-series.controller';
+import { JobSeriesService } from './job-series.service';
 import { JobsController } from './jobs.controller';
 import { JobsService } from './jobs.service';
 
@@ -10,8 +12,8 @@ import { JobsService } from './jobs.service';
  * the CRM module's services.
  */
 @Module({
-  controllers: [JobsController],
-  providers: [JobsService],
-  exports: [JobsService],
+  controllers: [JobsController, JobSeriesController],
+  providers: [JobsService, JobSeriesService],
+  exports: [JobsService, JobSeriesService],
 })
 export class SchedulingModule {}

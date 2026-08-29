@@ -7,6 +7,7 @@ import { InvitationsModule } from './invitations/invitations.module';
 import { CrmModule } from './crm/crm.module';
 import { TasksModule } from './tasks/tasks.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
+import { ReportingModule } from './reporting/reporting.module';
 import { LocationsModule } from './locations/locations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TenantModule } from './tenancy/tenant.module';
@@ -64,6 +65,7 @@ import { SERVER_ENV, type ServerEnv } from './config.provider';
     CrmModule,
     TasksModule,
     SchedulingModule,
+    ReportingModule,
     HealthModule,
   ],
   providers: [

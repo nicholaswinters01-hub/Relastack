@@ -144,6 +144,7 @@ model Organization {
   tags                   Tag[]
   tasks                  Task[]
   jobs                   Job[]
+  jobSeries              JobSeries[]
   customFieldDefinitions CustomFieldDefinition[]
 
   @@map("organizations")
@@ -172,10 +173,12 @@ model OrganizationMembership {
 
   ownedCustomers Customer[]
   authoredNotes  CustomerNote[]
-  assignedTasks  Task[]          @relation("TaskAssignee")
-  createdTasks   Task[]          @relation("TaskCreator")
-  jobAssignments JobAssignment[] @relation("JobAssignee")
-  createdJobs    Job[]           @relation("JobCreator")
+  assignedTasks  Task[]                @relation("TaskAssignee")
+  createdTasks   Task[]                @relation("TaskCreator")
+  jobAssignments JobAssignment[]       @relation("JobAssignee")
+  createdJobs    Job[]                 @relation("JobCreator")
+  seriesCrew     JobSeriesAssignment[] @relation("SeriesAssignee")
+  createdSeries  JobSeries[]           @relation("SeriesCreator")
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -236,6 +239,7 @@ model Location {
   sharedCustomers CustomerLocation[]
   tasks           Task[]
   jobs            Job[]
+  jobSeries       JobSeries[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -748,6 +752,7 @@ model Customer {
   jobs            Job[]
   tags            CustomerTag[]
   sharedLocations CustomerLocation[]
+  jobSeries       JobSeries[]
 
   @@index([organizationId, stage])
   @@index([organizationId, locationId])
@@ -1104,12 +1109,27 @@ model Job {
 
   createdByMembershipId String? @map("created_by_membership_id") @db.Uuid
 
+  /// The series this visit came from, if any.
+  seriesId String? @map("series_id") @db.Uuid
+
+  /// Which occurrence it is, as a calendar day. Lets regeneration find what
+  /// already exists without matching on times that may have been moved.
+  seriesOccurrenceOn DateTime? @map("series_occurrence_on") @db.Date
+
+  /// Set the moment somebody edits this visit individually.
+  ///
+  /// Changing the series afterwards leaves it alone. Somebody deliberately
+  /// moved this one to Thursday, and silently dragging it back on the next
+  /// rule change is how people stop trusting a calendar.
+  detachedFromSeries Boolean @default(false) @map("detached_from_series")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   location     Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
   customer     Customer?               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  series       JobSeries?              @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   createdBy    OrganizationMembership? @relation("JobCreator", fields: [createdByMembershipId], references: [id], onDelete: SetNull)
 
   assignments JobAssignment[]
@@ -1119,6 +1139,7 @@ model Job {
   @@index([organizationId, status])
   @@index([organizationId, locationId])
   @@index([customerId])
+  @@index([seriesId, seriesOccurrenceOn])
   @@map("jobs")
 }
 
@@ -1144,4 +1165,110 @@ model JobAssignment {
   /// for, so an overlapping window is a range scan rather than a table scan.
   @@index([membershipId])
   @@map("job_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// Recurring jobs (Phase 9b)
+// ---------------------------------------------------------------------------
+
+/// How often a series repeats.
+///
+/// Deliberately not full RFC 5545. "Every second Tuesday" and "the first of
+/// the month" cover what a service business actually sells; supporting
+/// "the last weekday before Easter" would be machinery nobody asked for.
+enum RecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+
+  @@map("recurrence_frequency")
+}
+
+/// The template a run of repeating visits is generated from.
+///
+/// Occurrences are REAL job rows, materialised over a rolling horizon rather
+/// than computed on read. That is the decision the whole phase rests on:
+/// because each visit is an ordinary job, assigning a crew to one, completing
+/// one, or moving one to Thursday is just editing a job. The alternative —
+/// virtual occurrences — needs a parallel exception table and a second set of
+/// permission rules to get wrong.
+model JobSeries {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// The template every occurrence is stamped from.
+  title       String
+  description String?
+
+  locationId String? @map("location_id") @db.Uuid
+  customerId String? @map("customer_id") @db.Uuid
+
+  addressLine1 String? @map("address_line1")
+  addressLine2 String? @map("address_line2")
+  city         String?
+  region       String?
+  postalCode   String? @map("postal_code")
+  country      String?
+
+  /// How long each visit runs. Stored as a duration rather than an end time,
+  /// because the end moves with the start when a series is rescheduled.
+  durationMinutes Int @map("duration_minutes")
+
+  frequency RecurrenceFrequency
+  /// Every N periods. 2 with WEEKLY is fortnightly, which is the single most
+  /// common lawn-care cadence.
+  interval  Int                 @default(1)
+
+  /// Days of the week for a WEEKLY series, 0 = Sunday. Empty for other
+  /// frequencies. A crew that comes Monday and Thursday is one series.
+  byWeekday Int[] @map("by_weekday")
+
+  /// The first date the series can produce, as a calendar day in the branch's
+  /// timezone.
+  startsOn DateTime @map("starts_on") @db.Date
+
+  /// Minutes past local midnight. Stored as wall-clock rather than an instant
+  /// because "9am every Tuesday" stays 9am across a daylight-saving change,
+  /// which a fixed offset would not.
+  startMinutes Int @map("start_minutes")
+
+  /// Last date the series can produce. Null runs indefinitely.
+  until DateTime? @db.Date
+
+  /// Stopping a series leaves the visits already booked alone. A customer who
+  /// cancels their contract in March does not un-happen February.
+  active Boolean @default(true)
+
+  createdByMembershipId String? @map("created_by_membership_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location?               @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  customer     Customer?               @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  createdBy    OrganizationMembership? @relation("SeriesCreator", fields: [createdByMembershipId], references: [id], onDelete: SetNull)
+
+  jobs        Job[]
+  assignments JobSeriesAssignment[]
+
+  @@index([organizationId, active])
+  @@index([customerId])
+  @@map("job_series")
+}
+
+/// The default crew for a series. Copied onto each occurrence as it is made.
+model JobSeriesAssignment {
+  seriesId     String @map("series_id") @db.Uuid
+  membershipId String @map("membership_id") @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  series JobSeries              @relation(fields: [seriesId], references: [id], onDelete: Cascade)
+  member OrganizationMembership @relation("SeriesAssignee", fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@id([seriesId, membershipId])
+  @@index([organizationId])
+  @@map("job_series_assignments")
 }

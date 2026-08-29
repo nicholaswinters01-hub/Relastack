@@ -452,6 +452,20 @@ export class JobsService {
 
       const becomingComplete = input.status === 'COMPLETED' && current.status !== 'COMPLETED';
 
+      /*
+       * Editing one visit takes it out of the series' reach for good.
+       *
+       * Somebody moved this Tuesday to Thursday on purpose. Dragging it back
+       * the next time the rule changes is how people stop trusting a calendar,
+       * so the visit is marked detached and regeneration leaves it alone
+       * afterwards.
+       *
+       * A status change alone does not detach: marking a visit complete is
+       * doing the work, not overriding the schedule.
+       */
+      const SCHEDULE_NEUTRAL = new Set(['acknowledgeConflicts', 'status']);
+      const overridesSchedule = Object.keys(input).some((key) => !SCHEDULE_NEUTRAL.has(key));
+
       await tx.job.update({
         where: { id },
         data: {
@@ -470,6 +484,7 @@ export class JobsService {
           ...(input.country !== undefined ? { country: input.country ?? null } : {}),
           // Stamped on the first completion only.
           ...(becomingComplete && current.completedAt === null ? { completedAt: new Date() } : {}),
+          ...(overridesSchedule ? { detachedFromSeries: true } : {}),
         },
       });
 

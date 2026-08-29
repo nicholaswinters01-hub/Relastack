@@ -10,7 +10,7 @@ businesses. Priced by **business location**, not per user. Organizations
 activate modules (CRM, Scheduling, Employees, Inventory, …) at the company
 level.
 
-**Current phase: 9 complete (Scheduling).** Customers, the work to be done
+**Current phase: 10 complete (Reporting).** Customers, the work to be done
 about them, and the work booked into a day. Entitlement derives from a plan
 plus purchased add-ons, and a lapsed subscription narrows the account to
 read-only rather than locking it. Business logic still asks only "is this
@@ -21,7 +21,19 @@ structural difference from a task. Times are stored as instants and rendered in
 the branch's timezone. Conflicts **warn and can be overridden**: refusing
 outright gets worked around by booking the wrong slot, which is worse than the
 overlap. Touching windows do not clash, because back-to-back is how a day is
-filled. Recurrence is deliberately not built yet.
+filled.
+
+A **series** produces real job rows over a rolling 90-day horizon, not virtual
+occurrences. That is why editing one visit is just editing a job. Touching a
+visit individually sets `detachedFromSeries`, and rule changes leave it alone
+afterwards; stopping a series releases untouched future visits and keeps
+everything already done.
+
+Reports run every count through the SAME visibility filter as the list they
+summarise. **An aggregate is still a disclosure** — telling a branch employee
+the company has forty customers leaks the size of a book they can see four of.
+The dashboard also reports its own scope, so a partial view never reads as a
+company total.
 
 Tasks are part of **core**, not a module: Scheduling and Automation both build
 on them, and gating the foundation would gate everything standing on it. A task
@@ -182,9 +194,9 @@ next phase without it.
 | 7     | CRM: leads, customers, contacts, notes, tags, custom fields | Complete |
 | 8     | Tasks and basic workflow infrastructure                     | Complete |
 | 9     | Scheduling: jobs, crews, conflicts                          | Complete |
-| 9b    | Recurring jobs                                              |          |
-| 10    | Reporting and dashboards                                    | **Next** |
-| 11    | Notifications and the event system                          |          |
+| 9b    | Recurring jobs                                              | Complete |
+| 10    | Reporting and dashboards                                    | Complete |
+| 11    | Notifications and the event system                          | **Next** |
 | 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers |          |
 | 12    | Automation engine (trigger → condition → action)            |          |
 | 13    | Public website API                                          |          |

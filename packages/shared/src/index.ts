@@ -20,3 +20,6 @@ export * from './subscription';
 export * from './customer';
 export * from './task';
 export * from './job';
+export * from './recurrence';
+export * from './job-series';
+export * from './report';

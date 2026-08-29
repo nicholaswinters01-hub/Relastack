@@ -1,136 +1,83 @@
 import Link from 'next/link';
-import { healthResponseSchema, type HealthResponse } from '@platform/shared';
-import { getCurrentUser } from '@/lib/api';
+import { redirect } from 'next/navigation';
+import { MODULES } from '@platform/shared';
+import { AppNav } from '@/components/app-nav';
+import { DashboardView } from '@/components/dashboard-view';
+import { getCurrentOrganization, getCurrentUser, getDashboard, getModules } from '@/lib/api';
 
-// Foundation status page. Confirms the full stack is wired together:
-// browser -> Next.js -> API -> PostgreSQL. Replaced by the real dashboard in
-// Phase 10.
+// The dashboard, replacing the Phase 0 status page this route used to hold.
 
 export const dynamic = 'force-dynamic';
 
-type ProbeResult = { ok: true; data: HealthResponse } | { ok: false; reason: string };
+export default async function HomePage() {
+  const user = await getCurrentUser();
 
-async function probeApi(): Promise<ProbeResult> {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+  if (!user) redirect('/login');
 
-  try {
-    const response = await fetch(`${baseUrl}/api/v1/health`, { cache: 'no-store' });
-    const json = await response.json();
+  const organization = await getCurrentOrganization();
 
-    // Validate against the shared contract rather than trusting the shape.
-    const parsed = healthResponseSchema.safeParse(json);
-    if (!parsed.success) {
-      return { ok: false, reason: 'API responded, but the payload did not match the contract.' };
-    }
-
-    return { ok: true, data: parsed.data };
-  } catch {
-    return { ok: false, reason: `Could not reach the API at ${baseUrl}. Is it running?` };
+  if (!organization) {
+    return (
+      <main className="mx-auto max-w-2xl px-6 py-16">
+        <h1 className="text-3xl font-semibold tracking-tight">You are signed in</h1>
+        <p className="mt-3 text-[var(--color-muted)]">
+          Your account does not belong to an organization yet.
+        </p>
+      </main>
+    );
   }
-}
 
-function Row({ label, value, tone }: { label: string; value: string; tone?: 'ok' | 'bad' }) {
-  const color =
-    tone === 'ok' ? 'text-[var(--color-ok)]' : tone === 'bad' ? 'text-[var(--color-bad)]' : '';
+  const modules = await getModules();
+  const reporting = modules.find((module) => module.key === MODULES.REPORTING);
+
+  const greeting = user.firstName ? `Morning, ${user.firstName}` : organization.organization.name;
+
+  if (!reporting?.enabled) {
+    return (
+      <>
+        <AppNav current="dashboard" />
+        <main className="mx-auto max-w-4xl px-6 py-16">
+          <h1 className="text-3xl font-semibold tracking-tight">{greeting}</h1>
+          <p className="mt-3 text-[var(--color-muted)]">
+            {reporting?.entitled
+              ? 'Turn on Reporting to see how the business is doing at a glance.'
+              : 'Reporting is not included in your plan.'}
+          </p>
+          <p className="mt-6 text-sm">
+            <Link
+              href={reporting?.entitled ? '/modules' : '/billing'}
+              className="underline underline-offset-4"
+            >
+              {reporting?.entitled ? 'Turn it on' : 'See plans'}
+            </Link>
+          </p>
+        </main>
+      </>
+    );
+  }
+
+  const dashboard = await getDashboard();
 
   return (
-    <div className="flex items-baseline justify-between gap-6 border-b border-[var(--color-line)] py-3 last:border-0">
-      <dt className="text-sm text-[var(--color-muted)]">{label}</dt>
-      <dd className={`font-mono text-sm font-medium ${color}`}>{value}</dd>
-    </div>
-  );
-}
+    <>
+      <AppNav current="dashboard" />
+      <main className="mx-auto max-w-4xl px-6 py-16">
+        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+          Phase 10 — Dashboard
+        </p>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">{greeting}</h1>
+        <p className="mt-3 text-[var(--color-muted)]">
+          Where {organization.organization.name} stands over the last thirty days.
+        </p>
 
-export default async function StatusPage() {
-  const [probe, user] = await Promise.all([probeApi(), getCurrentUser()]);
-
-  return (
-    <main className="mx-auto max-w-2xl px-6 py-16">
-      <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-        Phase 1 — Authentication
-      </p>
-      <h1 className="mt-2 text-3xl font-semibold tracking-tight">Platform</h1>
-      <p className="mt-3 text-[var(--color-muted)]">
-        Foundation status. This page confirms the web application, the API, and the database are
-        connected to one another.
-      </p>
-
-      <section className="mt-10 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-          System status
-        </h2>
-
-        <dl className="mt-4">
-          <Row label="Web application" value="running" tone="ok" />
-
-          {probe.ok ? (
-            <>
-              <Row
-                label="API"
-                value={probe.data.status}
-                tone={probe.data.status === 'ok' ? 'ok' : 'bad'}
-              />
-              <Row
-                label="Database"
-                value={probe.data.dependencies.database.status}
-                tone={probe.data.dependencies.database.status === 'connected' ? 'ok' : 'bad'}
-              />
-              <Row
-                label="Database latency"
-                value={
-                  probe.data.dependencies.database.latencyMs === null
-                    ? '—'
-                    : `${probe.data.dependencies.database.latencyMs} ms`
-                }
-              />
-              <Row label="Environment" value={probe.data.environment} />
-            </>
-          ) : (
-            <>
-              <Row label="API" value="unreachable" tone="bad" />
-              <Row label="Database" value="unknown" tone="bad" />
-            </>
-          )}
-
-          <Row
-            label="Authentication"
-            value={user ? `signed in as ${user.email}` : 'signed out'}
-            tone={user ? 'ok' : undefined}
-          />
-        </dl>
-
-        {!probe.ok && (
-          <p className="mt-4 rounded-lg bg-[var(--color-canvas)] p-3 text-sm text-[var(--color-bad)]">
-            {probe.reason}
+        {dashboard ? (
+          <DashboardView dashboard={dashboard} />
+        ) : (
+          <p className="mt-8 rounded-xl border border-dashed border-[var(--color-line)] p-8 text-center text-sm text-[var(--color-muted)]">
+            We could not load your figures just now.
           </p>
         )}
-      </section>
-
-      <div className="mt-6 flex flex-wrap gap-3">
-        {user ? (
-          <Link
-            href="/account"
-            className="rounded-lg bg-[var(--color-ink)] px-4 py-2.5 text-sm font-medium text-[var(--color-canvas)] transition-opacity hover:opacity-90"
-          >
-            Go to your account
-          </Link>
-        ) : (
-          <>
-            <Link
-              href="/login"
-              className="rounded-lg bg-[var(--color-ink)] px-4 py-2.5 text-sm font-medium text-[var(--color-canvas)] transition-opacity hover:opacity-90"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
-              className="rounded-lg border border-[var(--color-line)] px-4 py-2.5 text-sm font-medium transition-colors hover:bg-[var(--color-surface)]"
-            >
-              Create an account
-            </Link>
-          </>
-        )}
-      </div>
-    </main>
+      </main>
+    </>
   );
 }

@@ -34,6 +34,12 @@ interface Entry {
 
 const ENTRIES: Entry[] = [
   {
+    href: '/',
+    label: 'Dashboard',
+    permission: PERMISSIONS.ORGANIZATION_READ,
+    module: MODULES.REPORTING,
+  },
+  {
     href: '/customers',
     label: 'Customers',
     permission: PERMISSIONS.CUSTOMER_READ,

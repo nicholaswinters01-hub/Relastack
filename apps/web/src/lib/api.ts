@@ -13,6 +13,7 @@ import {
   publicUserSchema,
   subscriptionResponseSchema,
   tagsResponseSchema,
+  dashboardResponseSchema,
   jobsResponseSchema,
   tasksResponseSchema,
   type CustomerDetail,
@@ -27,6 +28,7 @@ import {
   type PublicUser,
   type SubscriptionResponse,
   type TagsResponse,
+  type Dashboard,
   type JobsResponse,
   type TasksResponse,
 } from '@platform/shared';
@@ -320,5 +322,30 @@ export async function getJobs(
     return parsed.success ? parsed.data : { jobs: [], nextCursor: null };
   } catch {
     return { jobs: [], nextCursor: null };
+  }
+}
+
+/**
+ * The dashboard figures.
+ *
+ * Already narrowed by the server to what this reader may see — the response
+ * carries a `scope` saying whether that is the whole company or some branches.
+ */
+export async function getDashboard(
+  params: Record<string, string | undefined> = {},
+): Promise<Dashboard | null> {
+  const query = new URLSearchParams(
+    Object.entries(params).filter((entry): entry is [string, string] => Boolean(entry[1])),
+  );
+
+  try {
+    const response = await serverFetch(`/api/v1/reports/dashboard?${query.toString()}`);
+    if (!response.ok) return null;
+
+    const parsed = dashboardResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data.dashboard : null;
+  } catch {
+    return null;
   }
 }
