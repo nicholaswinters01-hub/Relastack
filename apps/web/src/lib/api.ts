@@ -14,6 +14,8 @@ import {
   subscriptionResponseSchema,
   tagsResponseSchema,
   dashboardResponseSchema,
+  notificationsResponseSchema,
+  preferencesResponseSchema,
   jobsResponseSchema,
   tasksResponseSchema,
   type CustomerDetail,
@@ -29,6 +31,8 @@ import {
   type SubscriptionResponse,
   type TagsResponse,
   type Dashboard,
+  type NotificationPreference,
+  type NotificationsResponse,
   type JobsResponse,
   type TasksResponse,
 } from '@platform/shared';
@@ -347,5 +351,33 @@ export async function getDashboard(
     return parsed.success ? parsed.data.dashboard : null;
   } catch {
     return null;
+  }
+}
+
+/** The caller's own notifications. Never anybody else's — there is no ask. */
+export async function getNotifications(): Promise<NotificationsResponse> {
+  try {
+    const response = await serverFetch('/api/v1/notifications?limit=20');
+    if (!response.ok) return { notifications: [], unread: 0 };
+
+    const parsed = notificationsResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data : { notifications: [], unread: 0 };
+  } catch {
+    return { notifications: [], unread: 0 };
+  }
+}
+
+/** The caller's own notification preferences, defaults included. */
+export async function getNotificationPreferences(): Promise<NotificationPreference[]> {
+  try {
+    const response = await serverFetch('/api/v1/notifications/preferences');
+    if (!response.ok) return [];
+
+    const parsed = preferencesResponseSchema.safeParse(await response.json());
+
+    return parsed.success ? parsed.data.preferences : [];
+  } catch {
+    return [];
   }
 }

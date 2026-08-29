@@ -1,6 +1,7 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { EventsService } from '../notifications/events.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from './billing.service';
 
@@ -85,6 +86,9 @@ describe('BillingService', () => {
             client: { plan: { findUnique: planFindUnique, findMany: vi.fn() } },
           },
         },
+        // The outbox is a collaborator here, not the thing under test: these
+        // cases are about what effectiveStatus decides, not what it announces.
+        { provide: EventsService, useValue: { emit: vi.fn() } },
       ],
     }).compile();
 

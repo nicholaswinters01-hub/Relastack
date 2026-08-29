@@ -145,6 +145,8 @@ model Organization {
   tasks                  Task[]
   jobs                   Job[]
   jobSeries              JobSeries[]
+  events                 DomainEvent[]
+  notifications          Notification[]
   customFieldDefinitions CustomFieldDefinition[]
 
   @@map("organizations")
@@ -171,14 +173,16 @@ model OrganizationMembership {
   locationMemberships LocationMembership[]
   roleAssignments     MembershipRole[]
 
-  ownedCustomers Customer[]
-  authoredNotes  CustomerNote[]
-  assignedTasks  Task[]                @relation("TaskAssignee")
-  createdTasks   Task[]                @relation("TaskCreator")
-  jobAssignments JobAssignment[]       @relation("JobAssignee")
-  createdJobs    Job[]                 @relation("JobCreator")
-  seriesCrew     JobSeriesAssignment[] @relation("SeriesAssignee")
-  createdSeries  JobSeries[]           @relation("SeriesCreator")
+  ownedCustomers          Customer[]
+  authoredNotes           CustomerNote[]
+  assignedTasks           Task[]                   @relation("TaskAssignee")
+  createdTasks            Task[]                   @relation("TaskCreator")
+  jobAssignments          JobAssignment[]          @relation("JobAssignee")
+  createdJobs             Job[]                    @relation("JobCreator")
+  seriesCrew              JobSeriesAssignment[]    @relation("SeriesAssignee")
+  createdSeries           JobSeries[]              @relation("SeriesCreator")
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -1271,4 +1275,103 @@ model JobSeriesAssignment {
   @@id([seriesId, membershipId])
   @@index([organizationId])
   @@map("job_series_assignments")
+}
+
+// ---------------------------------------------------------------------------
+// Events and notifications (Phase 11)
+// ---------------------------------------------------------------------------
+
+/// Something that happened, recorded in the same transaction that caused it.
+///
+/// A transactional outbox, not an in-memory emitter. If the process dies
+/// between "task assigned" and "email sent", an emitter loses the event and
+/// nobody ever learns they were given work. Writing the event alongside the
+/// change means the two commit together or not at all.
+///
+/// This is also the stream Phase 12's automation engine consumes, so its
+/// durability is not only about email.
+model DomainEvent {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// Dotted and stable, e.g. `task.assigned`. Matched by handlers and, later,
+  /// by automation triggers, so renaming one is a migration.
+  type    String
+  payload Json
+
+  /// Null until handled. The dispatcher's whole query is "oldest unprocessed".
+  processedAt DateTime? @map("processed_at")
+  attempts    Int       @default(0)
+  lastError   String?   @map("last_error")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization  Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([processedAt, createdAt])
+  @@index([organizationId, type, createdAt])
+  @@map("domain_events")
+}
+
+/// Something a particular person should know about.
+///
+/// Addressed to a membership rather than a user: the same person in two
+/// organizations gets two separate inboxes, and leaving one company takes its
+/// notifications with it.
+model Notification {
+  id String @id @default(uuid()) @db.Uuid
+
+  organizationId String @map("organization_id") @db.Uuid
+  membershipId   String @map("membership_id") @db.Uuid
+
+  type  String
+  title String
+  body  String
+
+  /// Where it points in the app. Relative, so it survives a domain change.
+  linkPath String? @map("link_path")
+
+  readAt DateTime? @map("read_at")
+
+  /// Which event produced it, and when it went out by email.
+  ///
+  /// The unique pair below is what makes redelivery safe: a handler that fails
+  /// halfway is retried, and the notification it already created is refused
+  /// rather than duplicated. `emailedAt` does the same job for the email.
+  eventId   String?   @map("event_id") @db.Uuid
+  emailedAt DateTime? @map("emailed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  member       OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  event        DomainEvent?           @relation(fields: [eventId], references: [id], onDelete: SetNull)
+
+  @@unique([eventId, membershipId])
+  @@index([membershipId, readAt, createdAt])
+  @@index([organizationId])
+  @@map("notifications")
+}
+
+/// Per-person, per-type delivery choices.
+///
+/// Absence means the default, which is on. Storing only the exceptions keeps
+/// this table small and means a new notification type does not need a
+/// backfill for every member of every organization.
+model NotificationPreference {
+  membershipId String @map("membership_id") @db.Uuid
+  type         String
+
+  organizationId String @map("organization_id") @db.Uuid
+
+  inApp Boolean @default(true) @map("in_app")
+  email Boolean @default(true)
+
+  member OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@id([membershipId, type])
+  @@index([organizationId])
+  @@map("notification_preferences")
 }

@@ -8,6 +8,7 @@ import { CrmModule } from './crm/crm.module';
 import { TasksModule } from './tasks/tasks.module';
 import { SchedulingModule } from './scheduling/scheduling.module';
 import { ReportingModule } from './reporting/reporting.module';
+import { NotificationsModule } from './notifications/notifications.module';
 import { LocationsModule } from './locations/locations.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { TenantModule } from './tenancy/tenant.module';
@@ -57,6 +58,7 @@ import { SERVER_ENV, type ServerEnv } from './config.provider';
     TenantModule,
     RbacModule,
     BillingModule,
+    NotificationsModule,
     ModulesModule,
     AuthModule,
     OrganizationsModule,

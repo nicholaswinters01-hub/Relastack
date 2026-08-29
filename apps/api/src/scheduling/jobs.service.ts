@@ -17,7 +17,9 @@ import {
   type JobQuery,
   type PermissionKey,
   type UpdateJobRequest,
+  EVENT_TYPES,
 } from '@platform/shared';
+import { EventsService } from '../notifications/events.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
@@ -45,7 +47,10 @@ const nameOf = (person?: { firstName: string | null; lastName: string | null; em
 export class JobsService {
   private readonly logger = new Logger(JobsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsService,
+  ) {}
 
   // -------------------------------------------------------------------------
   // Visibility
@@ -356,6 +361,19 @@ export class JobsService {
         });
       }
 
+      // Told about the work they were just given, in the same transaction
+      // that gave it to them.
+      const told = assignees.filter((id) => id !== membershipId);
+      if (told.length > 0) {
+        await this.events.emit(tx, context.organizationId, EVENT_TYPES.JOB_ASSIGNED, {
+          jobId: job.id,
+          title: input.title,
+          membershipIds: told.join(','),
+          when: startsAt.toISOString(),
+          day: startsAt.toISOString().slice(0, 10),
+        });
+      }
+
       return job;
     });
 
@@ -487,6 +505,31 @@ export class JobsService {
           ...(overridesSchedule ? { detachedFromSeries: true } : {}),
         },
       });
+
+      /*
+       * The crew hears when the plan changes under them.
+       *
+       * Only a move or a cancellation — not every edit. Retitling a job or
+       * correcting its postcode is not something to interrupt somebody's day
+       * for, and a notification that fires on everything is one people mute.
+       */
+      const cancelled = input.status === 'CANCELLED' && current.status !== 'CANCELLED';
+      const crewToTell = assignees.filter((id) => id !== membershipId);
+
+      if (crewToTell.length > 0 && (windowMoved || cancelled)) {
+        await this.events.emit(
+          tx,
+          context.organizationId,
+          cancelled ? EVENT_TYPES.JOB_CANCELLED : EVENT_TYPES.JOB_CHANGED,
+          {
+            jobId: id,
+            title: input.title ?? '',
+            membershipIds: crewToTell.join(','),
+            when: startsAt.toISOString(),
+            day: startsAt.toISOString().slice(0, 10),
+          },
+        );
+      }
 
       if (crewChanged) {
         await tx.jobAssignment.deleteMany({

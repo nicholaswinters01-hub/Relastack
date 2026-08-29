@@ -15,6 +15,7 @@ import {
   type InvitationPreview,
 } from '@platform/shared';
 import { PasswordService } from '../auth/password.service';
+import { EmailService } from '../notifications/email.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
@@ -37,6 +38,7 @@ export class InvitationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly passwords: PasswordService,
+    private readonly email: EmailService,
   ) {}
 
   /**
@@ -156,13 +158,35 @@ export class InvitationsService {
       return created;
     });
 
+    const acceptUrl = `${baseUrl}/invitations/accept?token=${token}`;
+
+    /*
+     * Sent, at last.
+     *
+     * Invitations have existed since Phase 4 with no way to reach anybody —
+     * the link came back in the response and somebody had to paste it into a
+     * message by hand.
+     *
+     * Deliberately NOT through the outbox. An invitation is the direct result
+     * of somebody pressing a button and watching to see it work, so a failure
+     * belongs in front of them rather than retried quietly a minute later.
+     * The link is still returned either way, so a provider outage degrades to
+     * copying it by hand rather than to losing the invitation.
+     */
+    try {
+      await this.email.send({
+        to: input.email,
+        subject: 'You have been invited to join',
+        body: 'Someone has invited you to their team. Follow the link below to set up your account.',
+        link: acceptUrl,
+      });
+    } catch (error) {
+      this.logger.error(`Could not email invitation ${invitation.id}`, error);
+    }
+
     this.logger.log(`Invitation ${invitation.id} created for ${input.email}`);
 
-    return {
-      invitation: this.toPublic(invitation),
-      // Returned once. Phase 11 sends this by email instead.
-      acceptUrl: `${baseUrl}/invitations/accept?token=${token}`,
-    };
+    return { invitation: this.toPublic(invitation), acceptUrl };
   }
 
   async list(context: TenantContext): Promise<Invitation[]> {

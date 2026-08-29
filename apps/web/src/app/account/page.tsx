@@ -1,8 +1,9 @@
 import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
-import { getCurrentOrganization, getCurrentUser } from '@/lib/api';
+import { getCurrentOrganization, getCurrentUser, getNotificationPreferences } from '@/lib/api';
 import { roleLabel } from '@/lib/permissions';
+import { NotificationPreferences } from '@/components/notification-preferences';
 import { SignOutButtons } from '@/components/sign-out-buttons';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,11 @@ export const dynamic = 'force-dynamic';
  * without a session returns 401 regardless of what this page does.
  */
 export default async function AccountPage() {
-  const [user, organization] = await Promise.all([getCurrentUser(), getCurrentOrganization()]);
+  const [user, organization, preferences] = await Promise.all([
+    getCurrentUser(),
+    getCurrentOrganization(),
+    getNotificationPreferences(),
+  ]);
 
   if (!user) redirect('/login');
 
@@ -93,6 +98,10 @@ export default async function AccountPage() {
             <Row label="Member since" value={new Date(user.createdAt).toLocaleDateString()} />
           </dl>
         </section>
+
+        {organization && preferences.length > 0 && (
+          <NotificationPreferences preferences={preferences} />
+        )}
 
         <SignOutButtons />
 

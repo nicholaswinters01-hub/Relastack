@@ -201,4 +201,35 @@ export async function withInvitationToken<T>(
   });
 }
 
+/**
+ * Platform background work, across every tenant.
+ *
+ * The dispatcher and the periodic sweeps genuinely have to see rows belonging
+ * to every organization — an outbox serving one tenant is not an outbox. There
+ * is no single tenant to set, so `withTenant` cannot be used, and running
+ * without any context sees NOTHING because RLS fails closed. That is rule 3
+ * doing its job, and it is why this hatch is explicit rather than implied.
+ *
+ * Deliberately narrow. The policy branch it unlocks exists on exactly three
+ * tables — domain_events, subscriptions and job_series — which are the ones a
+ * worker must scan to know what needs doing. It grants nothing on customers,
+ * tasks, jobs or notifications; those writes still go through `withTenant` for
+ * one organization at a time, so the work a worker performs is as scoped as
+ * anything a request does.
+ *
+ * NOT a superuser connection. The application still connects as `platform_app`
+ * and every other policy still applies, which is the difference between a
+ * narrow hatch and turning row-level security off.
+ */
+export async function withPlatformWorker<T>(
+  client: PrismaClient,
+  work: (tx: TransactionClient) => Promise<T>,
+): Promise<T> {
+  return client.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SET LOCAL app.platform_worker = 'on'`);
+
+    return work(tx);
+  });
+}
+
 export { Prisma, PrismaClient };

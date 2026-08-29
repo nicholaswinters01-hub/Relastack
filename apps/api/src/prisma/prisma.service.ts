@@ -11,6 +11,7 @@ import {
   withTenant,
   withInvitationToken,
   withOrganization,
+  withPlatformWorker,
   withUserOnly,
   type PrismaClient,
   type TenantContext,
@@ -89,6 +90,17 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
     work: (tx: TransactionClient) => Promise<T>,
   ): Promise<T> {
     return withInvitationToken(this.client, tokenHash, work);
+  }
+
+  /**
+   * Cross-tenant reads for background work. See withPlatformWorker.
+   *
+   * Unlocks a narrow policy branch on three tables the dispatcher and sweeps
+   * must scan. Everything they WRITE still goes through withTenant, one
+   * organization at a time.
+   */
+  withPlatformWorker<T>(work: (tx: TransactionClient) => Promise<T>): Promise<T> {
+    return withPlatformWorker(this.client, work);
   }
 
   /** Organization context without a user identity. See withOrganization. */

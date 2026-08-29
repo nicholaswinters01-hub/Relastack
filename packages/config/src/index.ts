@@ -122,6 +122,39 @@ export const serverEnvSchema = z
      * automated guessing while leaving a real user only briefly inconvenienced.
      */
     LOGIN_LOCKOUT_MINUTES: z.coerce.number().int().positive().max(1440).default(15),
+
+    /**
+     * Where outbound email goes.
+     *
+     * `log` is the default so the whole notification path runs end to end with
+     * no account and no key — and so a misconfigured deploy writes the message
+     * to the log rather than losing it silently.
+     */
+    EMAIL_PROVIDER: z.enum(['log', 'resend']).default('log'),
+    EMAIL_API_KEY: z.string().optional(),
+
+    /** The From address. Must be on a domain the provider has verified. */
+    EMAIL_FROM: z.string().default('BizFoundry <hello@bizfoundry.net>'),
+
+    /**
+     * A physical postal address, printed in the footer of every message.
+     *
+     * Required by CAN-SPAM for commercial email in the US, which is the market.
+     * Kept in configuration rather than a template so it is impossible to send
+     * a batch that quietly omits it.
+     */
+    EMAIL_POSTAL_ADDRESS: z.string().default(''),
+
+    /** Where links in email point. No trailing slash. */
+    APP_URL: z.string().default('http://localhost:3000'),
+
+    /**
+     * How often the outbox is drained, in seconds.
+     *
+     * Zero disables the dispatcher entirely, which is what the test suite uses
+     * so that a background timer cannot race the assertions.
+     */
+    DISPATCH_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(3600).default(10),
   })
   // A production deployment serving session cookies over plaintext HTTP would
   // expose every session to anyone on the network path. Refuse to start.

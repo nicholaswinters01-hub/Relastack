@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MODULES, PERMISSIONS, type ModuleState, type PermissionKey } from '@platform/shared';
-import { getCurrentOrganization, getModules } from '@/lib/api';
+import { NotificationBell } from '@/components/notification-bell';
+import { getCurrentOrganization, getModules, getNotifications } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
 
 /**
@@ -64,7 +65,7 @@ export async function AppNav({ current }: { current: string }) {
 
   if (!organization) return null;
 
-  const modules = await getModules();
+  const [modules, inbox] = await Promise.all([getModules(), getNotifications()]);
   const enabled = new Set(
     modules.filter((module: ModuleState) => module.enabled).map((module) => module.key),
   );
@@ -105,10 +106,14 @@ export async function AppNav({ current }: { current: string }) {
           );
         })}
 
+        <div className="ml-auto flex items-center gap-1">
+          <NotificationBell notifications={inbox.notifications} unread={inbox.unread} />
+        </div>
+
         <Link
           href="/account"
           aria-current={current === 'account' ? 'page' : undefined}
-          className={`ml-auto rounded-lg px-3 py-1.5 text-sm ${
+          className={`rounded-lg px-3 py-1.5 text-sm ${
             current === 'account'
               ? 'bg-[var(--color-canvas)] font-medium'
               : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'

@@ -15,7 +15,9 @@ import {
   type Task,
   type TaskQuery,
   type UpdateTaskRequest,
+  EVENT_TYPES,
 } from '@platform/shared';
+import { EventsService } from '../notifications/events.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
@@ -37,7 +39,10 @@ const nameOf = (person?: { firstName: string | null; lastName: string | null; em
 export class TasksService {
   private readonly logger = new Logger(TasksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsService,
+  ) {}
 
   // -------------------------------------------------------------------------
   // Visibility
@@ -265,7 +270,7 @@ export class TasksService {
         input.assigneeMembershipId,
       );
 
-      return tx.task.create({
+      const task = await tx.task.create({
         data: {
           organizationId: context.organizationId,
           title: input.title,
@@ -281,6 +286,19 @@ export class TasksService {
         },
         select: { id: true },
       });
+
+      // Emitted inside the same transaction as the task. If the process dies
+      // here, both roll back together — the alternative is a task nobody was
+      // told about, which fails silently and leaves no trace.
+      if (input.assigneeMembershipId && input.assigneeMembershipId !== membershipId) {
+        await this.events.emit(tx, context.organizationId, EVENT_TYPES.TASK_ASSIGNED, {
+          taskId: task.id,
+          title: input.title,
+          assigneeMembershipId: input.assigneeMembershipId,
+        });
+      }
+
+      return task;
     });
 
     this.logger.log(`Task ${created.id} created in organization ${context.organizationId}`);

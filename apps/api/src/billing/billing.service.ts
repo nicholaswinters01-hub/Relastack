@@ -8,7 +8,9 @@ import {
   type Plan,
   type Subscription,
   type SubscriptionStatus,
+  EVENT_TYPES,
 } from '@platform/shared';
+import { EventsService } from '../notifications/events.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 /** Every organization starts here, so evaluation is not hobbled by packaging. */
@@ -33,7 +35,10 @@ export interface ResolvedSubscription {
 export class BillingService {
   private readonly logger = new Logger(BillingService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly events: EventsService,
+  ) {}
 
   /**
    * Subscribe a brand-new organization to a trial.
@@ -340,9 +345,22 @@ export class BillingService {
         break;
     }
 
-    await this.prisma.withTenant(context, (tx) =>
-      tx.subscription.update({ where: { organizationId: context.organizationId }, data }),
-    );
+    await this.prisma.withTenant(context, async (tx) => {
+      await tx.subscription.update({ where: { organizationId: context.organizationId }, data });
+
+      // Money reaches the owner. Emitted with the status change so a failed
+      // card cannot silently start a grace period nobody was told about.
+      const notify =
+        event === 'payment_failed'
+          ? EVENT_TYPES.SUBSCRIPTION_PAST_DUE
+          : event === 'grace_expired' || event === 'cancel'
+            ? EVENT_TYPES.SUBSCRIPTION_READ_ONLY
+            : null;
+
+      if (notify) {
+        await this.events.emit(tx, context.organizationId, notify, { event });
+      }
+    });
 
     this.logger.log(`Billing event "${event}" applied to ${context.organizationId}`);
 

@@ -10,7 +10,7 @@ businesses. Priced by **business location**, not per user. Organizations
 activate modules (CRM, Scheduling, Employees, Inventory, …) at the company
 level.
 
-**Current phase: 10 complete (Reporting).** Customers, the work to be done
+**Current phase: 11 complete (Notifications).** Customers, the work to be done
 about them, and the work booked into a day. Entitlement derives from a plan
 plus purchased add-ons, and a lapsed subscription narrows the account to
 read-only rather than locking it. Business logic still asks only "is this
@@ -34,6 +34,25 @@ summarise. **An aggregate is still a disclosure** — telling a branch employee
 the company has forty customers leaks the size of a book they can see four of.
 The dashboard also reports its own scope, so a partial view never reads as a
 company total.
+
+Anything worth telling somebody about is written to `domain_events` **in the
+same transaction as the change**, by a **transactional outbox**. A dispatcher
+drains it on a timer, so a slow mail provider never makes anybody wait to save
+a task, and a crash between the change and the message is impossible — either
+both happened or neither did. Redelivery is safe: the unique pair on
+(event, membership) refuses a duplicate notification, and `emailedAt` refuses a
+duplicate email.
+
+The bell is **quiet on purpose**. Only work addressed to a specific person, and
+money, produce a notification. A bell that lights up for everything is one
+people learn to ignore, and that cannot be undone. Preferences decide
+_delivery_, never whether the event is recorded — Phase 12's automation reads
+the same stream and must not be muted by somebody's inbox settings.
+
+Background work runs as a **single instance** and needs
+`FOR UPDATE SKIP LOCKED` before that changes. The dispatcher and the hourly
+sweeps are idempotent, so a second copy would duplicate effort rather than
+results.
 
 Tasks are part of **core**, not a module: Scheduling and Automation both build
 on them, and gating the foundation would gate everything standing on it. A task
@@ -166,6 +185,19 @@ Recorded because each one cost real time and none is obvious.
   A suite deleting `WHERE name LIKE 'X%'` leaked an organization once a
   sabotage let a rename through. Fixtures should rename within the prefix the
   cleanup matches.
+- **RLS fails closed, so background work sees nothing at all.** A worker
+  serving every tenant has no single organization to set, and querying the bare
+  client returned an empty queue forever — silently, because an empty outbox
+  looks exactly like an idle one. `withPlatformWorker()` is the narrow hatch:
+  it sets `app.platform_worker` and the policies on **exactly three** tables
+  (`domain_events`, `subscriptions`, `job_series`) accept it. Nothing that
+  names a person is reachable through it. Every write still goes through
+  `withTenant()` for one organization at a time. Do not widen it — a fourth
+  table is a design decision, not a convenience.
+- **A stored preference for a type nobody reads is worse than an error.** The
+  preferences list is built from the catalogue, so a row for a mistyped type
+  would never be looked at: somebody would believe they had switched something
+  off and keep being told about it. Validate the key against the catalogue.
 
 ## Commands
 
@@ -196,8 +228,8 @@ next phase without it.
 | 9     | Scheduling: jobs, crews, conflicts                          | Complete |
 | 9b    | Recurring jobs                                              | Complete |
 | 10    | Reporting and dashboards                                    | Complete |
-| 11    | Notifications and the event system                          | **Next** |
-| 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers |          |
+| 11    | Notifications and the event system                          | Complete |
+| 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers | **Next** |
 | 12    | Automation engine (trigger → condition → action)            |          |
 | 13    | Public website API                                          |          |
 | 14    | Website module                                              |          |
