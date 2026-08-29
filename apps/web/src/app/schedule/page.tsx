@@ -16,7 +16,7 @@ import { canAnywhere } from '@/lib/permissions';
 export const dynamic = 'force-dynamic';
 
 interface Props {
-  searchParams: Promise<{ day?: string; filter?: string }>;
+  searchParams: Promise<{ day?: string; filter?: string; view?: string }>;
 }
 
 export default async function SchedulePage({ searchParams }: Props) {
@@ -53,23 +53,40 @@ export default async function SchedulePage({ searchParams }: Props) {
     );
   }
 
-  const { day: requestedDay, filter = '' } = await searchParams;
+  const { day: requestedDay, filter = '', view: requestedView } = await searchParams;
 
-  // Default to today. The window is a full UTC day; jobs are rendered in the
-  // branch's own zone, which is the time the crew actually reads.
   const day = /^\d{4}-\d{2}-\d{2}$/.test(requestedDay ?? '')
     ? (requestedDay as string)
-    : new Date().toISOString().slice(0, 10);
+    : new Date().toLocaleDateString('en-CA');
 
-  const nextDay = new Date(`${day}T00:00:00.000Z`);
-  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+  const view = requestedView === 'week' ? 'week' : 'day';
+
+  /*
+   * Fetch a day either side of what is shown, then let the client file each
+   * job under its BRANCH-local day.
+   *
+   * A UTC-day window is wrong for anyone not on UTC: a 7pm visit in New York
+   * is already tomorrow in UTC, so it would vanish from the day the crew
+   * actually works it. Over-fetching two days and bucketing properly costs
+   * nothing and is correct for a company whose branches span zones.
+   */
+  const span = view === 'week' ? 7 : 1;
+  const anchor = new Date(`${day}T00:00:00.000Z`);
+  const monday = new Date(anchor);
+  if (view === 'week') monday.setUTCDate(monday.getUTCDate() - ((monday.getUTCDay() + 6) % 7));
+
+  const from = new Date(monday);
+  from.setUTCDate(from.getUTCDate() - 1);
+  const to = new Date(monday);
+  to.setUTCDate(to.getUTCDate() + span + 1);
 
   const canWrite = canAnywhere(organization.permissions, PERMISSIONS.JOB_WRITE);
 
   const [{ jobs }, locations, members, { customers }] = await Promise.all([
     getJobs({
-      from: `${day}T00:00:00.000Z`,
-      to: nextDay.toISOString(),
+      from: from.toISOString(),
+      to: to.toISOString(),
+      limit: '200',
       ...(filter === 'mine' ? { mine: 'true' } : {}),
     }),
     getLocations(),
@@ -86,7 +103,7 @@ export default async function SchedulePage({ searchParams }: Props) {
         </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Schedule</h1>
         <p className="mt-3 text-[var(--color-muted)]">
-          Jobs booked into the day, with who is going. Times show in the branch&apos;s own zone.
+          Jobs booked in, with who is going. Times show in the branch&apos;s own zone.
         </p>
 
         <ScheduleManager
@@ -97,6 +114,7 @@ export default async function SchedulePage({ searchParams }: Props) {
           canWrite={canWrite}
           membershipId={organization.membershipId}
           day={day}
+          view={view}
           activeFilter={filter}
         />
       </main>
