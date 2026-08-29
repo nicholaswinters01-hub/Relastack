@@ -318,6 +318,7 @@ export class TasksService {
         where: this.scopedTo(permissions, membershipId, { id }),
         select: {
           id: true,
+          title: true,
           locationId: true,
           status: true,
           completedAt: true,
@@ -379,6 +380,34 @@ export class TasksService {
           ...(becomingDone && current.completedAt === null ? { completedAt: new Date() } : {}),
         },
       });
+
+      /*
+       * Handing work to somebody else tells them, exactly as creating it
+       * assigned to them does.
+       *
+       * Without this, fixing a mis-assignment was silent: the task moved to
+       * the right person and the right person never found out, which is worse
+       * than the original mistake because the sender believes it is handled.
+       *
+       * Only on a real change of hands. Editing a due date on a task somebody
+       * already holds must not re-announce it, and reassigning something to
+       * yourself is not news. Unassigning tells nobody — there is nobody to
+       * tell, and the person losing it finds out from the list.
+       */
+      const newAssignee = input.assigneeMembershipId;
+
+      if (
+        newAssignee !== undefined &&
+        newAssignee !== null &&
+        newAssignee !== current.assigneeMembershipId &&
+        newAssignee !== membershipId
+      ) {
+        await this.events.emit(tx, context.organizationId, EVENT_TYPES.TASK_ASSIGNED, {
+          taskId: id,
+          title: input.title ?? current.title,
+          assigneeMembershipId: newAssignee,
+        });
+      }
     });
 
     return this.getById(context, permissions, membershipId, id);

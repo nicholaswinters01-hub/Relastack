@@ -35,6 +35,9 @@ export default async function TasksPage({ searchParams }: Props) {
           : { openOnly: 'true' };
 
   const canWrite = canAnywhere(organization.permissions, PERMISSIONS.TASK_WRITE);
+  // Deleting is the sharper tool and only an owner holds it. Cancelling is
+  // what everyone else reaches for, and it keeps the record that it was asked.
+  const canDelete = canAnywhere(organization.permissions, PERMISSIONS.TASK_DELETE);
 
   const [{ tasks }, locations, members] = await Promise.all([
     getTasks(query),
@@ -60,6 +63,7 @@ export default async function TasksPage({ searchParams }: Props) {
           locations={locations}
           members={members}
           canWrite={canWrite}
+          canDelete={canDelete}
           membershipId={organization.membershipId}
           activeFilter={filter}
         />

@@ -532,6 +532,42 @@ describe('Tasks (e2e)', () => {
     it('refuses a task with no title', async () => {
       expect((await makeTask(admin.token, { title: '   ' })).statusCode).toBe(400);
     });
+
+    it('emptying the description actually clears it', async () => {
+      const id = json(
+        await makeTask(admin.token, {
+          title: 'Has a note',
+          description: 'Ring the bell twice',
+          locationId: downtownId,
+        }),
+      ).task.id;
+
+      // An empty box means "remove this". Treating it as "not mentioned"
+      // leaves the old note in place and still reports success, which is the
+      // worst of both.
+      const response = await request('PATCH', `/api/v1/tasks/${id}`, admin.token, {
+        description: '',
+      });
+
+      expect(response.statusCode, response.body).toBe(200);
+      expect(json(response).task.description).toBeNull();
+    });
+
+    it('an edit that does not mention the description leaves it alone', async () => {
+      const id = json(
+        await makeTask(admin.token, {
+          title: 'Keeps its note',
+          description: 'Gate code 4821',
+          locationId: downtownId,
+        }),
+      ).task.id;
+
+      const response = await request('PATCH', `/api/v1/tasks/${id}`, admin.token, {
+        title: 'Keeps its note, retitled',
+      });
+
+      expect(json(response).task.description).toBe('Gate code 4821');
+    });
   });
 
   // =========================================================================

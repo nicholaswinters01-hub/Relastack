@@ -11,12 +11,14 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from '@platform/shared';
+import { TaskEditor } from '@/components/task-editor';
 
 interface Props {
   tasks: Task[];
   locations: Location[];
   members: OrganizationMember[];
   canWrite: boolean;
+  canDelete: boolean;
   membershipId: string;
   activeFilter: string;
 }
@@ -57,6 +59,7 @@ export function TasksManager({
   locations,
   members,
   canWrite,
+  canDelete,
   membershipId,
   activeFilter,
 }: Props) {
@@ -64,6 +67,7 @@ export function TasksManager({
   const params = useSearchParams();
 
   const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -275,25 +279,57 @@ export function TasksManager({
                   </p>
                 </div>
 
-                <select
-                  value={task.status}
-                  disabled={!canMove || busy !== null}
-                  onChange={(event) =>
-                    send(
-                      `/api/v1/tasks/${task.id}`,
-                      'PATCH',
-                      { status: event.target.value },
-                      task.id,
-                    )
-                  }
-                  className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-xs disabled:opacity-50"
-                >
-                  {(Object.keys(STATUS_LABEL) as TaskStatus[]).map((status) => (
-                    <option key={status} value={status}>
-                      {STATUS_LABEL[status]}
-                    </option>
-                  ))}
-                </select>
+                <div className="flex items-center gap-2">
+                  {/*
+                   * Shown only to people who can actually save. An assignee
+                   * without task.write may move the status beside it, but the
+                   * API refuses them everything else, so offering the form
+                   * would only produce a 403 they cannot act on.
+                   */}
+                  {canWrite && (
+                    <button
+                      onClick={() => setEditing(editing === task.id ? null : task.id)}
+                      className="rounded-lg border border-[var(--color-line)] px-2 py-1.5 text-xs"
+                    >
+                      {editing === task.id ? 'Close' : 'Edit'}
+                    </button>
+                  )}
+
+                  <select
+                    value={task.status}
+                    disabled={!canMove || busy !== null}
+                    onChange={(event) =>
+                      send(
+                        `/api/v1/tasks/${task.id}`,
+                        'PATCH',
+                        { status: event.target.value },
+                        task.id,
+                      )
+                    }
+                    className="rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-2 py-1.5 text-xs disabled:opacity-50"
+                  >
+                    {(Object.keys(STATUS_LABEL) as TaskStatus[]).map((status) => (
+                      <option key={status} value={status}>
+                        {STATUS_LABEL[status]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {canWrite && editing === task.id && (
+                  <TaskEditor
+                    task={task}
+                    locations={locations}
+                    members={members}
+                    canDelete={canDelete}
+                    busy={busy === task.id}
+                    onSave={(changes) =>
+                      send(`/api/v1/tasks/${task.id}`, 'PATCH', changes, task.id)
+                    }
+                    onDelete={() => send(`/api/v1/tasks/${task.id}`, 'DELETE', undefined, task.id)}
+                    onCancel={() => setEditing(null)}
+                  />
+                )}
               </div>
             );
           })}

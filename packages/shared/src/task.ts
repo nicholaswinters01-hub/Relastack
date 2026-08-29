@@ -77,11 +77,20 @@ export type Task = z.infer<typeof taskSchema>;
 
 const taskFields = {
   title: z.string().trim().min(1, 'A task needs a title').max(200),
+  /*
+   * Empty becomes null, not undefined.
+   *
+   * Undefined means "not mentioned", and the update leaves anything not
+   * mentioned alone — so an emptied box would have silently failed to clear
+   * the description while reporting success. Null is how you say "remove
+   * this", and it is the only way a form can express it.
+   */
   description: z
     .string()
     .trim()
     .max(5000)
-    .transform((value) => (value === '' ? undefined : value))
+    .transform((value) => (value === '' ? null : value))
+    .nullable()
     .optional(),
   priority: taskPrioritySchema.default('NORMAL'),
   dueAt: z

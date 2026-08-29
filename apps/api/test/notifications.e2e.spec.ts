@@ -221,6 +221,63 @@ describe('Notifications (e2e)', () => {
       // The unique pair on (event, membership) is what makes retrying safe.
       expect(after).toBe(before);
     });
+
+    it('handing a task to somebody else tells THEM, not just the first person', async () => {
+      // The whole point of being able to edit: a task went to the wrong
+      // person. Fixing it silently would be worse than the mistake, because
+      // the sender believes it is handled and the right person never knows.
+      const created = await request('POST', '/api/v1/tasks', ownerToken, {
+        title: 'Meant for somebody else',
+        locationId,
+        assigneeMembershipId: ownerMembershipId,
+      });
+      const taskId = json(created).task.id;
+
+      const before = await privileged.notification.count({
+        where: { membershipId: crewMembershipId, type: EVENT_TYPES.TASK_ASSIGNED },
+      });
+
+      const moved = await request('PATCH', `/api/v1/tasks/${taskId}`, ownerToken, {
+        assigneeMembershipId: crewMembershipId,
+      });
+      expect(moved.statusCode, moved.body).toBe(200);
+
+      await dispatcher.drain();
+
+      expect(
+        await privileged.notification.count({
+          where: { membershipId: crewMembershipId, type: EVENT_TYPES.TASK_ASSIGNED },
+        }),
+      ).toBe(before + 1);
+    });
+
+    it('editing something else about a task does not re-announce it', async () => {
+      const created = await request('POST', '/api/v1/tasks', ownerToken, {
+        title: 'Already theirs',
+        locationId,
+        assigneeMembershipId: crewMembershipId,
+      });
+      const taskId = json(created).task.id;
+      await dispatcher.drain();
+
+      const before = await privileged.notification.count({
+        where: { membershipId: crewMembershipId, type: EVENT_TYPES.TASK_ASSIGNED },
+      });
+
+      // Sending the assignee unchanged alongside a real edit is exactly what a
+      // form does. Announcing on every save is how a bell becomes noise.
+      await request('PATCH', `/api/v1/tasks/${taskId}`, ownerToken, {
+        title: 'Already theirs, retitled',
+        assigneeMembershipId: crewMembershipId,
+      });
+      await dispatcher.drain();
+
+      expect(
+        await privileged.notification.count({
+          where: { membershipId: crewMembershipId, type: EVENT_TYPES.TASK_ASSIGNED },
+        }),
+      ).toBe(before);
+    });
   });
 
   // =========================================================================
