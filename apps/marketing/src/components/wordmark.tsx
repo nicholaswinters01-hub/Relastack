@@ -1,22 +1,44 @@
 import { BRAND } from '@/lib/brand';
 
 /**
- * The name, set as plain text — a placeholder, not a finished mark.
+ * The name, set the way the logo sets it: navy "Rela", blue "Stack".
  *
- * The old wordmark hard-coded a split "Biz"/"Foundry" colouring taken
- * straight from that logo. Relastack does not split the same way and has no
- * supplied mark yet, so this deliberately does nothing clever: one weight,
- * one colour, pulled from `BRAND.productName` so it can never drift from the
- * name used everywhere else.
+ * Text rather than the PNG: it stays crisp at any size, costs no request,
+ * inverts correctly in dark mode, and can never render as a broken image. The
+ * logo file is still wanted — for the favicon and the social card, where an
+ * image is unavoidable — but the header is better off without it.
  *
- * REPLACE THIS once the real Relastack logo exists. If the mark ends up
- * using a colour split or a genuine logotype, this is the one place that
- * needs to change — every page imports the component, not the string.
+ * The split is written out as two literal strings rather than sliced from
+ * `BRAND.productName`, so a typo in either breaks visibly at compile time
+ * instead of silently mis-slicing a renamed product. The assertion below is
+ * what keeps them from drifting apart the way the slice would have prevented
+ * automatically — if the name ever changes, this fails loudly rather than
+ * quietly rendering half of the old one.
  */
+const FIRST = 'Rela';
+const SECOND = 'Stack';
+
+if (`${FIRST}${SECOND}` !== BRAND.productName) {
+  throw new Error(
+    `Wordmark halves ("${FIRST}" + "${SECOND}") no longer match BRAND.productName ("${BRAND.productName}")`,
+  );
+}
+
 export function Wordmark({ className = '' }: { className?: string }) {
   return (
-    <span className={`font-semibold tracking-tight text-[var(--color-brand)] ${className}`}>
-      {BRAND.productName}
+    <span
+      className={`font-semibold tracking-tight ${className}`}
+      // One accessible name, so a screen reader says "RelaStack" rather than
+      // spelling out two adjacent fragments.
+      aria-label={BRAND.productName}
+      role="img"
+    >
+      <span aria-hidden="true" className="text-[var(--color-brand)]">
+        {FIRST}
+      </span>
+      <span aria-hidden="true" className="text-[var(--color-accent-ink)]">
+        {SECOND}
+      </span>
     </span>
   );
 }

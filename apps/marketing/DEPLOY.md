@@ -138,9 +138,9 @@ automatically once the records resolve.
 
 ## Before you send anyone the link
 
-- [ ] `public/logo.png` added — needed for the favicon and the social card.
-      Removed for now: the file there was the old BizFoundry mark, and a
-      competitor's logo on Relastack's own share previews is worse than none.
+- [x] `public/logo.png` (social card) and `src/app/icon.png` (favicon) are the
+      real RelaStack mark, not the old BizFoundry one — both cropped from the
+      supplied logo with the tagline removed, at the product owner's go-ahead.
 - [ ] `BRAND.legalEntity` confirmed correct — it currently names B&N Business
       Solutions ahead of its expected 2026-10-01 formation date; re-check it
       actually filed before relying on it

@@ -15,13 +15,14 @@ pnpm dev:marketing    # http://localhost:3001
 
 ## Before this goes live
 
-1. **Add the real logo** at `public/logo.png`, once Relastack has one — a
-   product logo is in progress but not supplied yet. The header uses a text
-   wordmark (`src/components/wordmark.tsx`) in the meantime, currently a plain
-   single-colour placeholder rather than a finished mark. Restore
-   `images: ['/logo.png']` in `src/app/layout.tsx`'s `openGraph` block once the
-   file exists — it is deliberately omitted now rather than pointing at
-   nothing, or worse, at the old BizFoundry mark this project no longer uses.
+1. **Re-check the logo assets if a new export ever replaces this one.**
+   `public/logo.png` (the social card) and `src/app/icon.png` (the favicon —
+   Next.js picks up that filename automatically, no code references it) are
+   both cropped from the supplied 1254×1254 source with the tagline removed.
+   The colour split it uses (navy "Rela", blue "Stack") is sampled into
+   `globals.css`, and the header wordmark (`src/components/wordmark.tsx`)
+   already matches it — a new export only needs re-cropping the same way, not
+   a colour or component change.
 2. **Confirm B&N Business Solutions LLC formation on or after 2026-10-01**
    before treating `legalEntity` in `src/lib/brand.ts` as settled. It already
    names the company ahead of the filing, at the product owner's direction —
@@ -34,11 +35,23 @@ pnpm dev:marketing    # http://localhost:3001
 
 ## Colour
 
-`--color-accent` was picked for the old BizFoundry mark and has not been
-revisited for Relastack's palette yet. It measures 2.76:1 on white, which is
-fine for a mark and fails WCAG AA for anything read as text. Use
-`--color-accent-ink` (4.76:1 on the canvas, 5.06:1 behind white button text)
-wherever it has to carry words, until the real palette replaces both.
+Sampled from the Relastack logo: navy `--color-brand`, blue `--color-accent`.
+Three roles, not two — see the comment block at the top of `globals.css` for
+why a plain accent/accent-ink split was not enough once dark mode was checked
+properly. In short:
+
+- `--color-accent` is a fill, not text — it measures 3.1:1 on white, which
+  fails WCAG AA for anything read as words.
+- `--color-accent-ink` (4.86:1 on the canvas) is what carries words — the
+  wordmark's "Stack".
+- `--color-cta` is the button's own colour, deliberately not the same
+  variable as `--color-accent-ink`. The old scheme shared one variable
+  between "the wordmark's text in dark mode" and "the button's fill behind
+  white text", and dark mode broke it silently — the wordmark needed a bright
+  blue to stay legible on a dark page, and that same blue could no longer
+  hold white button text at 4.5:1 (it measured 2.06:1, undetected, because the
+  README only ever checked light mode). Each token is now picked only against
+  the constraint it actually has to satisfy.
 
 ## Where the list can go
 

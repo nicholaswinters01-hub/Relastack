@@ -60,16 +60,19 @@ export const metadata: Metadata = {
   description:
     'One system for running an independent business: customers, scheduling, staff and stock. Turn on the parts you need. Priced per location, never per user.',
 
-  // The social card has no image for now. There WAS a /logo.png here, but it
-  // was the old BizFoundry mark — shipping a competitor's name in Relastack's
-  // own share previews is worse than shipping none. Drop the real Relastack
-  // logo at public/logo.png and restore `images: ['/logo.png']` below.
+  // The RelaStack lockup, cropped from the supplied logo file with the
+  // "Business management. Simplified." tagline removed — the product owner's
+  // own call, and the right one: illegible at social-preview thumbnail sizes
+  // anyway. If a new export ever needs the same treatment: the tagline sat in
+  // the bottom ~230px of a 1254×1254 source, so cropping to roughly the top
+  // 860px reproduces this.
   openGraph: {
     title: `${BRAND.productName} — ${BRAND.tagline}`,
     description:
       'One system for running an independent business. Priced per location, never per user.',
     siteName: BRAND.productName,
     type: 'website',
+    images: ['/logo.png'],
   },
   twitter: { card: 'summary_large_image' },
 };

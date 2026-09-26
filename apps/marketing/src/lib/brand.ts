@@ -9,11 +9,12 @@
 
 export const BRAND = {
   /**
-   * One word, capital R. Worth being consistent about from the first day,
-   * because it ends up in the domain, the email footer, the app title and
-   * every invoice.
+   * Cased to match the logo: capital R twice, "RelaStack". Worth being
+   * consistent about from the first day, because it ends up in the domain
+   * (which is lowercase regardless — that is just how domains work, not a
+   * casing decision), the email footer, the app title and every invoice.
    */
-  productName: 'Relastack',
+  productName: 'RelaStack',
 
   tagline: 'Business software, built around you.',
 

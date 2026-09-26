@@ -6,10 +6,19 @@
  * you stare at all day, and this is a first impression. Sharing one file would
  * mean every brand tweak here landed in the application too.
  *
- * --color-brand and --color-accent are sampled from the logo, so the mark and
- * the page cannot drift apart. The accent carries the primary action and the
- * second half of the wordmark, and nothing else — an accent used everywhere
- * stops being one.
+ * --color-brand and --color-accent are sampled from the Relastack logo (navy
+ * "Rela", blue "Stack"), so the mark and the page cannot drift apart. Three
+ * roles, not two, because one variable was being asked to do two jobs that
+ * turned out to conflict — see the note on --color-cta below.
+ *
+ *   --color-brand      the navy. Headings, the first half of the wordmark.
+ *   --color-accent      decorative blue fills the eye only has to see —
+ *                       icons, backgrounds. Not used as text: it is not
+ *                       reliably legible as text in either theme.
+ *   --color-accent-ink  the readable blue. The wordmark's second half, and
+ *                       anywhere else blue carries words.
+ *   --color-cta         the button. See below for why this is not
+ *                       --color-accent-ink too.
  */
 
 @theme {
@@ -21,18 +30,45 @@
   --color-ok: #059669;
   --color-bad: #dc2626;
 
-  --color-brand: #24304b;
-  --color-accent: #f4791f;
-  /* Darkened for anything text-shaped. The logo orange on white measures
-     2.76:1, which fails WCAG AA — fine for a mark, not for words. This
-     variant measures 4.76:1 on the canvas and 5.06:1 behind white button
-     text. Use --color-accent for fills the eye only has to see, and
-     --color-accent-ink wherever something has to be read. */
-  --color-accent-ink: #b4520c;
+  --color-brand: #0f1b33;
+  --color-accent: #4fa3f7;
+  /* Darkened for anything text-shaped. The raw accent blue on white measures
+     3.1:1, which fails WCAG AA for text — fine for a fill, not for words.
+     This variant measures 4.86:1 on the canvas. */
+  --color-accent-ink: #2563eb;
+
+  /* The button's own colour, deliberately independent of --color-accent-ink.
+     Both were the same variable once: in dark mode the wordmark's blue has to
+     turn bright to stay legible against a dark page, and a button that bright
+     can no longer hold white text at AA contrast — the old orange scheme had
+     exactly this bug (2.06:1, silently, because nobody had checked dark mode
+     specifically). A button does not need to invert; it is a shape on the
+     page either way, not page text. One fixed-per-theme colour, picked only
+     so its own text (white, always) and its own edge (against whichever
+     canvas) both clear WCAG on their own terms. */
+  --color-cta: #1d4ed8;
 }
 
+/*
+ * A plain :root override, NOT another @theme block.
+ *
+ * @theme is a Tailwind build-time directive: it registers tokens and
+ * generates the utility classes for them, once, regardless of what it is
+ * nested inside. A SECOND @theme block here does not mean "these values
+ * apply only under this @media" — Tailwind flattens both into the same
+ * unconditional :root layer, and whichever one is later in the source file
+ * wins outright. That is exactly what was happening: every visitor, in every
+ * theme, was silently served the dark-mode values, because this block came
+ * second. It compiled cleanly and looked right in a quick glance at either
+ * theme alone, which is exactly why it went unnoticed — it was only caught by
+ * forcing light mode and reading the generated CSS instead of trusting the
+ * screenshot.
+ *
+ * Plain CSS custom properties, by contrast, cascade and override exactly the
+ * way @media implies. This block does the same job correctly.
+ */
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root {
     --color-canvas: #0d1220;
     --color-surface: #161d2e;
     --color-ink: #e8eaf0;
@@ -44,8 +80,12 @@
     /* The navy is the page in dark mode, so the mark needs a light form of
        itself to stay legible. */
     --color-brand: #e8eaf0;
-    --color-accent: #ff8c3a;
-    --color-accent-ink: #ff9d55;
+    --color-accent: #5fb0ff;
+    --color-accent-ink: #6fb2ff;
+    /* A different, less extreme brightening than --color-accent-ink above —
+       see the comment on the light-mode value for why the two cannot share
+       a number in this theme. */
+    --color-cta: #2e63d6;
   }
 }
 

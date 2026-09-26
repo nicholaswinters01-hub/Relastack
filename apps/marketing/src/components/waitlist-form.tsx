@@ -117,11 +117,14 @@ export function WaitlistForm() {
           type="submit"
           disabled={state.status === 'sending'}
           /*
-           * The one place the logo orange appears as a fill. White on this
-           * orange clears 4.5:1, which the lighter logo orange does not — the
-           * mark can afford a tint that text cannot.
+           * --color-cta, not --color-accent-ink. The wordmark's blue has to
+           * brighten in dark mode to stay legible as page text, and a fill
+           * that bright cannot hold white button text at AA contrast — see
+           * the comment on --color-cta in globals.css. A button is a shape on
+           * the page either way, so it gets its own colour instead of
+           * inheriting one picked for a different job.
            */
-          className="mt-1 rounded-lg border border-transparent bg-[var(--color-accent-ink)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
+          className="mt-1 rounded-lg border border-transparent bg-[var(--color-cta)] px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50"
         >
           {state.status === 'sending' ? 'Just a moment…' : 'Join the waitlist'}
         </button>
