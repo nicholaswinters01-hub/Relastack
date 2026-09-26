@@ -123,6 +123,34 @@ function ensureTable(): Promise<void> {
   return ready;
 }
 
+export interface SignupRow {
+  email: string;
+  note: string | null;
+  createdAt: string;
+}
+
+/** Newest first. Only ever called from behind `requireAdmin`. */
+export async function listSignups(limit = 1000): Promise<{ total: number; rows: SignupRow[] }> {
+  await ensureTable();
+
+  const [count, result] = await Promise.all([
+    getPool().query<{ total: string }>('SELECT count(*)::text AS total FROM waitlist_signups'),
+    getPool().query<{ email: string; note: string | null; created_at: Date }>(
+      'SELECT email, note, created_at FROM waitlist_signups ORDER BY created_at DESC LIMIT $1',
+      [limit],
+    ),
+  ]);
+
+  return {
+    total: Number(count.rows[0]?.total ?? 0),
+    rows: result.rows.map((row) => ({
+      email: row.email,
+      note: row.note,
+      createdAt: row.created_at.toISOString(),
+    })),
+  };
+}
+
 export async function subscribeToPostgres(input: SubscribeInput): Promise<SubscribeResult> {
   try {
     await ensureTable();

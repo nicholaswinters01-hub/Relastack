@@ -115,6 +115,26 @@ Both paths matter. The native `method="post"` in particular is what stops a
 browser falling back to GET and putting the visitor's email address in the URL,
 where every proxy and access log in the path would record it.
 
+## Admin: seeing who signed up
+
+`/admin` shows the waitlist table to the two people who run the business. It
+is not linked from anywhere, but that is not what protects it: every admin
+page and route checks a signed session on the server.
+
+```bash
+node apps/marketing/scripts/admin-setup.mjs
+```
+
+This asks for each account's email and password, then prints `ADMIN_USERS` and
+`ADMIN_SESSION_SECRET` to paste into the host's environment. Passwords are
+stored only as scrypt hashes. To add, remove or re-password someone, re-run it
+and replace both values. Changing `ADMIN_SESSION_SECRET` signs everyone out;
+changing one person's password signs out only them.
+
+Unset, nobody can sign in, and the public site is unaffected. Sessions last 7
+days. Five failed attempts from one address locks it out for 15 minutes. That
+limit is in memory, so it resets on deploy and isn't shared across instances.
+
 ## Where signups are stored
 
 A Postgres table you own, not a mailing-list vendor. Set:
