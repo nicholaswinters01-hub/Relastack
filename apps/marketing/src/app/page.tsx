@@ -132,20 +132,6 @@ export default async function HomePage({ searchParams }: Props) {
       </section>
 
       {/* ------------------------------------------------------------- */}
-      <section className="mt-20 rounded-2xl border border-[var(--color-line)] p-6">
-        <h2 className="text-lg font-semibold">Where this is up to</h2>
-        <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">
-          Being built in the open, one piece at a time. Accounts, locations, staff permissions,
-          billing and the customer records are working. Scheduling is next. There is no launch date
-          and no trial to sign up for yet — the waitlist is how you hear when there is.
-        </p>
-        <p className="mt-3 text-sm leading-relaxed text-[var(--color-muted)]">
-          If you run a business like this and want a say in what gets built, say so in the box
-          above. Early on, that is worth more than any roadmap.
-        </p>
-      </section>
-
-      {/* ------------------------------------------------------------- */}
       <footer className="mt-20 flex flex-wrap items-center justify-between gap-4 border-t border-[var(--color-line)] pt-8 text-sm text-[var(--color-muted)]">
         <span>
           © {new Date().getFullYear()} {BRAND.legalEntity}
