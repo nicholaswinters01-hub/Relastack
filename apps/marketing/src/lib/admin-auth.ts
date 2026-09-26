@@ -52,29 +52,52 @@ function parseHash(raw: string): StoredHash | null {
   return { raw, N, r, p, salt, hash };
 }
 
+let reported = false;
+let reportedRejects = false;
+
+/** Why sign-in is off, logged once per instance and never with the values. */
+function disabled(reason: string): null {
+  if (!reported) {
+    reported = true;
+    console.warn(`[admin] sign-in disabled: ${reason}`);
+  }
+  return null;
+}
+
 function loadConfig(): AdminConfig | null {
-  const rawUsers = process.env.ADMIN_USERS?.trim();
+  // Whitespace stripped entirely, not just trimmed: the value is copied from a
+  // terminal where it wraps, and neither emails nor hashes ever contain any.
+  const rawUsers = process.env.ADMIN_USERS?.replace(/\s+/g, '') ?? '';
   const secret = process.env.ADMIN_SESSION_SECRET?.trim() ?? '';
 
-  if (!rawUsers || secret.length < MIN_SECRET_LENGTH) return null;
-
-  const users = new Map<string, StoredHash>();
-
-  for (const entry of rawUsers.split(',')) {
-    const separator = entry.indexOf(':');
-    const email = entry.slice(0, separator).trim().toLowerCase();
-    const stored = parseHash(entry.slice(separator + 1).trim());
-
-    if (separator <= 0 || !email || !stored) {
-      // Skipped, not fatal: one bad entry should not lock the other person out.
-      console.error('[admin] ignoring a malformed ADMIN_USERS entry');
-      continue;
-    }
-
-    users.set(email, stored);
+  if (!rawUsers) return disabled('ADMIN_USERS is not set');
+  if (secret.length < MIN_SECRET_LENGTH) {
+    return disabled(
+      secret
+        ? `ADMIN_SESSION_SECRET is shorter than ${MIN_SECRET_LENGTH} characters`
+        : 'ADMIN_SESSION_SECRET is not set',
+    );
   }
 
-  return users.size > 0 ? { users, secret } : null;
+  const users = new Map<string, StoredHash>();
+  const rejected: number[] = [];
+
+  rawUsers.split(',').forEach((entry, index) => {
+    const separator = entry.indexOf(':');
+    const email = entry.slice(0, separator).toLowerCase();
+    const stored = parseHash(entry.slice(separator + 1));
+
+    // Skipped, not fatal: one bad entry should not lock the other person out.
+    if (separator <= 0 || !email || !stored) rejected.push(index + 1);
+    else users.set(email, stored);
+  });
+
+  if (rejected.length > 0 && !reportedRejects) {
+    reportedRejects = true;
+    console.error(`[admin] ignoring unreadable ADMIN_USERS entries: #${rejected.join(', #')}`);
+  }
+
+  return users.size > 0 ? { users, secret } : disabled('no readable accounts in ADMIN_USERS');
 }
 
 export function isAdminConfigured(): boolean {
