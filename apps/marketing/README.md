@@ -1,4 +1,4 @@
-# BizFoundry — marketing site
+# Relastack — marketing site
 
 The public landing page and waitlist. Deliberately **not** part of `apps/web`.
 
@@ -15,12 +15,17 @@ pnpm dev:marketing    # http://localhost:3001
 
 ## Before this goes live
 
-1. **Add the logo file** at `public/logo.png`. The header uses a text
-   wordmark by design — crisp at any size, correct in dark mode, never a
-   broken image — but the favicon and the social card need the raster.
-2. **Revisit `legalEntity` in `src/lib/brand.ts` when the LLC is formed.**
-   It currently names an individual, which is correct while trading as one.
-   The privacy notice must name whoever actually holds the data at the time.
+1. **Add the real logo** at `public/logo.png`, once Relastack has one — a
+   product logo is in progress but not supplied yet. The header uses a text
+   wordmark (`src/components/wordmark.tsx`) in the meantime, currently a plain
+   single-colour placeholder rather than a finished mark. Restore
+   `images: ['/logo.png']` in `src/app/layout.tsx`'s `openGraph` block once the
+   file exists — it is deliberately omitted now rather than pointing at
+   nothing, or worse, at the old BizFoundry mark this project no longer uses.
+2. **Confirm B&N Business Solutions LLC formation on or after 2026-10-01**
+   before treating `legalEntity` in `src/lib/brand.ts` as settled. It already
+   names the company ahead of the filing, at the product owner's direction —
+   see the comment on that field for why that matters and what to check.
 3. **Have the privacy notice reviewed.** It accurately describes what the form
    does, which is the necessary starting point, but it has not been read by a
    lawyer.
@@ -29,10 +34,11 @@ pnpm dev:marketing    # http://localhost:3001
 
 ## Colour
 
-`--color-accent` is the logo orange. It measures 2.76:1 on white, which is
+`--color-accent` was picked for the old BizFoundry mark and has not been
+revisited for Relastack's palette yet. It measures 2.76:1 on white, which is
 fine for a mark and fails WCAG AA for anything read as text. Use
 `--color-accent-ink` (4.76:1 on the canvas, 5.06:1 behind white button text)
-wherever the orange has to carry words.
+wherever it has to carry words, until the real palette replaces both.
 
 ## Where the list can go
 

@@ -9,33 +9,35 @@
 
 export const BRAND = {
   /**
-   * Cased to match the logo: capital B, capital F. Worth being consistent
-   * about from the first day, because it ends up in the domain, the email
-   * footer, the app title and every invoice.
+   * One word, capital R. Worth being consistent about from the first day,
+   * because it ends up in the domain, the email footer, the app title and
+   * every invoice.
    */
-  productName: 'BizFoundry',
+  productName: 'Relastack',
 
   tagline: 'Business software, built around you.',
 
   /**
    * The legal entity that controls the data, which is not the product name.
    *
-   * Trading as an individual until an LLC is formed, so the controller is a
-   * person. That is normal for a pre-launch project and it is the honest
-   * answer — naming a company that does not exist yet would make the privacy
-   * notice point at nobody.
+   * Named ahead of formation, at the product owner's explicit direction
+   * (2026-09-26): B&N Business Solutions LLC is expected to register on
+   * 2026-10-01 and this is set in advance of that date. Until the filing
+   * actually goes through, "B&N Business Solutions" names an entity that does
+   * not yet legally exist — a deletion or complaint sent to it before then has
+   * no registered company to reach, only the person behind it.
    *
-   * CHANGE THIS when the LLC is registered: the notice must name whoever
-   * actually holds the data at the time, and the copyright line below uses it
-   * too.
+   * CONFIRM on or after 2026-10-01 that formation actually completed. If it
+   * slips, this needs to read a person's name again until it does — see the
+   * same note this replaced, on `legalEntity: 'Nicholas Winters'`.
    */
-  legalEntity: 'Nicholas Winters',
+  legalEntity: 'B&N Business Solutions',
 
   /**
    * Published in the privacy notice as the address to write to. It has to
    * actually reach someone — this is where deletion requests arrive.
    */
-  contactEmail: 'hello@bizfoundry.net',
+  contactEmail: 'hello@relastack.com',
 
   /** PLACEHOLDER — the jurisdiction whose law governs the privacy notice. */
   jurisdiction: 'the United States',

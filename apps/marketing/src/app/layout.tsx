@@ -60,16 +60,16 @@ export const metadata: Metadata = {
   description:
     'One system for running an independent business: customers, scheduling, staff and stock. Turn on the parts you need. Priced per location, never per user.',
 
-  // The social card. Pointing at /logo.png, which is not in the repository
-  // yet — drop the mark there and this starts working. Until then a shared
-  // link simply shows no image, which is tidier than showing a broken one.
+  // The social card has no image for now. There WAS a /logo.png here, but it
+  // was the old BizFoundry mark — shipping a competitor's name in Relastack's
+  // own share previews is worse than shipping none. Drop the real Relastack
+  // logo at public/logo.png and restore `images: ['/logo.png']` below.
   openGraph: {
     title: `${BRAND.productName} — ${BRAND.tagline}`,
     description:
       'One system for running an independent business. Priced per location, never per user.',
     siteName: BRAND.productName,
     type: 'website',
-    images: ['/logo.png'],
   },
   twitter: { card: 'summary_large_image' },
 };

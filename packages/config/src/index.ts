@@ -134,7 +134,7 @@ export const serverEnvSchema = z
     EMAIL_API_KEY: z.string().optional(),
 
     /** The From address. Must be on a domain the provider has verified. */
-    EMAIL_FROM: z.string().default('BizFoundry <hello@bizfoundry.net>'),
+    EMAIL_FROM: z.string().default('Relastack <hello@relastack.com>'),
 
     /**
      * A physical postal address, printed in the footer of every message.

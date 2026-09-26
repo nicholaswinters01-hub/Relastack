@@ -1,4 +1,4 @@
-# Putting BizFoundry online
+# Putting Relastack online
 
 From a working local site to a real domain collecting real addresses.
 
@@ -26,29 +26,36 @@ Secrets are already safe: `.gitignore` covers `.env`, and nothing matching a
 credential is tracked. Verified before writing this.
 
 ```bash
-gh repo create bizfoundry --private --source=. --remote=origin --push
+gh repo create relastack --private --source=. --remote=origin --push
 ```
 
 If you would rather not use the `gh` CLI, create an empty **private** repo on
 GitHub and:
 
 ```bash
-git remote add origin git@github.com:<you>/bizfoundry.git
+git remote add origin git@github.com:<you>/relastack.git
 git push -u origin main
 ```
 
+> Already done once under the old name (`bizfoundry`). Renaming the existing
+> GitHub repo (`gh repo rename relastack`) and updating the local remote gets
+> the same result without losing history, issues or stars — no need to
+> recreate it from scratch.
+
 ## 2. Register the domain
 
-`bizfoundry.com` if it is free. Cloudflare, Namecheap and Porkbun are all fine;
-Cloudflare sells at cost and does not raise the price on renewal, which most
-registrars do.
+Already done — `relastack.com`, purchased to replace `bizfoundry.net` after
+finding an unrelated business already trading as BizFoundry. Cloudflare,
+Namecheap and Porkbun are all fine for a future registration; Cloudflare sells
+at cost and does not raise the price on renewal, which most registrars do.
 
-Check the name is not already a trademark in your line of business before you
-commit to it — a rename after launch means the domain, the logo, the emails you
-have already sent and every link anyone has shared.
+Whatever the domain, check the name is not already a trademark in your line of
+business before committing to it — this is the second time around for exactly
+that reason, and a second rename would cost the domain, the logo, the emails
+already sent and every link anyone has shared.
 
-While you are there, decide on the address the privacy notice will publish.
-`hello@bizfoundry.com` needs to actually reach you: it is where deletion
+The address the privacy notice publishes lives at that domain too.
+`hello@relastack.com` needs to actually reach you: it is where deletion
 requests arrive, and ignoring one is the kind of thing regulators care about.
 Most registrars will forward an address to your personal inbox for free.
 
@@ -105,7 +112,7 @@ nginx.
 In the host's project settings, for the Production environment:
 
 ```
-SITE_URL               https://bizfoundry.net
+SITE_URL               https://relastack.com
 WAITLIST_PROVIDER      buttondown
 WAITLIST_API_KEY       <the key from step 3>
 ```
@@ -131,9 +138,12 @@ automatically once the records resolve.
 
 ## Before you send anyone the link
 
-- [ ] `public/logo.png` added — needed for the favicon and the social card
-- [ ] `BRAND.legalEntity` set to the entity that actually controls the data,
-      which may be a company rather than "BizFoundry"
+- [ ] `public/logo.png` added — needed for the favicon and the social card.
+      Removed for now: the file there was the old BizFoundry mark, and a
+      competitor's logo on Relastack's own share previews is worse than none.
+- [ ] `BRAND.legalEntity` confirmed correct — it currently names B&N Business
+      Solutions ahead of its expected 2026-10-01 formation date; re-check it
+      actually filed before relying on it
 - [ ] `BRAND.contactEmail` set to an address you genuinely read
 - [ ] Privacy notice read by a lawyer
 - [ ] `robots: { index: false }` removed from `src/app/layout.tsx` — it is
