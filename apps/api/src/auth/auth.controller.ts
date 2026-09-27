@@ -1,14 +1,18 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
+  forgotPasswordRequestSchema,
   loginRequestSchema,
   registerRequestSchema,
+  resetPasswordRequestSchema,
   SESSION_COOKIE_NAME,
   type AuthResponse,
+  type ForgotPasswordRequest,
   type LoginRequest,
   type LogoutResponse,
   type PublicUser,
   type RegisterRequest,
+  type ResetPasswordRequest,
 } from '@platform/shared';
 import type { User } from '@platform/db';
 import { loadServerEnv } from '@platform/config';
@@ -16,6 +20,7 @@ import { clientIpOf } from '../common/internal-gate';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthService } from './auth.service';
 import { CookieService } from './cookie.service';
+import { PasswordResetService } from './password-reset.service';
 import { CurrentUser, Public } from './auth.decorators';
 import { AllowNoOrganization } from '../tenancy/tenant.decorators';
 import type { FastifyReply, FastifyRequest } from './fastify.types';
@@ -44,6 +49,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly cookies: CookieService,
+    private readonly resets: PasswordResetService,
   ) {}
 
   /**
@@ -91,6 +97,40 @@ export class AuthController {
     this.cookies.setSession(reply, session.token, session.expiresAt);
 
     return { user };
+  }
+
+  /**
+   * Email a reset link. The answer is identical whether or not the address
+   * has an account, so this cannot be used to find out who does.
+   */
+  @Public()
+  @Post('password/forgot')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @Throttle({ default: { limit: rateLimits.RATE_LIMIT_REGISTER_PER_HOUR, ttl: HOUR } })
+  async forgotPassword(
+    @Body(new ZodValidationPipe(forgotPasswordRequestSchema)) body: ForgotPasswordRequest,
+    @Req() request: FastifyRequest,
+  ): Promise<{ message: string }> {
+    await this.resets.requestReset(body.email, clientIpOf(request));
+
+    return {
+      message: 'If that email has an account, we have sent it a link to reset the password.',
+    };
+  }
+
+  /** Set a new password from an emailed link. Signs the person out everywhere. */
+  @Public()
+  @Post('password/reset')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @Throttle({ default: { limit: rateLimits.RATE_LIMIT_LOGIN_PER_MINUTE, ttl: MINUTE } })
+  async resetPassword(
+    @Body(new ZodValidationPipe(resetPasswordRequestSchema)) body: ResetPasswordRequest,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ): Promise<void> {
+    await this.resets.resetPassword(body.token, body.password);
+
+    // Whatever session this browser had was just revoked with the rest.
+    this.cookies.clearSession(reply);
   }
 
   /**

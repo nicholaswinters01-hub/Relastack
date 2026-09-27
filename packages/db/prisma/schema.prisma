@@ -78,8 +78,9 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
-  sessions    Session[]
-  memberships OrganizationMembership[]
+  sessions            Session[]
+  passwordResetTokens PasswordResetToken[]
+  memberships         OrganizationMembership[]
 
   platformStaff PlatformStaff?
 
@@ -116,6 +117,30 @@ model Session {
   @@index([userId])
   @@index([expiresAt])
   @@map("sessions")
+}
+
+/// A "forgot password" link, sent by email.
+///
+/// Like a session, only the hash of the token is stored: a copy of this table
+/// must not be a set of working links. Short-lived, single-use, and every
+/// earlier unused link for the person dies when a new one is issued.
+model PasswordResetToken {
+  id String @id @default(uuid()) @db.Uuid
+
+  userId    String @map("user_id") @db.Uuid
+  tokenHash String @unique @map("token_hash")
+
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  /// Recorded for audit. Never used to decide anything.
+  requestedIp String? @map("requested_ip")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("password_reset_tokens")
 }
 
 /// A customer business. THE tenant boundary — the unit of isolation.
@@ -1491,10 +1516,10 @@ model BillingPayment {
   recordedByEmail  String  @map("recorded_by_email")
   note             String?
 
-  voidedAt         DateTime? @map("voided_at")
-  voidedByUserId   String?   @map("voided_by_user_id") @db.Uuid
-  voidedByEmail    String?   @map("voided_by_email")
-  voidReason       String?   @map("void_reason")
+  voidedAt       DateTime? @map("voided_at")
+  voidedByUserId String?   @map("voided_by_user_id") @db.Uuid
+  voidedByEmail  String?   @map("voided_by_email")
+  voidReason     String?   @map("void_reason")
 
   createdAt DateTime @default(now()) @map("created_at")
 

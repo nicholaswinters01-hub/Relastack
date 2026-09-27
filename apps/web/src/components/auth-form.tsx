@@ -19,7 +19,7 @@ interface FieldError {
  * feedback without a round trip. This is a convenience, never a control — the
  * server validates independently and is the only opinion that counts.
  */
-export function AuthForm({ mode }: { mode: Mode }) {
+export function AuthForm({ mode, notice }: { mode: Mode; notice?: string }) {
   const router = useRouter();
   const isRegister = mode === 'register';
 
@@ -101,6 +101,12 @@ export function AuthForm({ mode }: { mode: Mode }) {
           : 'Welcome back.'}
       </p>
 
+      {notice && (
+        <p role="status" className="mt-6 rounded-lg bg-[var(--color-surface)] p-3 text-sm">
+          {notice}
+        </p>
+      )}
+
       <form onSubmit={handleSubmit} noValidate className="mt-8 flex flex-col gap-4">
         {isRegister && (
           <Field
@@ -165,6 +171,15 @@ export function AuthForm({ mode }: { mode: Mode }) {
           required
         />
 
+        {!isRegister && (
+          <Link
+            href="/forgot-password"
+            className="-mt-2 self-end text-xs text-[var(--color-muted)] underline underline-offset-4"
+          >
+            Forgot password?
+          </Link>
+        )}
+
         {formError && (
           <p
             role="alert"
@@ -207,7 +222,7 @@ interface FieldProps {
   required?: boolean;
 }
 
-function Field({
+export function Field({
   label,
   value,
   onChange,

@@ -82,6 +82,18 @@ export const loginRequestSchema = z.object({
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
+/** How long a "forgot password" link works. */
+export const PASSWORD_RESET_TTL_MINUTES = 60;
+
+export const forgotPasswordRequestSchema = z.object({ email: emailSchema });
+export type ForgotPasswordRequest = z.infer<typeof forgotPasswordRequestSchema>;
+
+export const resetPasswordRequestSchema = z.object({
+  token: z.string().trim().min(1, 'This link is not valid').max(200),
+  password: passwordSchema,
+});
+export type ResetPasswordRequest = z.infer<typeof resetPasswordRequestSchema>;
+
 export const userStatusSchema = z.enum(['ACTIVE', 'SUSPENDED']);
 export type UserStatus = z.infer<typeof userStatusSchema>;
 

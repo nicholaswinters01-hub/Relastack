@@ -3,6 +3,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { CookieService } from './cookie.service';
+import { PasswordResetService } from './password-reset.service';
 import { PasswordService } from './password.service';
 import { SessionService } from './session.service';
 
@@ -15,7 +16,7 @@ import { SessionService } from './session.service';
 @Module({
   imports: [OrganizationsModule],
   controllers: [AuthController],
-  providers: [AuthService, PasswordService, SessionService, CookieService],
+  providers: [AuthService, PasswordService, PasswordResetService, SessionService, CookieService],
   exports: [AuthService, SessionService, CookieService, PasswordService],
 })
 export class AuthModule {}
