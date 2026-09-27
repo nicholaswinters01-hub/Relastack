@@ -12,6 +12,14 @@ import {
 import {
   addStaffNoteRequestSchema,
   creditRequestSchema,
+  staffSupportQuerySchema,
+  staffSupportReplySchema,
+  staffSupportStatusSchema,
+  type StaffSupportDetail,
+  type StaffSupportList,
+  type StaffSupportQuery,
+  type StaffSupportReply,
+  type StaffSupportStatus,
   extendTrialRequestSchema,
   recordPaymentRequestSchema,
   setBusinessStatusRequestSchema,
@@ -35,6 +43,7 @@ import {
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentStaff, StaffOnly, type StaffIdentity } from './staff.decorators';
 import { StaffBillingService } from './staff-billing.service';
+import { StaffSupportService } from './staff-support.service';
 import { StaffService } from './staff.service';
 
 /**
@@ -49,6 +58,7 @@ export class StaffController {
   constructor(
     private readonly staff: StaffService,
     private readonly billing: StaffBillingService,
+    private readonly support: StaffSupportService,
   ) {}
 
   /** Lets the web app decide whether to show the Staff link. 404 for everyone else. */
@@ -184,6 +194,42 @@ export class StaffController {
     @Body(new ZodValidationPipe(creditRequestSchema)) body: CreditRequest,
   ): Promise<void> {
     return this.billing.removeCredit(staff, id, body.amountCents, body.reason);
+  }
+
+  @Get('support')
+  async supportInbox(
+    @CurrentStaff() staff: StaffIdentity,
+    @Query(new ZodValidationPipe(staffSupportQuerySchema)) query: StaffSupportQuery,
+  ): Promise<StaffSupportList> {
+    return { requests: await this.support.list(staff, query) };
+  }
+
+  @Get('support/:id')
+  supportRequest(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<StaffSupportDetail> {
+    return this.support.detail(staff, id);
+  }
+
+  @Post('support/:id/messages')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  supportReply(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(staffSupportReplySchema)) body: StaffSupportReply,
+  ): Promise<void> {
+    return this.support.reply(staff, id, body.body, body.status);
+  }
+
+  @Post('support/:id/status')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  supportStatus(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(staffSupportStatusSchema)) body: StaffSupportStatus,
+  ): Promise<void> {
+    return this.support.setStatus(staff, id, body.status);
   }
 
   @Post('businesses/:id/notes')

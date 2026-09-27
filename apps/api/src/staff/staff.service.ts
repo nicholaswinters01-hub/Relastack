@@ -58,7 +58,7 @@ export class StaffService {
   async overview(staff: StaffIdentity): Promise<StaffOverview> {
     const now = Date.now();
 
-    const { organizations, collected, credit } = await this.prisma.withStaff(
+    const { organizations, collected, credit, openSupport } = await this.prisma.withStaff(
       staff.userId,
       async (tx) => ({
         organizations: await tx.organization.findMany({
@@ -73,6 +73,7 @@ export class StaffService {
           _sum: { amountCents: true },
         }),
         credit: await tx.billingCredit.aggregate({ _sum: { amountCents: true } }),
+        openSupport: await tx.supportRequest.count({ where: { status: 'OPEN' } }),
       }),
     );
 
@@ -88,6 +89,7 @@ export class StaffService {
       renewalsDueSoon: 0,
       collectedLast30DaysCents: collected._sum.amountCents ?? 0,
       creditOutstandingCents: Math.max(0, credit._sum.amountCents ?? 0),
+      openSupportRequests: openSupport,
     };
 
     for (const organization of organizations) {

@@ -23,6 +23,7 @@ export const EVENT_TYPES = {
   SUBSCRIPTION_PAST_DUE: 'subscription.past_due',
   SUBSCRIPTION_READ_ONLY: 'subscription.read_only',
   INVITATION_SENT: 'invitation.sent',
+  SUPPORT_REPLIED: 'support.replied',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -53,6 +54,11 @@ export const NOTIFIABLE: Array<{ type: EventType; label: string; description: st
     type: EVENT_TYPES.SUBSCRIPTION_PAST_DUE,
     label: 'A payment is due or fails',
     description: 'Owners only. A payment is due or was declined, and the grace period has started.',
+  },
+  {
+    type: EVENT_TYPES.SUPPORT_REPLIED,
+    label: 'We reply to your help request',
+    description: 'The RelaStack team answers something you asked through Help.',
   },
 ];
 

@@ -26,3 +26,4 @@ export * from './job-series';
 export * from './report';
 export * from './notification';
 export * from './staff';
+export * from './support';

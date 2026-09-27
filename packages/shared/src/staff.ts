@@ -34,6 +34,8 @@ export const staffOverviewSchema = z.object({
   collectedLast30DaysCents: z.number().int().nonnegative(),
   /** Credit businesses hold with us that has not been spent yet. */
   creditOutstandingCents: z.number().int().nonnegative(),
+  /** Help requests waiting on us. */
+  openSupportRequests: z.number().int().nonnegative(),
 });
 export type StaffOverview = z.infer<typeof staffOverviewSchema>;
 

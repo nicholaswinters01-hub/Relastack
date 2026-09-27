@@ -6,7 +6,8 @@ export const ALLOWS_READ_ONLY_KEY = 'billing:allowsReadOnly';
 /**
  * Permits a write even when the subscription is read-only.
  *
- * For the billing endpoints themselves, and nothing else. A customer whose
+ * For the billing endpoints themselves and the help desk, and nothing else
+ * (rule 13). A customer whose
  * card failed must be able to choose a plan and pay — locking that behind the
  * lapse they are trying to fix would be a trap of our own making.
  *

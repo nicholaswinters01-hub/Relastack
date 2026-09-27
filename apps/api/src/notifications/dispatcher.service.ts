@@ -286,6 +286,18 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
         }));
       }
 
+      case EVENT_TYPES.SUPPORT_REPLIED:
+        return data.membershipId
+          ? [
+              {
+                membershipId: data.membershipId,
+                title: 'We replied to your help request',
+                body: data.subject ?? 'The RelaStack team has answered your request.',
+                linkPath: data.requestId ? `/help/${data.requestId}` : '/help',
+              },
+            ]
+          : [];
+
       // Invitations are emailed directly by their own service, because the
       // recipient has no membership to address a notification to yet.
       case EVENT_TYPES.INVITATION_SENT:

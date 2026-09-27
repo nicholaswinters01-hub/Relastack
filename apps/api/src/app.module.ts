@@ -25,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { SERVER_ENV, type ServerEnv } from './config.provider';
 import { StaffGuard } from './staff/staff.guard';
 import { StaffModule } from './staff/staff.module';
+import { SupportModule } from './support/support.module';
 
 /**
  * Application root.
@@ -72,6 +73,7 @@ import { StaffModule } from './staff/staff.module';
     ReportingModule,
     HealthModule,
     StaffModule,
+    SupportModule,
   ],
   providers: [
     // ORDER MATTERS. Guards run in registration order, so rate limiting is
