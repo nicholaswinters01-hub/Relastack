@@ -285,8 +285,16 @@ export type NotesResponse = z.infer<typeof notesResponseSchema>;
 // Customers
 // ---------------------------------------------------------------------------
 
+/** The largest account number a business can choose. */
+export const ACCOUNT_NUMBER_MAX = 99_999_999;
+
+/** How an account number is written everywhere: #1042. */
+export const formatAccountNumber = (n: number): string => `#${n}`;
+
 export const customerSchema = z.object({
   id: z.string().uuid(),
+  /** #1001, #1002, … per business. Given by the database, never reused. */
+  accountNumber: z.number().int().positive(),
   stage: customerStageSchema,
   type: customerTypeSchema,
   displayName: z.string(),
@@ -373,6 +381,8 @@ export type CreateCustomerRequest = z.infer<typeof createCustomerRequestSchema>;
 
 export const updateCustomerRequestSchema = z.object({
   ...customerFields,
+  /** Owners only: to match the numbers of a system the business is leaving. */
+  accountNumber: z.number().int().min(1).max(ACCOUNT_NUMBER_MAX).optional(),
   type: customerTypeSchema.optional(),
   stage: customerStageSchema.optional(),
 });

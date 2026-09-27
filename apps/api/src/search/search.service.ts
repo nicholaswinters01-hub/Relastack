@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { TenantContext } from '@platform/db';
 import {
   customerQuerySchema,
+  formatAccountNumber,
   jobQuerySchema,
   MODULES,
   PERMISSIONS,
@@ -17,6 +18,14 @@ import { JobsService } from '../scheduling/jobs.service';
 import { TasksService } from '../tasks/tasks.service';
 
 const LIMIT = SEARCH_RESULTS_PER_KIND;
+
+/** "Maple Street HOA #1042"; both are already null when the reader may not see the customer. */
+const withNumber = (name: string | null, accountNumber: number | null): string | null =>
+  name === null
+    ? null
+    : accountNumber === null
+      ? name
+      : `${name} ${formatAccountNumber(accountNumber)}`;
 
 /**
  * Quick search across everything a person can open.
@@ -63,6 +72,7 @@ export class SearchService {
                 title: customer.displayName,
                 subtitle:
                   [
+                    formatAccountNumber(customer.accountNumber),
                     customer.stage === 'ARCHIVED' ? 'Archived' : null,
                     customer.email,
                     customer.phone,
@@ -89,7 +99,7 @@ export class SearchService {
                 id: job.id,
                 title: job.title,
                 // Already null when the reader may not see the customer.
-                subtitle: job.customerName,
+                subtitle: withNumber(job.customerName, job.customerAccountNumber),
                 at: job.startsAt,
                 href: `/jobs/${job.id}`,
               })),
@@ -109,7 +119,7 @@ export class SearchService {
                 kind: 'task',
                 id: task.id,
                 title: task.title,
-                subtitle: task.customerName,
+                subtitle: withNumber(task.customerName, task.customerAccountNumber),
                 at: null,
                 href: `/tasks/${task.id}`,
               })),

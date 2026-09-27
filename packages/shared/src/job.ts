@@ -80,6 +80,8 @@ export const jobSchema = z.object({
    * allowed to know whose job it is.
    */
   customerName: z.string().nullable(),
+  /** Hidden exactly when the name is. */
+  customerAccountNumber: z.number().int().nullable(),
 
   addressLine1: z.string().nullable(),
   addressLine2: z.string().nullable(),

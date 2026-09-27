@@ -27,7 +27,7 @@ const NOT_FOUND = 'Job not found';
 
 const JOB_INCLUDE = {
   location: { select: { name: true, timezone: true } },
-  customer: { select: { displayName: true, locationId: true } },
+  customer: { select: { displayName: true, locationId: true, accountNumber: true } },
   createdBy: { select: { user: { select: { firstName: true, lastName: true, email: true } } } },
   assignments: {
     include: {
@@ -140,6 +140,7 @@ export class JobsService {
       locationTimezone: row.location?.timezone ?? null,
       customerId: customerVisible ? row.customerId : null,
       customerName: customerVisible ? (row.customer?.displayName ?? null) : null,
+      customerAccountNumber: customerVisible ? (row.customer?.accountNumber ?? null) : null,
       addressLine1: row.addressLine1,
       addressLine2: row.addressLine2,
       city: row.city,

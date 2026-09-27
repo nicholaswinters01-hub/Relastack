@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -182,6 +183,8 @@ export class CustomersService {
 
     return {
       id: row.id,
+      // Required by a CHECK constraint; Prisma only thinks it optional.
+      accountNumber: row.accountNumber ?? 0,
       stage: row.stage,
       type: row.type,
       displayName: row.displayName,
@@ -244,8 +247,11 @@ export class CustomersService {
 
     if (query.search) {
       const term = query.search;
+      // "1042" or "#1042" also finds that account.
+      const asNumber = /^#?\d{1,8}$/.test(term) ? Number(term.replace('#', '')) : null;
       filters.push({
         OR: [
+          ...(asNumber !== null ? [{ accountNumber: asNumber }] : []),
           { displayName: { contains: term, mode: 'insensitive' } },
           { email: { contains: term, mode: 'insensitive' } },
           { phone: { contains: term, mode: 'insensitive' } },
@@ -318,10 +324,15 @@ export class CustomersService {
     tx: TransactionClient,
     permissions: PermissionSet,
     id: string,
-  ): Promise<{ id: string; locationId: string | null; stage: CustomerStage }> {
+  ): Promise<{
+    id: string;
+    locationId: string | null;
+    stage: CustomerStage;
+    accountNumber: number | null;
+  }> {
     const row = await tx.customer.findFirst({
       where: this.scopedTo(permissions, { id }),
-      select: { id: true, locationId: true, stage: true },
+      select: { id: true, locationId: true, stage: true, accountNumber: true },
     });
 
     if (!row) throw new NotFoundException(NOT_FOUND);
@@ -446,6 +457,25 @@ export class CustomersService {
       const firstConversion =
         input.stage === 'ACTIVE' && current.stage !== 'ACTIVE' && existing.convertedAt === null;
 
+      // Numbers are handed out by the database. Choosing one is for an owner
+      // bringing records over from another system, and a number must only ever
+      // mean one account.
+      const renumber =
+        input.accountNumber !== undefined && input.accountNumber !== current.accountNumber;
+      if (renumber) {
+        this.assertPermissionOrganizationWide(
+          permissions,
+          PERMISSIONS.CUSTOMER_DELETE,
+          'change account numbers',
+        );
+        const taken = await tx.customer.count({
+          where: { accountNumber: input.accountNumber, id: { not: id } },
+        });
+        if (taken > 0) {
+          throw new ConflictException(`Account #${input.accountNumber} is already in use`);
+        }
+      }
+
       await tx.customer.update({
         where: { id },
         data: {
@@ -468,6 +498,7 @@ export class CustomersService {
             ? { ownerMembershipId: input.ownerMembershipId ?? null }
             : {}),
           ...(customFields !== undefined ? { customFields } : {}),
+          ...(renumber ? { accountNumber: input.accountNumber } : {}),
           displayName,
           // Set once, on the first conversion, and left alone afterwards so a
           // customer who lapses and returns keeps their original date.

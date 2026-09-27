@@ -25,7 +25,7 @@ const NOT_FOUND = 'Task not found';
 
 const TASK_INCLUDE = {
   location: { select: { name: true } },
-  customer: { select: { displayName: true, locationId: true } },
+  customer: { select: { displayName: true, locationId: true, accountNumber: true } },
   assignee: { select: { user: { select: { firstName: true, lastName: true, email: true } } } },
   createdBy: { select: { user: { select: { firstName: true, lastName: true, email: true } } } },
 } as const;
@@ -159,6 +159,7 @@ export class TasksService {
       // to a customer page that will 404, which tells the reader it exists.
       customerId: customerVisible ? row.customerId : null,
       customerName: customerVisible ? (row.customer?.displayName ?? null) : null,
+      customerAccountNumber: customerVisible ? (row.customer?.accountNumber ?? null) : null,
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),
     };

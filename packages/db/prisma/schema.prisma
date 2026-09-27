@@ -157,6 +157,9 @@ model Organization {
   slug   String             @unique
   status OrganizationStatus @default(ACTIVE)
 
+  /// The next customer account number to hand out. Only ever goes up.
+  nextCustomerNumber Int @default(1001) @map("next_customer_number")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
@@ -727,6 +730,12 @@ model Customer {
 
   organizationId String @map("organization_id") @db.Uuid
 
+  /// The account number people say on the phone: #1001, #1002, … per business.
+  /// Filled in by the database on insert (see the add_customer_account_numbers
+  /// migration), so every way of creating a customer gets one. Never reused.
+  /// Nullable only to Prisma: a CHECK constraint makes it required.
+  accountNumber Int? @map("account_number")
+
   stage CustomerStage @default(LEAD)
   type  CustomerType  @default(PERSON)
 
@@ -796,6 +805,7 @@ model Customer {
   @@index([organizationId, locationId])
   @@index([organizationId, displayName])
   @@index([organizationId, ownerMembershipId])
+  @@unique([organizationId, accountNumber])
   @@map("customers")
 }
 

@@ -915,4 +915,112 @@ describe('CRM (e2e)', () => {
       expect(response.statusCode).toBe(400);
     });
   });
+
+  // =========================================================================
+
+  describe('account numbers', () => {
+    const create = async (firstName: string) => {
+      const response = await request('POST', '/api/v1/customers', admin.token, {
+        firstName,
+        locationId: downtownId,
+      });
+      expect(response.statusCode, response.body).toBe(201);
+      return json(response).customer as { id: string; accountNumber: number };
+    };
+    const renumber = (token: string, id: string, accountNumber: number) =>
+      request('PATCH', `/api/v1/customers/${id}`, token, { accountNumber });
+
+    it('gives every customer the next number, one business at a time', async () => {
+      const first = await create('Numbered One');
+      const second = await create('Numbered Two');
+      expect(second.accountNumber).toBe(first.accountNumber + 1);
+      expect(first.accountNumber).toBeGreaterThanOrEqual(1001);
+
+      // Another business counts on its own.
+      const rival = await request('POST', '/api/v1/customers', otherToken, {
+        firstName: 'Rival First',
+      });
+      expect(rival.statusCode, rival.body).toBe(201);
+      const numbers = await privileged.customer.findMany({
+        where: { organizationId: { not: organizationId }, id: json(rival).customer.id },
+        select: { accountNumber: true },
+      });
+      expect(numbers[0]!.accountNumber).toBeLessThan(first.accountNumber + 1000);
+    });
+
+    it('keeps the number when a lead becomes a customer', async () => {
+      const lead = await create('Converting Carla');
+      const converted = await request('PATCH', `/api/v1/customers/${lead.id}`, admin.token, {
+        stage: 'ACTIVE',
+      });
+      expect(json(converted).customer.accountNumber).toBe(lead.accountNumber);
+    });
+
+    it('never reuses a number, even after a permanent delete', async () => {
+      const doomed = await create('Deleted Dan');
+      await request('DELETE', `/api/v1/customers/${doomed.id}/permanent`, admin.token);
+
+      const next = await create('After Dan');
+      expect(next.accountNumber).toBe(doomed.accountNumber + 1);
+    });
+
+    it('finds a customer by number, with or without the #', async () => {
+      const target = await create('Findable Fran');
+      for (const term of [String(target.accountNumber), `%23${target.accountNumber}`]) {
+        const found = await request('GET', `/api/v1/customers?search=${term}`, admin.token);
+        expect(json(found).customers.map((c: { id: string }) => c.id)).toEqual([target.id]);
+      }
+    });
+
+    it('lets an owner choose a number, and nobody else', async () => {
+      const customer = await create('Imported Ivy');
+
+      const refused = await renumber(manager.token, customer.id, 42);
+      expect(refused.statusCode).toBe(403);
+
+      const allowed = await renumber(admin.token, customer.id, 42);
+      expect(allowed.statusCode, allowed.body).toBe(200);
+      expect(json(allowed).customer.accountNumber).toBe(42);
+    });
+
+    it('refuses a number already in use', async () => {
+      const a = await create('Duplicate A');
+      const b = await create('Duplicate B');
+
+      const response = await renumber(admin.token, b.id, a.accountNumber);
+      expect(response.statusCode).toBe(409);
+      expect(json(response).message).toContain(`#${a.accountNumber}`);
+    });
+
+    it('moves the counter past a chosen number, so automatic ones never collide', async () => {
+      const chosen = await create('Far Ahead');
+      const ahead = chosen.accountNumber + 50;
+      expect((await renumber(admin.token, chosen.id, ahead)).statusCode).toBe(200);
+
+      const next = await create('After Far Ahead');
+      expect(next.accountNumber).toBe(ahead + 1);
+    });
+
+    it('shows the number on a job only when the customer is visible', async () => {
+      await request('POST', `/api/v1/modules/${MODULES.SCHEDULING}`, admin.token);
+      const start = new Date(Date.now() + 5 * 86_400_000);
+      const job = await request('POST', '/api/v1/jobs', admin.token, {
+        title: 'Numbered job',
+        locationId: downtownId,
+        customerId: northsideCustomerId,
+        startsAt: start.toISOString(),
+        endsAt: new Date(start.getTime() + 3_600_000).toISOString(),
+        acknowledgeConflicts: true,
+      });
+      expect(job.statusCode, job.body).toBe(201);
+      const jobId = json(job).job.id;
+      expect(json(job).job.customerAccountNumber).toEqual(expect.any(Number));
+
+      // The downtown manager sees the job but not the Northside customer.
+      const asManager = await request('GET', `/api/v1/jobs/${jobId}`, manager.token);
+      expect(asManager.statusCode, asManager.body).toBe(200);
+      expect(json(asManager).job.customerName).toBeNull();
+      expect(json(asManager).job.customerAccountNumber).toBeNull();
+    });
+  });
 });

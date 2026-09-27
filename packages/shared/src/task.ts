@@ -68,6 +68,8 @@ export const taskSchema = z.object({
    * through the task list.
    */
   customerName: z.string().nullable(),
+  /** Hidden exactly when the name is. */
+  customerAccountNumber: z.number().int().nullable(),
 
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
