@@ -1,10 +1,11 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, Res } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Patch, Post, Req, Res } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   forgotPasswordRequestSchema,
   loginRequestSchema,
   registerRequestSchema,
   resetPasswordRequestSchema,
+  updateProfileRequestSchema,
   SESSION_COOKIE_NAME,
   type AuthResponse,
   type ForgotPasswordRequest,
@@ -13,6 +14,7 @@ import {
   type PublicUser,
   type RegisterRequest,
   type ResetPasswordRequest,
+  type UpdateProfileRequest,
 } from '@platform/shared';
 import type { User } from '@platform/db';
 import { loadServerEnv } from '@platform/config';
@@ -186,5 +188,15 @@ export class AuthController {
   @Get('me')
   me(@CurrentUser() user: User): { user: PublicUser } {
     return { user: AuthService.toPublicUser(user) };
+  }
+
+  /** Change your own name. Always the signed-in person; there is no id to aim elsewhere. */
+  @AllowNoOrganization()
+  @Patch('me')
+  async updateMe(
+    @CurrentUser() user: User,
+    @Body(new ZodValidationPipe(updateProfileRequestSchema)) body: UpdateProfileRequest,
+  ): Promise<{ user: PublicUser }> {
+    return { user: await this.auth.updateProfile(user.id, body) };
   }
 }

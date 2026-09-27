@@ -82,6 +82,20 @@ export const loginRequestSchema = z.object({
 
 export type LoginRequest = z.infer<typeof loginRequestSchema>;
 
+/** A blank name is cleared rather than stored as an empty string. */
+const profileName = z
+  .string()
+  .trim()
+  .max(100, 'Name is too long')
+  .transform((value) => (value === '' ? null : value));
+
+/** Change your own name. Only your own: the route takes no user id. */
+export const updateProfileRequestSchema = z.object({
+  firstName: profileName,
+  lastName: profileName,
+});
+export type UpdateProfileRequest = z.infer<typeof updateProfileRequestSchema>;
+
 /** How long a "forgot password" link works. */
 export const PASSWORD_RESET_TTL_MINUTES = 60;
 

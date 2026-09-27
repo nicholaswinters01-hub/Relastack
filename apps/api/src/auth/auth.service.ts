@@ -7,7 +7,12 @@ import {
   Logger,
   UnauthorizedException,
 } from '@nestjs/common';
-import type { LoginRequest, PublicUser, RegisterRequest } from '@platform/shared';
+import type {
+  LoginRequest,
+  PublicUser,
+  RegisterRequest,
+  UpdateProfileRequest,
+} from '@platform/shared';
 import { Prisma, type User } from '@platform/db';
 import { SERVER_ENV, type ServerEnv } from '../config.provider';
 import { OrganizationsService } from '../organizations/organizations.service';
@@ -226,6 +231,19 @@ export class AuthService {
     } else {
       this.logger.warn(`Failed login attempt ${attempts}/${threshold} for user ${user.id}`);
     }
+  }
+
+  /**
+   * Change your own name. It is how colleagues see you, and how invitations
+   * you send introduce you, instead of an email address.
+   */
+  async updateProfile(userId: string, input: UpdateProfileRequest): Promise<PublicUser> {
+    const user = await this.prisma.client.user.update({
+      where: { id: userId },
+      data: { firstName: input.firstName, lastName: input.lastName },
+    });
+
+    return AuthService.toPublicUser(user);
   }
 
   async logout(token: string): Promise<number> {

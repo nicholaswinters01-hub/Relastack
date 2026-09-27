@@ -6,6 +6,7 @@ import { can, roleLabel } from '@/lib/permissions';
 import { PERMISSIONS } from '@platform/shared';
 import { NotificationPreferences } from '@/components/notification-preferences';
 import { OrganizationNameForm } from '@/components/organization-name-form';
+import { ProfileNameForm } from '@/components/profile-name-form';
 import { SignOutButtons } from '@/components/sign-out-buttons';
 
 export const dynamic = 'force-dynamic';
@@ -26,8 +27,6 @@ export default async function AccountPage() {
   ]);
 
   if (!user) redirect('/login');
-
-  const fullName = [user.firstName, user.lastName].filter(Boolean).join(' ');
 
   return (
     <>
@@ -94,7 +93,10 @@ export default async function AccountPage() {
 
           <dl className="mt-4">
             <Row label="Email" value={user.email} />
-            <Row label="Name" value={fullName || '—'} />
+            <Row
+              label="Name"
+              value={<ProfileNameForm firstName={user.firstName} lastName={user.lastName} />}
+            />
             <Row label="Status" value={user.status} />
             <Row
               label="Last sign-in"

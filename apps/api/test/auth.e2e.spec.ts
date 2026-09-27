@@ -413,6 +413,62 @@ describe('Authentication (e2e)', () => {
     });
   });
 
+  describe('PATCH /auth/me', () => {
+    const patch = (payload: unknown, token?: string) =>
+      app.inject({
+        method: 'PATCH',
+        url: '/api/v1/auth/me',
+        payload: payload as never,
+        cookies: token ? { [SESSION_COOKIE_NAME]: token } : undefined,
+      }) as unknown as Promise<InjectResult>;
+
+    it('changes your own name', async () => {
+      const token = await registerFixture();
+
+      const response = await patch({ firstName: ' Nick ', lastName: 'Winters' }, token);
+      expect(response.statusCode, response.body).toBe(200);
+      expect(JSON.parse(response.body).user).toMatchObject({
+        firstName: 'Nick',
+        lastName: 'Winters',
+      });
+
+      const me = JSON.parse((await get('/api/v1/auth/me', token)).body).user;
+      expect(me.firstName).toBe('Nick');
+    });
+
+    it('clears a name left blank rather than storing an empty one', async () => {
+      const token = await registerFixture();
+      await patch({ firstName: 'Nick', lastName: 'Winters' }, token);
+
+      await patch({ firstName: 'Nick', lastName: '   ' }, token);
+
+      const me = JSON.parse((await get('/api/v1/auth/me', token)).body).user;
+      expect(me.lastName).toBeNull();
+    });
+
+    it('changes nothing else, whatever else is sent', async () => {
+      const token = await registerFixture();
+
+      await patch(
+        {
+          firstName: 'Nick',
+          lastName: 'Winters',
+          email: 'taken-over@example.test',
+          status: 'SUSPENDED',
+        },
+        token,
+      );
+
+      const me = JSON.parse((await get('/api/v1/auth/me', token)).body).user;
+      expect(me.email).toBe(EMAIL);
+      expect(me.status).toBe('ACTIVE');
+    });
+
+    it('requires signing in', async () => {
+      expect((await patch({ firstName: 'Nobody', lastName: '' })).statusCode).toBe(401);
+    });
+  });
+
   describe('POST /auth/logout', () => {
     it('revokes the session and clears the cookie', async () => {
       const token = await registerFixture();
