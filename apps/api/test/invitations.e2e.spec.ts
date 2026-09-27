@@ -9,7 +9,8 @@ process.env.RATE_LIMIT_ENABLED = 'false';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { SESSION_COOKIE_NAME, SYSTEM_ROLE_IDS } from '@platform/shared';
 import type { PrismaClient } from '@platform/db';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { EmailService } from '../src/notifications/email.service';
 import { createPrivilegedTestClient, createTestApp } from './create-test-app';
 
 /**
@@ -127,6 +128,27 @@ describe('Invitations (e2e)', () => {
       expect(response.statusCode, response.body).toBe(201);
       expect(json(response).acceptUrl).toContain('/invitations/accept?token=');
       expect(json(response).invitation.status).toBe('PENDING');
+    });
+
+    it('emails the link, saying who invited them and to which business', async () => {
+      // A message naming nobody and no business reads as spam, and gets deleted.
+      const send = vi.spyOn(app.get(EmailService), 'send').mockResolvedValue();
+
+      try {
+        const response = await invite('e2e-inv-invitee@example.test');
+        expect(response.statusCode, response.body).toBe(201);
+
+        expect(send).toHaveBeenCalledTimes(1);
+        const message = send.mock.calls[0]![0];
+        expect(message.to).toBe('e2e-inv-invitee@example.test');
+        expect(message.subject).toBe(
+          'e2e-inv-admin@example.test invited you to join Invite Test Company on RelaStack',
+        );
+        expect(message.body).toContain('Invite Test Company');
+        expect(message.link).toBe(json(response).acceptUrl);
+      } finally {
+        send.mockRestore();
+      }
     });
 
     it('stores only the hash of the token', async () => {

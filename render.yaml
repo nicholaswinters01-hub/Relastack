@@ -58,6 +58,13 @@ services:
         value: https://app.relastack.com
       - key: EMAIL_FROM
         value: RelaStack <hello@relastack.com>
+      # Resend, with relastack.com verified there (DKIM, the send/rsend
+      # CNAMEs and _dmarc at Squarespace; the root MX stays with Gmail).
+      - key: EMAIL_PROVIDER
+        value: resend
+      # A Resend key with sending access only, limited to relastack.com.
+      - key: EMAIL_API_KEY
+        sync: false
       # Owner role: runs migrations only.
       - key: DATABASE_URL
         sync: false

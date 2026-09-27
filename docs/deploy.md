@@ -97,3 +97,15 @@ requests in flight at that instant; a reload works.
 Background work is prompted rather than polled: an event nudges delivery a
 second later, and one hourly sweep catches anything missed. A shorter poll
 would keep the database awake and use up the free tier.
+
+## Email
+
+Sent through Resend. relastack.com is verified there by four records at
+Squarespace: the `resend._domainkey` TXT (DKIM), the `send` and `rsend`
+CNAMEs, and the `_dmarc` TXT. Receiving stays off in Resend: the root MX
+points at Gmail, which is where hello@relastack.com lives, and moving it
+would stop that inbox receiving anything.
+
+On Render, `EMAIL_PROVIDER=resend` and `EMAIL_API_KEY` (a sending-only key
+limited to relastack.com). Without the key the API writes each message to its
+log instead of sending it, so nothing is lost, but nothing arrives either.

@@ -114,7 +114,7 @@ export class InvitationsService {
     const token = randomBytes(TOKEN_BYTES).toString('base64url');
     const invitationId = randomUUID();
 
-    const invitation = await this.prisma.withTenant(context, async (tx) => {
+    const result = await this.prisma.withTenant(context, async (tx) => {
       const role = await tx.role.findFirst({ where: { key: input.roleKey } });
       if (!role) throw new NotFoundException('Role not found');
 
@@ -160,7 +160,19 @@ export class InvitationsService {
         include: { role: true, locations: true },
       });
 
-      return created;
+      // For the email: a message naming nobody and no business reads as spam.
+      const [organization, inviter] = await Promise.all([
+        tx.organization.findUniqueOrThrow({
+          where: { id: context.organizationId },
+          select: { name: true },
+        }),
+        tx.organizationMembership.findUnique({
+          where: { id: membershipId },
+          select: { user: { select: { firstName: true, lastName: true, email: true } } },
+        }),
+      ]);
+
+      return { created, organizationName: organization.name, inviter: inviter?.user ?? null };
     });
 
     const acceptUrl = `${baseUrl}/invitations/accept?token=${token}`;
@@ -178,11 +190,22 @@ export class InvitationsService {
      * The link is still returned either way, so a provider outage degrades to
      * copying it by hand rather than to losing the invitation.
      */
+    const { created: invitation, organizationName, inviter } = result;
+    const inviterName =
+      [inviter?.firstName, inviter?.lastName].filter(Boolean).join(' ') ||
+      inviter?.email ||
+      'Someone';
+    // Names are free text; a line break in a subject is how headers get forged.
+    const oneLine = (text: string) => text.replace(/[\r\n]+/g, ' ').trim();
+
     try {
       await this.email.send({
         to: input.email,
-        subject: 'You have been invited to join',
-        body: 'Someone has invited you to their team. Follow the link below to set up your account.',
+        subject: oneLine(`${inviterName} invited you to join ${organizationName} on RelaStack`),
+        body:
+          `${inviterName} has invited you to join ${organizationName} on RelaStack, ` +
+          'where the team keeps its customers, jobs and schedule.\n\n' +
+          `Follow the link below to set up your account. It works for ${INVITATION_TTL_DAYS} days.`,
         link: acceptUrl,
       });
     } catch (error) {
