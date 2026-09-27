@@ -1,6 +1,6 @@
 # Two monitors and quick search: design
 
-Status: **proposed, awaiting the product owner's approval.** Nothing built.
+Status: **approved 2026-09-27** ("go with your suggestions": notes are not searched; colleagues' changes refresh every 60 seconds). Being built.
 
 Goal: someone at a desk can spread RelaStack across two screens (schedule on
 one, customers on the other) and jump to anything by typing. We use real
@@ -123,7 +123,7 @@ Sync (unit-tested helper):
 - Offline use
 - The phone layout for crews, and first-run setup (both on the list for later)
 
-## Open questions for the product owner
+## Decisions (approved 2026-09-27)
 
 1. **Search scope:** also search the text of customer notes? Proposed: not
    yet. Names, contact details and addresses find almost everything, and notes
