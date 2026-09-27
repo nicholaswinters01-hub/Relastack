@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
@@ -556,7 +557,12 @@ function DayGrid({
                     : 'border-[var(--color-ink)] bg-[var(--color-surface)]'
                 }`}
               >
-                <p className="truncate font-semibold">{job.title}</p>
+                <Link
+                  href={`/jobs/${job.id}`}
+                  className="block truncate font-semibold underline-offset-4 hover:underline"
+                >
+                  {job.title}
+                </Link>
                 <p className="truncate font-mono text-[11px] text-[var(--color-muted)]">
                   {clock(start)}–{clock(end)}
                 </p>

@@ -248,7 +248,12 @@ export function TasksManager({
                 <div className="min-w-56 flex-1">
                   <div className="flex flex-wrap items-baseline gap-2">
                     <h3 className={`font-semibold ${closed ? 'text-[var(--color-muted)]' : ''}`}>
-                      {task.title}
+                      <Link
+                        href={`/tasks/${task.id}`}
+                        className="underline-offset-4 hover:underline"
+                      >
+                        {task.title}
+                      </Link>
                     </h3>
                     {task.priority !== 'NORMAL' && (
                       <span className="font-mono text-xs text-[var(--color-muted)]">

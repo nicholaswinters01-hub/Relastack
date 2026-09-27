@@ -17,7 +17,9 @@ import {
   notificationsResponseSchema,
   preferencesResponseSchema,
   jobsResponseSchema,
+  jobResponseSchema,
   tasksResponseSchema,
+  taskResponseSchema,
   type CustomerDetail,
   type CustomFieldsResponse,
   type CustomersResponse,
@@ -33,7 +35,9 @@ import {
   type Dashboard,
   type NotificationPreference,
   type NotificationsResponse,
+  type Job,
   type JobsResponse,
+  type Task,
   type TasksResponse,
 } from '@platform/shared';
 import { API_URL, internalHeaders } from '@/lib/internal-api';
@@ -383,5 +387,29 @@ export async function getNotificationPreferences(): Promise<NotificationPreferen
     return parsed.success ? parsed.data.preferences : [];
   } catch {
     return [];
+  }
+}
+
+/** One job, or null when it does not exist or the reader may not see it. */
+export async function getJob(id: string): Promise<Job | null> {
+  try {
+    const response = await serverFetch(`/api/v1/jobs/${encodeURIComponent(id)}`);
+    if (!response.ok) return null;
+    const parsed = jobResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.job : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One task, or null when it does not exist or the reader may not see it. */
+export async function getTask(id: string): Promise<Task | null> {
+  try {
+    const response = await serverFetch(`/api/v1/tasks/${encodeURIComponent(id)}`);
+    if (!response.ok) return null;
+    const parsed = taskResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.task : null;
+  } catch {
+    return null;
   }
 }
