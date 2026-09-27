@@ -181,6 +181,7 @@ model Organization {
   staffNotes             StaffNote[]
   billingPayments        BillingPayment[]
   billingCredits         BillingCredit[]
+  memberGroups           MemberGroup[]
   supportRequests        SupportRequest[]
 
   @@map("organizations")
@@ -217,6 +218,7 @@ model OrganizationMembership {
   createdSeries           JobSeries[]              @relation("SeriesCreator")
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
+  groupMemberships        MemberGroupMember[]
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -801,11 +803,11 @@ model Customer {
   sharedLocations CustomerLocation[]
   jobSeries       JobSeries[]
 
+  @@unique([organizationId, accountNumber])
   @@index([organizationId, stage])
   @@index([organizationId, locationId])
   @@index([organizationId, displayName])
   @@index([organizationId, ownerMembershipId])
-  @@unique([organizationId, accountNumber])
   @@map("customers")
 }
 
@@ -1649,4 +1651,48 @@ model SupportMessage {
 
   @@index([requestId, createdAt])
   @@map("support_messages")
+}
+
+// ---------------------------------------------------------------------------
+// Employee groups
+// ---------------------------------------------------------------------------
+
+/// A label a business gives its people: "Field crew", "Office", "Accounting".
+///
+/// Grants nothing. Roles decide what someone may do and locations where; a
+/// group only helps find and organise people. Each business names its own.
+model MemberGroup {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name      String
+  /// One of a fixed palette (see GROUP_COLORS in @platform/shared).
+  color     String
+  sortOrder Int    @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members      MemberGroupMember[]
+
+  @@index([organizationId])
+  @@map("member_groups")
+}
+
+/// Who is in which group. Removed with either the group or the person.
+model MemberGroupMember {
+  groupId        String @map("group_id") @db.Uuid
+  membershipId   String @map("membership_id") @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  group      MemberGroup            @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  membership OrganizationMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, membershipId])
+  @@index([organizationId])
+  @@index([membershipId])
+  @@map("member_group_members")
 }
