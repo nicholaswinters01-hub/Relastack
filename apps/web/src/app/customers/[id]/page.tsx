@@ -33,6 +33,10 @@ export default async function CustomerPage({ params }: Props) {
       ? can(organization.permissions, PERMISSIONS.CUSTOMER_WRITE)
       : canAt(organization.permissions, PERMISSIONS.CUSTOMER_WRITE, customer.locationId);
 
+  // Deleting for good (and choosing account numbers) is owner-level and
+  // company-wide, like the API check it mirrors.
+  const canDelete = can(organization.permissions, PERMISSIONS.CUSTOMER_DELETE);
+
   return (
     <>
       <AppNav current="customers" />
@@ -48,6 +52,7 @@ export default async function CustomerPage({ params }: Props) {
           tags={tags}
           fields={fields}
           canWrite={canWrite}
+          canDelete={canDelete}
           membershipId={organization.membershipId}
         />
       </main>

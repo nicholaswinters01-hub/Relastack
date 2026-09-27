@@ -3,7 +3,13 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { Location, OrganizationMember, Task, TaskStatus } from '@platform/shared';
+import {
+  type Location,
+  type OrganizationMember,
+  type Task,
+  type TaskStatus,
+  formatAccountNumber,
+} from '@platform/shared';
 import { TaskEditor } from '@/components/task-editor';
 import { apiWrite } from '@/lib/live-sync';
 
@@ -99,6 +105,8 @@ export function TaskDetail({ task, locations, members, canWrite, canDelete, isAs
             {task.customerId && task.customerName ? (
               <Link href={`/customers/${task.customerId}`} className="underline underline-offset-4">
                 {task.customerName}
+                {task.customerAccountNumber !== null &&
+                  ` ${formatAccountNumber(task.customerAccountNumber)}`}
               </Link>
             ) : (
               '—'

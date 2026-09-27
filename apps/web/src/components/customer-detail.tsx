@@ -4,18 +4,22 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import {
   ASSIGNABLE_STAGES,
+  formatAccountNumber,
   type CustomerDetail,
   type CustomerStage,
   type CustomFieldDefinition,
   type Tag,
 } from '@platform/shared';
 import { apiWrite } from '@/lib/live-sync';
+import { CustomerEditForm, CustomerRemoval } from '@/components/customer-manage';
 
 interface Props {
   customer: CustomerDetail;
   tags: Tag[];
   fields: CustomFieldDefinition[];
   canWrite: boolean;
+  /** Owners: delete for good, and choose account numbers. */
+  canDelete: boolean;
   membershipId: string;
 }
 
@@ -33,7 +37,15 @@ const STAGE_LABEL: Record<CustomerStage, string> = {
  * flow because there is no separate record to convert into. Everything below
  * stays exactly where it is.
  */
-export function CustomerDetailView({ customer, tags, fields, canWrite, membershipId }: Props) {
+export function CustomerDetailView({
+  customer,
+  tags,
+  fields,
+  canWrite,
+  canDelete,
+  membershipId,
+}: Props) {
+  const [editing, setEditing] = useState(false);
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +85,9 @@ export function CustomerDetailView({ customer, tags, fields, canWrite, membershi
       <header>
         <div className="flex flex-wrap items-baseline gap-3">
           <h1 className="text-3xl font-semibold tracking-tight">{customer.displayName}</h1>
+          <span className="font-mono text-sm text-[var(--color-muted)]">
+            {formatAccountNumber(customer.accountNumber)}
+          </span>
           <span className="font-mono text-xs text-[var(--color-muted)]">
             {STAGE_LABEL[customer.stage].toLowerCase()}
           </span>
@@ -115,43 +130,62 @@ export function CustomerDetailView({ customer, tags, fields, canWrite, membershi
 
       {/* --------------------------------------------------------------- */}
       <section className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-          Details
-        </h2>
-        <dl className="mt-4 flex flex-col">
-          <Row label="Email" value={customer.email} />
-          <Row label="Phone" value={customer.phone} />
-          <Row
-            label="Address"
-            value={
-              [customer.addressLine1, customer.city, customer.region, customer.postalCode]
-                .filter(Boolean)
-                .join(', ') || null
-            }
+        <div className="flex items-baseline justify-between gap-3">
+          <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+            Details
+          </h2>
+          {canWrite && !editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="text-xs underline underline-offset-4"
+            >
+              Edit details
+            </button>
+          )}
+        </div>
+        {editing ? (
+          <CustomerEditForm
+            customer={customer}
+            canRenumber={canDelete}
+            onDone={() => setEditing(false)}
           />
-          <Row label="Owner" value={customer.ownerName} />
-          <Row
-            label="Customer since"
-            value={
-              customer.convertedAt ? new Date(customer.convertedAt).toLocaleDateString() : null
-            }
-          />
-          <Row
-            label="Last contacted"
-            value={
-              customer.lastContactedAt
-                ? new Date(customer.lastContactedAt).toLocaleDateString()
-                : null
-            }
-          />
-          {fields.map((field) => (
+        ) : (
+          <dl className="mt-4 flex flex-col">
+            <Row label="Email" value={customer.email} />
+            <Row label="Phone" value={customer.phone} />
             <Row
-              key={field.id}
-              label={field.label}
-              value={formatField(customer.customFields[field.key])}
+              label="Address"
+              value={
+                [customer.addressLine1, customer.city, customer.region, customer.postalCode]
+                  .filter(Boolean)
+                  .join(', ') || null
+              }
             />
-          ))}
-        </dl>
+            <Row label="Owner" value={customer.ownerName} />
+            <Row
+              label="Customer since"
+              value={
+                customer.convertedAt ? new Date(customer.convertedAt).toLocaleDateString() : null
+              }
+            />
+            <Row
+              label="Last contacted"
+              value={
+                customer.lastContactedAt
+                  ? new Date(customer.lastContactedAt).toLocaleDateString()
+                  : null
+              }
+            />
+            {fields.map((field) => (
+              <Row
+                key={field.id}
+                label={field.label}
+                value={formatField(customer.customFields[field.key])}
+              />
+            ))}
+          </dl>
+        )}
       </section>
 
       {/* --------------------------------------------------------------- */}
@@ -345,6 +379,8 @@ export function CustomerDetailView({ customer, tags, fields, canWrite, membershi
           ))}
         </div>
       </section>
+
+      <CustomerRemoval customer={customer} canWrite={canWrite} canDelete={canDelete} />
     </div>
   );
 }

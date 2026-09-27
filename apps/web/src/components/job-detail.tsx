@@ -3,7 +3,12 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import type { Job, JobStatus, OrganizationMember } from '@platform/shared';
+import {
+  type Job,
+  type JobStatus,
+  type OrganizationMember,
+  formatAccountNumber,
+} from '@platform/shared';
 import { apiWrite } from '@/lib/live-sync';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
@@ -134,6 +139,8 @@ export function JobDetail({ job, members, canWrite, onCrew }: Props) {
             {job.customerId && job.customerName ? (
               <Link href={`/customers/${job.customerId}`} className="underline underline-offset-4">
                 {job.customerName}
+                {job.customerAccountNumber !== null &&
+                  ` ${formatAccountNumber(job.customerAccountNumber)}`}
               </Link>
             ) : (
               '—'

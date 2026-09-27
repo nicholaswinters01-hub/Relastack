@@ -9,6 +9,7 @@ import {
   type CustomerStage,
   type Location,
   type Tag,
+  formatAccountNumber,
 } from '@platform/shared';
 import { apiWrite } from '@/lib/live-sync';
 
@@ -229,7 +230,12 @@ export function CustomersManager({
             >
               <div className="min-w-56 flex-1">
                 <div className="flex flex-wrap items-baseline gap-2">
-                  <h3 className="font-semibold">{customer.displayName}</h3>
+                  <h3 className="font-semibold">
+                    {customer.displayName}{' '}
+                    <span className="font-mono text-xs font-normal text-[var(--color-muted)]">
+                      {formatAccountNumber(customer.accountNumber)}
+                    </span>
+                  </h3>
                   <span className="font-mono text-xs text-[var(--color-muted)]">
                     {STAGE_LABEL[customer.stage].toLowerCase()}
                   </span>
