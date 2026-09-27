@@ -146,6 +146,8 @@ export const planSchema = z.object({
   maxLocations: z.number().int().positive().nullable(),
   gracePeriodDays: z.number().int().nonnegative(),
   trialDays: z.number().int().nonnegative(),
+  /** Months charged for a year paid up front: 10 means two months free. */
+  annualBillingMonths: z.number().int().min(1).max(12),
   /** Module keys included at no extra charge. */
   modules: z.array(z.string()),
 });

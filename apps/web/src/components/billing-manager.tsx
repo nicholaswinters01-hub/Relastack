@@ -251,12 +251,18 @@ export function BillingManager({ subscription, summary, account, plans, canManag
                   </div>
                   <p className="mt-1 text-sm text-[var(--color-muted)]">{plan.description}</p>
                   <p className="mt-1 font-mono text-xs text-[var(--color-muted)]">
-                    {money(plan.basePriceCents)}/mo · {plan.includedLocations} location
-                    {plan.includedLocations === 1 ? '' : 's'} included
+                    {money(plan.basePriceCents)}/mo · includes {plan.includedLocations} location
+                    {plan.includedLocations === 1 ? '' : 's'}
                     {plan.perLocationPriceCents > 0 &&
-                      ` · ${money(plan.perLocationPriceCents)} each after`}
+                      ` · ${money(plan.perLocationPriceCents)}/mo per extra location`}
                     {plan.maxLocations !== null && ` · max ${plan.maxLocations}`}
                   </p>
+                  {plan.annualBillingMonths < 12 && (
+                    <p className="mt-0.5 font-mono text-xs text-[var(--color-muted)]">
+                      or {money(plan.basePriceCents * plan.annualBillingMonths)}/yr paid up front —{' '}
+                      {12 - plan.annualBillingMonths} months free
+                    </p>
+                  )}
 
                   {tooManyLocations && (
                     <p className="mt-1 text-xs text-[var(--color-bad)]">

@@ -49,7 +49,10 @@ export class StaffBillingService {
       graceEndsAt: Date | null;
       trialEndsAt: Date | null;
       periodEndsAt: Date;
-      plan: Parameters<typeof monthlyCharge>[0] & { gracePeriodDays: number };
+      plan: Parameters<typeof monthlyCharge>[0] & {
+        gracePeriodDays: number;
+        annualBillingMonths: number;
+      };
       addOns: Array<{ priceCents: number }>;
     } | null,
     activeLocations: number,
@@ -92,7 +95,11 @@ export class StaffBillingService {
       unusedCents,
       creditBalanceCents: creditBalance(credits),
       nextCoverageStartsAt: coverageStart.toISOString(),
-      suggestedCents: { MONTHLY: monthly, ANNUAL: monthly * 12 },
+      suggestedCents: {
+        MONTHLY: monthly,
+        // The plan says how many months a year up front costs.
+        ANNUAL: monthly * (subscription?.plan.annualBillingMonths ?? 12),
+      },
       payments: payments.map((payment) => ({
         id: payment.id,
         amountCents: payment.amountCents,

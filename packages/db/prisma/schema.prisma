@@ -613,6 +613,9 @@ model Plan {
 
   trialDays Int @default(14) @map("trial_days")
 
+  /// Months charged for a year paid up front: 10 means two months free.
+  annualBillingMonths Int @default(12) @map("annual_billing_months")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

@@ -718,6 +718,31 @@ describe('Billing by hand (e2e)', () => {
 
   // =========================================================================
 
+  describe('the 2026 price list', () => {
+    it('charges the plan with one location, $30 per extra, and ten months for a year', async () => {
+      const business = await freshBusiness();
+      await privileged.subscription.update({
+        where: { organizationId: business.organizationId },
+        data: { planKey: 'core' },
+      });
+      const { billing: one } = await detail(business.organizationId);
+      expect(one.suggestedCents).toEqual({ MONTHLY: 5_000, ANNUAL: 50_000 });
+
+      await request('POST', '/api/v1/locations', business.token, {
+        name: 'Yard A',
+        timezone: 'UTC',
+      });
+      await request('POST', '/api/v1/locations', business.token, {
+        name: 'Yard B',
+        timezone: 'UTC',
+      });
+
+      // Two active locations: the plan covers one, the other is $30.
+      const { billing: two } = await detail(business.organizationId);
+      expect(two.suggestedCents).toEqual({ MONTHLY: 8_000, ANNUAL: 80_000 });
+    });
+  });
+
   describe('the overview', () => {
     it('counts money collected and renewals coming up', async () => {
       const business = await freshBusiness();

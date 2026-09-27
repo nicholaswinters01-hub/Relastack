@@ -135,8 +135,10 @@ describe('Billing and subscriptions (e2e)', () => {
       const response = await request('GET', '/api/v1/billing/plans', token);
       const keys = json(response).plans.map((p: { key: string }) => p.key);
 
-      expect(keys).toContain('starter');
-      expect(keys).toContain('business');
+      expect(keys).toEqual(expect.arrayContaining(['core', 'pro', 'business_v2']));
+      // Retired plans stay for whoever is on one, but are not offered.
+      expect(keys).not.toContain('starter');
+      expect(keys).not.toContain('enterprise');
       // The trial is not offered as a choice.
       expect(keys).not.toContain('trial');
     });

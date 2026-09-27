@@ -226,6 +226,7 @@ export class BillingService {
       maxLocations: plan.maxLocations,
       gracePeriodDays: plan.gracePeriodDays,
       trialDays: plan.trialDays,
+      annualBillingMonths: plan.annualBillingMonths,
       modules: plan.modules.map((entry) => entry.moduleKey),
     }));
   }
