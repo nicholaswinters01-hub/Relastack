@@ -325,7 +325,7 @@ next phase without it.
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
 | 19a   | Staff console: businesses, support actions, audit trail      | Complete |
 | 19b   | Billing by hand: annual plans, payments, credits             | Complete |
-| 19c   | Help desk: in-app requests and replies (needs email)         | Review   |
+| 19c   | Help desk: in-app requests and replies (needs email)         | Complete |
 | 20a   | Deployment: Render + Neon + Vercel, invite-only (pulled fwd) | **Now**  |
 | 20    | Production hardening                                         |          |
 
