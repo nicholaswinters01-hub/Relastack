@@ -1,7 +1,8 @@
 # Employees and groups: design
 
-Status: **proposed, awaiting the product owner's answers** to the questions at
-the end. Nothing built.
+Status: **approved 2026-09-27.** Answers: no groups are made for a business (it names
+its own; the form only suggests an example), a colour per group, and
+`/employees` with `/team` redirecting. Being built.
 
 The idea (product owner, 2026-09-27): call the people page "Employees", and
 let a business group its people, so it can look at just the field crew or just
@@ -71,15 +72,13 @@ Groups are **labels a business gives its people**: "Field crew", "Office",
 - Deleting a group leaves the people and their roles untouched.
 - A person can't be added to a group from another business (the trigger).
 
-## Open questions for the product owner
+## Decisions (2026-09-27)
 
-1. **Start new businesses with two groups, "Field crew" and "Office"?**
-   Proposed: yes, renamable and deletable, so the feature is visible on day
-   one.
-2. **Colour per group** (a small dot beside names and on the crew picker)?
-   Proposed: yes, from a fixed set of eight.
-3. **Move the address to `/employees`**, with `/team` redirecting? Proposed:
-   yes.
+1. **No groups are created for a business.** Each business decides what it
+   needs; the empty page explains groups and the name box suggests "e.g. Field
+   crew".
+2. **A colour per group** from a fixed set of eight: approved.
+3. **`/employees`**, with `/team` redirecting: approved.
 
 ---
 
