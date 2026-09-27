@@ -52,8 +52,8 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
       // Suites deliberately provoke failures and assert they are rejected;
       // logging each one buries real failures in expected output.
       logErrors: !isTest(env),
-      onReconnect: () =>
-        this.logger.warn('The database closed the connection; reconnected and retried'),
+      onConnectionLost: (error) =>
+        this.logger.warn(`The database closed an idle connection (${error.message})`),
     });
   }
 

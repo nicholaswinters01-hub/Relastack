@@ -33,9 +33,27 @@ BEGIN
 END
 $$;
 
--- Explicitly strip the two attributes that would silently defeat RLS, in case
--- an operator created the role with them.
-ALTER ROLE platform_app NOSUPERUSER NOBYPASSRLS;
+-- Refuse to continue if the role has either attribute that would silently
+-- defeat RLS. Checked rather than stripped: `ALTER ROLE ... NOSUPERUSER` needs
+-- a real superuser, and no hosted Postgres (Neon, RDS, Render) grants one, so
+-- stripping made this migration impossible to apply anywhere but locally.
+-- Changed after being applied, with the product owner's approval
+-- (2026-09-26), before it had ever run against a shared database.
+--
+-- Membership counts too: a member of a role with either attribute can
+-- `SET ROLE` into it. That is exactly what a role created through Neon's
+-- console is — a member of neon_superuser, which has BYPASSRLS.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT FROM pg_roles r
+    WHERE (r.rolsuper OR r.rolbypassrls)
+      AND pg_has_role('platform_app', r.oid, 'MEMBER')
+  ) THEN
+    RAISE EXCEPTION 'platform_app has, or can assume, SUPERUSER or BYPASSRLS, so row-level security would enforce nothing. Recreate it with a plain CREATE ROLE.';
+  END IF;
+END
+$$;
 
 -- ---------------------------------------------------------------------------
 -- 2. Privileges.

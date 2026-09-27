@@ -8,6 +8,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { PrismaClient } from '@platform/db';
 import { SESSION_COOKIE_NAME } from '@platform/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { DispatcherService } from '../src/notifications/dispatcher.service';
 import { createPrivilegedTestClient, createTestApp } from './create-test-app';
 
 /**
@@ -138,8 +139,21 @@ describe('Delivery and database sleep (e2e)', () => {
       WHERE usename = 'platform_app' AND pid <> pg_backend_pid()
     `);
 
-    const response = await request('GET', '/api/v1/tasks', ownerToken);
+    // Neon closes connections as it goes to sleep and the next visitor arrives
+    // later, never in the same instant. A request sent into the exact moment
+    // of termination can still fail once; that is a restart mid-traffic, not
+    // this case.
+    await new Promise((r) => setTimeout(r, 200));
 
-    expect(response.statusCode, response.body).toBe(200);
+    // Several at once, including a background drain: concurrent recovery is
+    // what broke the first attempt at this (one reset tore down another's).
+    const [responses] = await Promise.all([
+      Promise.all(Array.from({ length: 10 }, () => request('GET', '/api/v1/tasks', ownerToken))),
+      app.get(DispatcherService).drain(),
+    ]);
+
+    for (const response of responses) {
+      expect(response.statusCode, response.body).toBe(200);
+    }
   });
 });

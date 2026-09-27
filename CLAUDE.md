@@ -205,11 +205,19 @@ Recorded because each one cost real time and none is obvious.
   that works locally can fail on the first production deploy. Check new
   migrations by running them as a non-superuser owner in a throwaway database
   (`CREATE ROLE x LOGIN CREATEROLE BYPASSRLS`, `CREATE DATABASE ... OWNER x`).
-- **Prisma never recovers from connections the server closed.** After Neon
-  sleeps, or any restart, every query failed until the process restarted:
-  40 of 40, then 10 of 10 five seconds later. `createPrismaClient` sets a
-  60-second idle limit and resets the pool and retries once on P1017. Do not
-  remove either; the delivery e2e suite fails without the retry.
+  The RLS migration was edited for this after being applied, with the product
+  owner's approval, before it had ever run on a shared database. That is the
+  only exception to rule 4; a local database needs its `_prisma_migrations`
+  checksum updated to match (SHA-256 of the file).
+- **Prisma's own pool never recovers from connections the server closed.**
+  After Neon sleeps, or any restart, every query failed until the process
+  restarted: 40 of 40, then 10 of 10 five seconds later. Resetting it from
+  outside was worse: under concurrent load the engine stayed "not yet
+  connected" for good. `createPrismaClient` therefore runs Prisma over a
+  node-postgres pool (`@prisma/adapter-pg`), which drops a closed connection
+  the moment it closes. Do not go back; the delivery e2e suite fails if you do.
+- **The pg adapter cannot read Postgres-internal column types in raw
+  queries** (`name`, `oid`, `void`). Cast them: `relname::text AS relname`.
 - **Behind the web tier, every request comes from the same few addresses.**
   Rate limits keyed on the socket address lump everyone together.
   `trustProxy: true` is worse: anyone can then choose their own address. The

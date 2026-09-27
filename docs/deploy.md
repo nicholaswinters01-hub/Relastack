@@ -25,7 +25,8 @@ cross-country round trips.
 
    **Not through Neon's Roles page.** Roles created there are given
    `neon_superuser`, which carries `BYPASSRLS` — row-level security would then
-   enforce nothing.
+   enforce nothing. The migrations check for exactly this, including through
+   group membership, and refuse to run.
 
 3. Copy two **direct** (not pooled) connection strings:
    - the owner role (`neondb_owner`) → `DATABASE_URL`, used only to migrate
@@ -78,15 +79,15 @@ from Vercel's servers, so without it one busy user would throttle everyone.
 ## When the database sleeps
 
 Neon's free tier suspends after five idle minutes and closes every
-connection. Two things keep that invisible:
+connection. The API talks to Postgres through a node-postgres pool, which
+closes its own idle connections after 60 seconds and drops any the server
+closes the moment it happens, so the next request simply opens a fresh one
+and wakes the database.
 
-- Prisma discards connections idle for more than 60 seconds, so it never
-  reuses one Neon has closed.
-- If a query still hits a closed connection, the pool is reset and the query
-  retried once.
-
-Without both, Prisma keeps handing out dead connections and every request
-fails until a restart — measured locally, not assumed.
+Prisma's built-in pool cannot do this. It keeps handing out dead connections
+and every request fails until the process restarts — measured locally, not
+assumed. A Neon restart in the middle of busy traffic can still fail the few
+requests in flight at that instant; a reload works.
 
 Background work is prompted rather than polled: an event nudges delivery a
 second later, and one hourly sweep catches anything missed. A shorter poll

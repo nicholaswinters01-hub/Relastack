@@ -163,7 +163,9 @@ describe('Tenant isolation (e2e)', () => {
       const rows = await appRoleClient.$queryRawUnsafe<
         Array<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>
       >(
-        `SELECT relname, relrowsecurity, relforcerowsecurity FROM pg_class
+        // relname is Postgres's internal `name` type, which the pg adapter
+        // cannot read back without a cast.
+        `SELECT relname::text AS relname, relrowsecurity, relforcerowsecurity FROM pg_class
          WHERE relname IN ('organizations','organization_memberships')`,
       );
 

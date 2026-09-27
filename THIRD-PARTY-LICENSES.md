@@ -4,16 +4,16 @@ This product includes open-source software. The packages below are dependencies
 — their source is not copied into this repository, and each remains the
 property of its respective authors under the license shown.
 
-Generated 2026-08-27 by `pnpm licenses:generate` from the installed dependency
-tree. 445 unique packages.
+Generated 2026-09-27 by `pnpm licenses:generate` from the installed dependency
+tree. 461 unique packages.
 
 ## Summary
 
 | License | Packages |
 | --- | ---: |
-| MIT | 359 |
-| Apache-2.0 | 32 |
-| ISC | 22 |
+| MIT | 372 |
+| Apache-2.0 | 34 |
+| ISC | 23 |
 | BSD-2-Clause | 10 |
 | BSD-3-Clause | 9 |
 | BlueOak-1.0.0 | 4 |
@@ -115,6 +115,7 @@ individually.
 - @types/estree@1.0.9
 - @types/json-schema@7.0.15
 - @types/node@22.20.1
+- @types/pg@8.23.1
 - @types/react@19.2.18
 - @types/react-dom@19.2.5
 - @typescript-eslint/eslint-plugin@8.68.0
@@ -305,6 +306,13 @@ individually.
 - pathe@2.0.3
 - pathval@2.0.1 — Veselin Todorov <hi@vesln.com>
 - perfect-debounce@1.0.0
+- pg@8.23.0 — Brian Carlson <brian.m.carlson@gmail.com>
+- pg-cloudflare@1.4.0
+- pg-connection-string@2.14.0 — Blaine Bublitz <blaine@iceddev.com> (http://iceddev.com/)
+- pg-pool@3.14.0 — Brian M. Carlson
+- pg-protocol@1.16.0
+- pg-types@2.2.0 — Brian M. Carlson
+- pgpass@1.0.5 — Hannes Hörl <hannes.hoerl+pgpass@snowreporter.com>
 - picomatch@4.0.4 — Jon Schlinkert (https://github.com/jonschlinkert)
 - pino@10.3.1 — Matteo Collina <hello@matteocollina.com>
 - pino-abstract-transport@3.0.0 — Matteo Collina <hello@matteocollina.com>
@@ -312,6 +320,10 @@ individually.
 - pkg-types@2.3.1
 - pluralize@8.0.0 — Blake Embrey
 - postcss@8.5.26 — Andrey Sitnik <andrey@sitnik.es>
+- postgres-array@3.0.4 — Ben Drucker
+- postgres-bytea@1.0.1 — Ben Drucker
+- postgres-date@1.0.7 — Ben Drucker
+- postgres-interval@1.2.0 — Ben Drucker
 - prelude-ls@1.2.1 — George Zahariev <z@georgezahariev.com>
 - prettier@3.9.6 — James Long
 - process-warning@5.1.0 — Tomas Della Vedova
@@ -394,6 +406,7 @@ individually.
 - why-is-node-running@2.3.0 — Mathias Buus (@mafintosh)
 - word-wrap@1.2.5 — Jon Schlinkert (https://github.com/jonschlinkert)
 - wrap-ansi@6.2.0 — Sindre Sorhus
+- xtend@4.0.2 — Raynos <raynos2@gmail.com>
 - yargs@17.7.2
 - yocto-queue@0.1.0 — Sindre Sorhus
 - yoctocolors-cjs@2.1.3 — Sindre Sorhus
@@ -411,9 +424,11 @@ individually.
 - @humanfs/types@0.15.0 — Nicholas C. Zakas
 - @humanwhocodes/module-importer@1.0.1 — Nicholas C. Zaks
 - @humanwhocodes/retry@0.4.3 — Nicholas C. Zaks
+- @prisma/adapter-pg@6.19.3 — Tom Houlé <houle@prisma.io>
 - @prisma/client@6.19.3 — Tim Suchanek <suchanek@prisma.io>
 - @prisma/config@6.19.3 — Alberto Schiabel <schiabel@prisma.io>
 - @prisma/debug@6.19.3 — Tim Suchanek <suchanek@prisma.io>
+- @prisma/driver-adapter-utils@6.19.3 — Alberto Schiabel <schiabel@prisma.io>
 - @prisma/engines@6.19.3 — Tim Suchanek <suchanek@prisma.io>
 - @prisma/engines-version@7.1.1-3.c2990dca591cba766e3b7ef5d9e8a84796e47ab7 — Tim Suchanek <suchanek@prisma.io>
 - @prisma/fetch-engine@6.19.3 — Tim Suchanek <suchanek@prisma.io>
@@ -450,6 +465,7 @@ individually.
 - iterare@1.2.1 — Felix Becker <felix.b@outlook.com>
 - minimatch@3.1.5 — Isaac Z. Schlueter <i@izs.me> (http://blog.izs.me)
 - mute-stream@2.0.0 — GitHub Inc.
+- pg-int8@1.0.1
 - picocolors@1.1.1 — Alexey Raspopov
 - semver@7.8.5 — GitHub Inc.
 - siginfo@2.0.0 — Emil Bay <github@tixz.dk>
@@ -475,7 +491,7 @@ individually.
 ### BSD-3-Clause
 
 - @xtuc/ieee754@1.2.0 — Feross Aboukhadijeh
-- deepmerge-ts@7.1.5 — Rebecca Stevens
+- deepmerge-ts@8.0.2 — Rebecca Stevens
 - esquery@1.7.0 — Joel Feenstra <jrfeenst+esquery@gmail.com>
 - fast-uri@4.1.3 — Vincent Le Goff <vince.legoff@gmail.com> (https://github.com/zekth)
 - ieee754@1.2.1 — Feross Aboukhadijeh
