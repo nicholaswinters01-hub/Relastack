@@ -78,6 +78,25 @@ Press Ctrl+K anywhere, or click the search box in the navigation bar.
   without CRM, no jobs without Scheduling).
 - Staff console search stays separate and is unchanged.
 
+## 5. Navigation: work on the left, account on the right
+
+The product owner's idea (2026-09-27): account management should not be mixed
+in with the modules. Proposed here because the bar is being rebuilt for search
+anyway.
+
+- **Left, the work:** Dashboard · Customers · Schedule · Tasks. These are the
+  modules a business works in; industry packs land here later.
+- **Right, tools and you:** Search (Ctrl+K) · Notifications · Help · the
+  person's name ▾.
+- **The name ▾ menu:** Your profile (name, password, email notifications) ·
+  Business settings · Locations · Team · Modules · Billing · Staff console
+  (staff only) · Sign out.
+- Every entry keeps today's permission and module checks. An employee sees
+  only what they may open, often just their profile and Sign out.
+- The menu opens with a click or keyboard, closes on Esc or a click outside,
+  and each entry is an ordinary link, so it can open in a new window.
+- On narrow screens the whole bar folds into one menu button.
+
 ## Tests to write, and break on purpose
 
 Search:
