@@ -12,6 +12,13 @@
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
       "port": 3000
+    },
+    {
+      "name": "app-hand-billed",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["dev"],
+      "env": { "BILLING_SIMULATION": "false" },
+      "port": 3000
     }
   ]
 }

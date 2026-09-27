@@ -46,6 +46,26 @@ const ACTION_LABEL: Record<string, string> = {
   'member.signed-out': 'Signed someone out everywhere',
   'invitation.reissued': 'Sent a new invitation link',
   'note.added': 'Added a note',
+  'payment.recorded': 'Recorded a payment',
+  'payment.voided': 'Voided a payment',
+  'credit.granted': 'Gave credit',
+  'credit.removed': 'Removed credit',
+};
+
+const METHOD_LABEL: Record<string, string> = {
+  CHECK: 'Check',
+  BANK_TRANSFER: 'Bank transfer',
+  CARD: 'Card',
+  CASH: 'Cash',
+  COMPLIMENTARY: 'Complimentary (no charge)',
+  OTHER: 'Other',
+};
+
+const CREDIT_LABEL: Record<string, string> = {
+  GRANTED: 'Given',
+  APPLIED: 'Used',
+  RESTORED: 'Returned',
+  REMOVED: 'Removed',
 };
 
 export default async function StaffBusinessPage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,12 +75,16 @@ export default async function StaffBusinessPage({ params }: { params: Promise<{ 
   const detail = await getStaffBusiness(id);
   if (!detail) notFound();
 
-  const { business, subscription } = detail;
+  const { business, subscription, billing } = detail;
+  // A business that has paid keeps its old trial date; it is not on a trial.
+  const hasPaid = billing.payments.some((payment) => payment.voidedAt === null);
   const onTrial =
     subscription !== null &&
+    !hasPaid &&
     (subscription.status === 'TRIALING' ||
       (subscription.status === 'SUSPENDED' && subscription.trialEndsAt !== null));
   const suggestedTrialEnd = inputDate(new Date(Date.now() + 14 * 86_400_000));
+  const dollars = (cents: number) => (cents / 100).toFixed(2);
 
   return (
     <>
@@ -116,10 +140,9 @@ export default async function StaffBusinessPage({ params }: { params: Promise<{ 
                   label="Access"
                   value={subscription.accessLevel === 'full' ? 'Full' : 'Read-only'}
                 />
-                {subscription.trialEndsAt && (
+                {subscription.trialEndsAt && !hasPaid && (
                   <Fact label="Trial ends" value={date(subscription.trialEndsAt)} />
                 )}
-                <Fact label="Current period ends" value={date(subscription.periodEndsAt)} />
                 {subscription.graceEndsAt && (
                   <Fact label="Grace ends" value={date(subscription.graceEndsAt)} />
                 )}
@@ -170,6 +193,193 @@ export default async function StaffBusinessPage({ params }: { params: Promise<{ 
                   ]}
                 />
               </div>
+            </>
+          )}
+        </Section>
+
+        {/* ------------------------------------------------------------- */}
+        <Section title="Payments and credit">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+            <Fact
+              label="Paid through"
+              value={billing.paidThrough ? date(billing.paidThrough) : 'Nothing paid yet'}
+            />
+            {billing.interval && (
+              <Fact label="Billed" value={billing.interval === 'ANNUAL' ? 'Annually' : 'Monthly'} />
+            )}
+            {billing.paidThrough && <Fact label="Days left" value={String(billing.daysLeft)} />}
+            {billing.paidForCurrentTimeCents > 0 && (
+              <Fact
+                label="Unused of what they paid"
+                value={`${money(billing.unusedCents)} of ${money(billing.paidForCurrentTimeCents)}`}
+              />
+            )}
+            <Fact label="Credit balance" value={money(billing.creditBalanceCents)} />
+          </dl>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            <StaffAction
+              label="Record a payment"
+              path={`businesses/${business.id}/payments`}
+              fields={[
+                {
+                  name: 'amountCents',
+                  label: 'Amount received ($)',
+                  type: 'money',
+                  defaultValue: dollars(billing.suggestedCents.MONTHLY),
+                  hint: `Their plan: ${money(billing.suggestedCents.MONTHLY)} a month, ${money(billing.suggestedCents.ANNUAL)} a year. Use 0 for complimentary.`,
+                },
+                {
+                  name: 'interval',
+                  label: 'Covers',
+                  type: 'select',
+                  options: [
+                    { value: 'MONTHLY', label: 'One month' },
+                    { value: 'ANNUAL', label: 'One year' },
+                  ],
+                },
+                {
+                  name: 'method',
+                  label: 'How they paid',
+                  type: 'select',
+                  options: Object.entries(METHOD_LABEL).map(([value, label]) => ({
+                    value,
+                    label,
+                  })),
+                },
+                {
+                  name: 'paidAt',
+                  label: 'Received on',
+                  type: 'day',
+                  defaultValue: inputDate(new Date()),
+                  hint: `Their paid time will start ${date(billing.nextCoverageStartsAt)}.`,
+                },
+                ...(billing.creditBalanceCents > 0
+                  ? [
+                      {
+                        name: 'creditAppliedCents',
+                        label: `Credit to use ($, up to ${dollars(billing.creditBalanceCents)})`,
+                        type: 'money' as const,
+                        optional: true,
+                      },
+                    ]
+                  : []),
+                {
+                  name: 'reference',
+                  label: 'Check number or transfer reference',
+                  type: 'text',
+                  optional: true,
+                },
+              ]}
+            />
+            <StaffAction
+              label="Give credit"
+              path={`businesses/${business.id}/credits`}
+              fields={[{ name: 'amountCents', label: 'Amount ($)', type: 'money' }]}
+            />
+            {billing.creditBalanceCents > 0 && (
+              <StaffAction
+                label="Remove credit"
+                path={`businesses/${business.id}/credits/remove`}
+                fields={[{ name: 'amountCents', label: 'Amount ($)', type: 'money' }]}
+                danger
+              />
+            )}
+          </div>
+
+          {billing.payments.length > 0 && (
+            <div className="mt-6 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-[var(--color-muted)]">
+                  <tr>
+                    <th className="py-2 pr-4 font-medium">Received</th>
+                    <th className="py-2 pr-4 font-medium">Amount</th>
+                    <th className="py-2 pr-4 font-medium">Covers</th>
+                    <th className="py-2 pr-4 font-medium">How</th>
+                    <th className="py-2 font-medium"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {billing.payments.map((payment) => (
+                    <tr
+                      key={payment.id}
+                      className={`border-t border-[var(--color-line)] align-top ${
+                        payment.voidedAt ? 'text-[var(--color-muted)]' : ''
+                      }`}
+                    >
+                      <td className="whitespace-nowrap py-3 pr-4">{date(payment.paidAt)}</td>
+                      <td className="whitespace-nowrap py-3 pr-4">
+                        <span className={payment.voidedAt ? 'line-through' : ''}>
+                          {money(payment.amountCents)}
+                        </span>
+                        {payment.creditAppliedCents > 0 && (
+                          <div className="text-xs text-[var(--color-muted)]">
+                            + {money(payment.creditAppliedCents)} credit
+                          </div>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap py-3 pr-4">
+                        {date(payment.coversFrom)} – {date(payment.coversUntil)}
+                      </td>
+                      <td className="py-3 pr-4">
+                        {METHOD_LABEL[payment.method] ?? payment.method}
+                        {payment.reference && (
+                          <div className="text-xs text-[var(--color-muted)]">
+                            {payment.reference}
+                          </div>
+                        )}
+                        <div className="text-xs text-[var(--color-muted)]">
+                          {payment.recordedByEmail}
+                          {payment.note && ` — “${payment.note}”`}
+                        </div>
+                        {payment.voidedAt && (
+                          <div className="text-xs text-[var(--color-bad)]">
+                            Voided {date(payment.voidedAt)} by {payment.voidedByEmail} — “
+                            {payment.voidReason}”
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3">
+                        {!payment.voidedAt && (
+                          <StaffAction
+                            label="Void"
+                            path={`businesses/${business.id}/payments/${payment.id}/void`}
+                            danger
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {billing.credits.length > 0 && (
+            <>
+              <h3 className="mt-6 text-xs font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+                Credit history
+              </h3>
+              <ul className="mt-2 flex flex-col gap-2 text-sm">
+                {billing.credits.map((entry) => (
+                  <li key={entry.id} className="flex flex-wrap justify-between gap-2">
+                    <span>
+                      {CREDIT_LABEL[entry.kind] ?? entry.kind} — {entry.reason}
+                      <span className="block text-xs text-[var(--color-muted)]">
+                        {entry.staffEmail} · {dateTime(entry.createdAt)}
+                      </span>
+                    </span>
+                    <span
+                      className={`font-mono ${
+                        entry.amountCents < 0 ? 'text-[var(--color-bad)]' : 'text-[var(--color-ok)]'
+                      }`}
+                    >
+                      {entry.amountCents < 0 ? '−' : '+'}
+                      {money(Math.abs(entry.amountCents))}
+                    </span>
+                  </li>
+                ))}
+              </ul>
             </>
           )}
         </Section>

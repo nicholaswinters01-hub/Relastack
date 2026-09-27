@@ -1,9 +1,10 @@
 import { randomBytes } from 'node:crypto';
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { ServerEnv } from '@platform/config';
 import type { Prisma, TransactionClient } from '@platform/db';
 import {
   accessLevelFor,
+  effectiveGraceEndsAt,
   effectiveSubscriptionStatus,
   monthlyCharge,
   type StaffAuditEvent,
@@ -20,12 +21,16 @@ import {
   TOKEN_BYTES,
 } from '../invitations/invitations.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { StaffBillingService } from './staff-billing.service';
+import { recordStaffEvent, toAuditEvent } from './staff-audit';
 import type { StaffIdentity } from './staff.decorators';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_TRIAL_EXTENSION = 366 * DAY;
 /** A second look at the same business within this window is the same visit. */
 const VIEW_LOG_WINDOW = 30 * 60 * 1000;
+/** Paid time running out within this window is a renewal to chase. */
+const RENEWAL_WINDOW = 30 * DAY;
 
 /**
  * The staff console.
@@ -41,10 +46,9 @@ const VIEW_LOG_WINDOW = 30 * 60 * 1000;
  */
 @Injectable()
 export class StaffService {
-  private readonly logger = new Logger(StaffService.name);
-
   constructor(
     private readonly prisma: PrismaService,
+    private readonly billing: StaffBillingService,
     @Inject(SERVER_ENV) private readonly env: ServerEnv,
   ) {}
 
@@ -52,17 +56,26 @@ export class StaffService {
   // Reading
 
   async overview(staff: StaffIdentity): Promise<StaffOverview> {
-    const organizations = await this.prisma.withStaff(staff.userId, (tx) =>
-      tx.organization.findMany({
-        select: {
-          status: true,
-          subscription: { include: { plan: true, addOns: true } },
-          _count: { select: { locations: { where: { status: 'ACTIVE' } } } },
-        },
+    const now = Date.now();
+
+    const { organizations, collected, credit } = await this.prisma.withStaff(
+      staff.userId,
+      async (tx) => ({
+        organizations: await tx.organization.findMany({
+          select: {
+            status: true,
+            subscription: { include: { plan: true, addOns: true } },
+            _count: { select: { locations: { where: { status: 'ACTIVE' } } } },
+          },
+        }),
+        collected: await tx.billingPayment.aggregate({
+          where: { voidedAt: null, paidAt: { gte: new Date(now - 30 * DAY) } },
+          _sum: { amountCents: true },
+        }),
+        credit: await tx.billingCredit.aggregate({ _sum: { amountCents: true } }),
       }),
     );
 
-    const now = Date.now();
     const overview: StaffOverview = {
       businesses: organizations.length,
       trialing: 0,
@@ -72,6 +85,9 @@ export class StaffService {
       readOnly: 0,
       suspended: 0,
       estimatedMonthlyRevenueCents: 0,
+      renewalsDueSoon: 0,
+      collectedLast30DaysCents: collected._sum.amountCents ?? 0,
+      creditOutstandingCents: Math.max(0, credit._sum.amountCents ?? 0),
     };
 
     for (const organization of organizations) {
@@ -88,7 +104,12 @@ export class StaffService {
           overview.trialsEndingThisWeek += 1;
         }
       }
-      if (status === 'ACTIVE') overview.paying += 1;
+      if (status === 'ACTIVE') {
+        overview.paying += 1;
+        if (subscription.periodEndsAt.getTime() - now <= RENEWAL_WINDOW) {
+          overview.renewalsDueSoon += 1;
+        }
+      }
       if (status === 'PAST_DUE') overview.pastDue += 1;
       if (accessLevelFor(status) === 'read-only') overview.readOnly += 1;
 
@@ -150,7 +171,7 @@ export class StaffService {
         },
       });
 
-      await this.record(tx, staff, null, 'businesses.listed', null, {
+      await recordStaffEvent(tx, staff, null, 'businesses.listed', null, {
         search: search ?? null,
         filter: query.filter,
         results: found.length,
@@ -182,6 +203,10 @@ export class StaffService {
           planName: row.subscription?.plan.name ?? null,
           subscriptionStatus: effective,
           trialEndsAt: row.subscription?.trialEndsAt?.toISOString() ?? null,
+          paidThrough:
+            row.subscription && (effective === 'ACTIVE' || effective === 'PAST_DUE')
+              ? row.subscription.periodEndsAt.toISOString()
+              : null,
           locationCount: row._count.locations,
           memberCount: row._count.memberships,
           ownerEmail: owner?.user.email ?? null,
@@ -200,6 +225,12 @@ export class StaffService {
             s.effective === 'TRIALING' &&
             s.trialEndsAt !== null &&
             new Date(s.trialEndsAt).getTime() - now <= 7 * DAY
+          );
+        case 'renewal-due':
+          return (
+            s.effective === 'ACTIVE' &&
+            s.paidThrough !== null &&
+            new Date(s.paidThrough).getTime() - now <= RENEWAL_WINDOW
           );
         case 'past-due':
           return s.effective === 'PAST_DUE';
@@ -239,7 +270,8 @@ export class StaffService {
         },
         select: { id: true },
       });
-      if (!recentLook) await this.record(tx, staff, organizationId, 'business.viewed', null, {});
+      if (!recentLook)
+        await recordStaffEvent(tx, staff, organizationId, 'business.viewed', null, {});
 
       const userIds = organization.memberships.map((m) => m.userId);
       const now = new Date();
@@ -271,6 +303,13 @@ export class StaffService {
       const sessionsFor = new Map(sessionCounts.map((row) => [row.userId, row._count._all]));
       const subscription = organization.subscription;
       const activeLocations = organization.locations.filter((l) => l.status === 'ACTIVE').length;
+      const billing = await this.billing.billingFor(
+        tx,
+        organizationId,
+        subscription,
+        activeLocations,
+        now.getTime(),
+      );
 
       return {
         business: {
@@ -292,7 +331,7 @@ export class StaffService {
                 trialEndsAt: subscription.trialEndsAt?.toISOString() ?? null,
                 periodStartsAt: subscription.periodStartsAt.toISOString(),
                 periodEndsAt: subscription.periodEndsAt.toISOString(),
-                graceEndsAt: subscription.graceEndsAt?.toISOString() ?? null,
+                graceEndsAt: effectiveGraceEndsAt(subscription)?.toISOString() ?? null,
                 cancelledAt: subscription.cancelledAt?.toISOString() ?? null,
                 monthlyChargeCents: monthlyCharge(
                   subscription.plan,
@@ -348,6 +387,7 @@ export class StaffService {
           name: plan.name,
           maxLocations: plan.maxLocations,
         })),
+        billing,
       };
     });
   }
@@ -387,6 +427,14 @@ export class StaffService {
     await this.prisma.withStaff(staff.userId, async (tx) => {
       const subscription = await this.subscriptionOf(tx, organizationId);
 
+      // A business that has paid keeps its old trial date, so "suspended with a
+      // trial date" alone would let a lapsed payer be handed a free trial.
+      if (await this.billing.hasPaid(tx, organizationId)) {
+        throw new BadRequestException(
+          'This business has paid, so it is not on a trial. Record a payment or give credit instead.',
+        );
+      }
+
       const lapsedTrial = subscription.status === 'SUSPENDED' && subscription.trialEndsAt !== null;
       if (subscription.status !== 'TRIALING' && !lapsedTrial) {
         throw new BadRequestException('This business is not on a trial');
@@ -397,7 +445,7 @@ export class StaffService {
         data: { status: 'TRIALING', trialEndsAt: until, periodEndsAt: until, graceEndsAt: null },
       });
 
-      await this.record(tx, staff, organizationId, 'trial.extended', reason, {
+      await recordStaffEvent(tx, staff, organizationId, 'trial.extended', reason, {
         from: subscription.trialEndsAt?.toISOString() ?? null,
         to: until.toISOString(),
         restarted: lapsedTrial,
@@ -450,7 +498,7 @@ export class StaffService {
         },
       });
 
-      await this.record(tx, staff, organizationId, 'plan.changed', reason, {
+      await recordStaffEvent(tx, staff, organizationId, 'plan.changed', reason, {
         from: subscription.planKey,
         to: plan.key,
         addOnsRemoved: removed.count,
@@ -484,7 +532,7 @@ export class StaffService {
 
       await tx.organization.update({ where: { id: organizationId }, data: { status } });
 
-      await this.record(
+      await recordStaffEvent(
         tx,
         staff,
         organizationId,
@@ -510,7 +558,7 @@ export class StaffService {
         data: { failedLoginAttempts: 0, lockedUntil: null },
       });
 
-      await this.record(tx, staff, organizationId, 'member.unlocked', reason, {
+      await recordStaffEvent(tx, staff, organizationId, 'member.unlocked', reason, {
         userId,
         email: member.user.email,
         wasLockedUntil: member.user.lockedUntil?.toISOString() ?? null,
@@ -533,7 +581,7 @@ export class StaffService {
         data: { revokedAt: new Date() },
       });
 
-      await this.record(tx, staff, organizationId, 'member.signed-out', reason, {
+      await recordStaffEvent(tx, staff, organizationId, 'member.signed-out', reason, {
         userId,
         email: member.user.email,
         sessionsEnded: revoked.count,
@@ -572,7 +620,7 @@ export class StaffService {
         },
       });
 
-      await this.record(tx, staff, organizationId, 'invitation.reissued', reason, {
+      await recordStaffEvent(tx, staff, organizationId, 'invitation.reissued', reason, {
         invitationId,
         email: invitation.email,
       });
@@ -593,7 +641,9 @@ export class StaffService {
         data: { organizationId, authorUserId: staff.userId, authorEmail: staff.email, body },
       });
 
-      await this.record(tx, staff, organizationId, 'note.added', null, { length: body.length });
+      await recordStaffEvent(tx, staff, organizationId, 'note.added', null, {
+        length: body.length,
+      });
     });
   }
 
@@ -614,51 +664,4 @@ export class StaffService {
     if (!membership) throw new NotFoundException();
     return membership;
   }
-
-  private async record(
-    tx: TransactionClient,
-    staff: StaffIdentity,
-    organizationId: string | null,
-    action: string,
-    reason: string | null,
-    details: Record<string, unknown>,
-  ): Promise<void> {
-    await tx.staffAuditEvent.create({
-      data: {
-        staffUserId: staff.userId,
-        staffEmail: staff.email,
-        organizationId,
-        action,
-        reason,
-        details: details as Prisma.InputJsonValue,
-      },
-    });
-
-    if (reason !== null) {
-      this.logger.log(`${staff.email} ${action} on ${organizationId ?? 'platform'}: ${reason}`);
-    }
-  }
-}
-
-function toAuditEvent(event: {
-  id: string;
-  staffEmail: string;
-  organizationId: string | null;
-  action: string;
-  reason: string | null;
-  details: Prisma.JsonValue;
-  createdAt: Date;
-}): StaffAuditEvent {
-  return {
-    id: event.id,
-    staffEmail: event.staffEmail,
-    organizationId: event.organizationId,
-    action: event.action,
-    reason: event.reason,
-    details:
-      event.details && typeof event.details === 'object' && !Array.isArray(event.details)
-        ? (event.details as Record<string, unknown>)
-        : {},
-    createdAt: event.createdAt.toISOString(),
-  };
 }

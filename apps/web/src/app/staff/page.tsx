@@ -17,7 +17,8 @@ const FILTERS: Array<{ key: string; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'trialing', label: 'On trial' },
   { key: 'trial-ending', label: 'Trial ends this week' },
-  { key: 'past-due', label: 'Payment failed' },
+  { key: 'renewal-due', label: 'Renewal due in 30 days' },
+  { key: 'past-due', label: 'Payment overdue' },
   { key: 'read-only', label: 'Read-only' },
   { key: 'suspended', label: 'Suspended' },
 ];
@@ -25,7 +26,7 @@ const FILTERS: Array<{ key: string; label: string }> = [
 const STATUS_LABEL: Record<string, string> = {
   TRIALING: 'Trial',
   ACTIVE: 'Paying',
-  PAST_DUE: 'Payment failed',
+  PAST_DUE: 'Payment overdue',
   SUSPENDED: 'Read-only',
   CANCELLED: 'Cancelled',
 };
@@ -50,10 +51,13 @@ export default async function StaffPage({
         { label: 'On trial', value: String(overview.trialing) },
         { label: 'Trials ending this week', value: String(overview.trialsEndingThisWeek) },
         { label: 'Paying', value: String(overview.paying) },
-        { label: 'Payment failed', value: String(overview.pastDue) },
+        { label: 'Renewals due (30 days)', value: String(overview.renewalsDueSoon) },
+        { label: 'Payment overdue', value: String(overview.pastDue) },
         { label: 'Read-only', value: String(overview.readOnly) },
         { label: 'Suspended', value: String(overview.suspended) },
         { label: 'Est. monthly revenue', value: money(overview.estimatedMonthlyRevenueCents) },
+        { label: 'Collected (30 days)', value: money(overview.collectedLast30DaysCents) },
+        { label: 'Credit we owe', value: money(overview.creditOutstandingCents) },
       ]
     : [];
 
@@ -167,6 +171,15 @@ export default async function StaffPage({
                             <span className="text-xs text-[var(--color-muted)]">
                               {' '}
                               · ends {shortDate(business.trialEndsAt)}
+                            </span>
+                          )}
+                          {business.paidThrough && (
+                            <span className="text-xs text-[var(--color-muted)]">
+                              {' '}
+                              · {business.subscriptionStatus === 'PAST_DUE'
+                                ? 'was due'
+                                : 'paid to'}{' '}
+                              {shortDate(business.paidThrough)}
                             </span>
                           )}
                         </>

@@ -1,10 +1,14 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { billingSimulationEnabled, type ServerEnv } from '@platform/config';
 import type { TenantContext, TransactionClient } from '@platform/db';
 import {
   accessLevelFor,
+  effectiveGraceEndsAt,
   effectiveSubscriptionStatus,
   monthlyCharge,
+  paidThroughOf,
   type AccessLevel,
+  type BillingAccount,
   type BillingEvent,
   type BillingSummary,
   type Plan,
@@ -12,6 +16,7 @@ import {
   type SubscriptionStatus,
   EVENT_TYPES,
 } from '@platform/shared';
+import { SERVER_ENV } from '../config.provider';
 import { EventsService } from '../notifications/events.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -40,7 +45,56 @@ export class BillingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventsService,
+    @Inject(SERVER_ENV) private readonly env: ServerEnv,
   ) {}
+
+  /**
+   * Choosing a plan and the simulated events both make a business "paying"
+   * with no money involved. While payments are recorded by staff, production
+   * answers them as if they did not exist.
+   */
+  private assertSelfServe(): void {
+    if (!billingSimulationEnabled(this.env)) throw new NotFoundException();
+  }
+
+  /**
+   * The business's own view of its account: what it has paid, for how long,
+   * and the credit it holds. Voided payments are left out, and so is anything
+   * about who recorded a payment or why.
+   */
+  async getAccount(context: TenantContext): Promise<BillingAccount> {
+    const { payments, credit } = await this.prisma.withTenant(context, async (tx) => ({
+      payments: await tx.billingPayment.findMany({
+        where: { organizationId: context.organizationId, voidedAt: null },
+        orderBy: { paidAt: 'desc' },
+      }),
+      credit: await tx.billingCredit.aggregate({
+        where: { organizationId: context.organizationId },
+        _sum: { amountCents: true },
+      }),
+    }));
+
+    const latest = [...payments].sort(
+      (a, b) => b.coversUntil.getTime() - a.coversUntil.getTime(),
+    )[0];
+
+    return {
+      selfServe: billingSimulationEnabled(this.env),
+      paidThrough: paidThroughOf(payments)?.toISOString() ?? null,
+      interval: latest?.interval ?? null,
+      creditBalanceCents: credit._sum.amountCents ?? 0,
+      payments: payments.map((payment) => ({
+        id: payment.id,
+        paidAt: payment.paidAt.toISOString(),
+        amountCents: payment.amountCents,
+        creditAppliedCents: payment.creditAppliedCents,
+        method: payment.method,
+        interval: payment.interval,
+        coversFrom: payment.coversFrom.toISOString(),
+        coversUntil: payment.coversUntil.toISOString(),
+      })),
+    };
+  }
 
   /**
    * Subscribe a brand-new organization to a trial.
@@ -121,11 +175,9 @@ export class BillingService {
    * correct; the scheduled sweep in Phase 11 only persists what is already
    * true, so notifications can fire.
    */
-  private effectiveStatus(subscription: {
-    status: SubscriptionStatus;
-    graceEndsAt: Date | null;
-    trialEndsAt: Date | null;
-  }): SubscriptionStatus {
+  private effectiveStatus(
+    subscription: Parameters<typeof effectiveSubscriptionStatus>[0],
+  ): SubscriptionStatus {
     return effectiveSubscriptionStatus(subscription);
   }
 
@@ -149,7 +201,7 @@ export class BillingService {
       periodStartsAt: row.periodStartsAt.toISOString(),
       periodEndsAt: row.periodEndsAt.toISOString(),
       trialEndsAt: row.trialEndsAt?.toISOString() ?? null,
-      graceEndsAt: row.graceEndsAt?.toISOString() ?? null,
+      graceEndsAt: effectiveGraceEndsAt(row)?.toISOString() ?? null,
       cancelledAt: row.cancelledAt?.toISOString() ?? null,
       addOns: row.addOns.map((entry) => entry.moduleKey),
     };
@@ -233,6 +285,8 @@ export class BillingService {
    * destructive surprise triggered by a billing change.
    */
   async changePlan(context: TenantContext, planKey: string): Promise<Subscription> {
+    this.assertSelfServe();
+
     const plan = await this.prisma.client.plan.findUnique({ where: { key: planKey } });
     if (!plan) throw new NotFoundException('Unknown plan');
 
@@ -290,6 +344,8 @@ export class BillingService {
    * a provider adapter.
    */
   async applyEvent(context: TenantContext, event: BillingEvent): Promise<Subscription> {
+    this.assertSelfServe();
+
     const current = await this.prisma.withTenant(context, (tx) =>
       tx.subscription.findUnique({
         where: { organizationId: context.organizationId },

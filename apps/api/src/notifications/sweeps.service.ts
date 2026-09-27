@@ -6,7 +6,7 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import type { ServerEnv } from '@platform/config';
-import { EVENT_TYPES } from '@platform/shared';
+import { EVENT_TYPES, lapsedGraceEndsAt } from '@platform/shared';
 import { SERVER_ENV } from '../config.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobSeriesService } from '../scheduling/job-series.service';
@@ -64,7 +64,14 @@ export class SweepsService implements OnModuleInit, OnModuleDestroy {
     this.running = true;
 
     try {
-      const result = { lapsed: await this.lapseSubscriptions(), booked: await this.extendSeries() };
+      // Unpaid first: a paid period that ran out long ago goes straight to
+      // read-only there, rather than to past due and then read-only a moment
+      // later with two notices.
+      const unpaid = await this.lapseUnpaidPeriods();
+      const result = {
+        lapsed: unpaid + (await this.lapseSubscriptions()),
+        booked: await this.extendSeries(),
+      };
 
       // Also the fallback for delivery: anything a nudge missed, including the
       // read-only notices lapsing just queued, goes out now.
@@ -74,6 +81,58 @@ export class SweepsService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.running = false;
     }
+  }
+
+  /**
+   * A paid period that ran out with no payment after it.
+   *
+   * Access already follows the clock (effectiveSubscriptionStatus); this
+   * records the change once so the owner is told their payment is due, and
+   * starts the grace period where the paid time ended, not where the sweep
+   * happened to notice.
+   */
+  private async lapseUnpaidPeriods(): Promise<number> {
+    const now = new Date();
+
+    const due = await this.prisma.withPlatformWorker((tx) =>
+      tx.subscription.findMany({
+        where: { status: 'ACTIVE', periodEndsAt: { lte: now } },
+        select: {
+          id: true,
+          organizationId: true,
+          periodEndsAt: true,
+          plan: { select: { gracePeriodDays: true } },
+        },
+      }),
+    );
+
+    for (const subscription of due) {
+      const graceEndsAt = lapsedGraceEndsAt(subscription.periodEndsAt, subscription.plan);
+      const expired = graceEndsAt <= now;
+
+      await this.prisma.withPlatformWorker(async (tx) => {
+        // Conditional on the same period: a payment recorded in the meantime
+        // moves periodEndsAt, and must not be overwritten.
+        const updated = await tx.subscription.updateMany({
+          where: { id: subscription.id, status: 'ACTIVE', periodEndsAt: subscription.periodEndsAt },
+          data: { status: expired ? 'SUSPENDED' : 'PAST_DUE', graceEndsAt },
+        });
+
+        if (updated.count === 0) return;
+
+        await tx.domainEvent.create({
+          data: {
+            organizationId: subscription.organizationId,
+            type: expired ? EVENT_TYPES.SUBSCRIPTION_READ_ONLY : EVENT_TYPES.SUBSCRIPTION_PAST_DUE,
+            payload: { reason: 'period_ended' },
+          },
+        });
+      });
+    }
+
+    if (due.length > 0) this.logger.log(`${due.length} paid period(s) ran out unpaid`);
+
+    return due.length;
   }
 
   /**

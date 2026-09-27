@@ -187,6 +187,17 @@ export const serverEnvSchema = z
 
     /** Production must either set SIGNUP_ACCESS_CODE or say this explicitly. */
     SIGNUP_OPEN: booleanFromString.default(false),
+
+    /**
+     * Customers choosing a plan, and the simulated billing events, on their own.
+     *
+     * Both stand in for a payment provider and both make a business "paying"
+     * without any money changing hands. Until Phase 18 connects a provider,
+     * payments are recorded by staff, so production refuses these outright.
+     * Defaults to on everywhere else, so the lapse-and-recover path can still
+     * be walked through locally.
+     */
+    BILLING_SIMULATION: booleanFromString.optional(),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.INTERNAL_API_SECRET !== undefined, {
     message: 'INTERNAL_API_SECRET must be set when NODE_ENV=production',
@@ -205,6 +216,11 @@ export const serverEnvSchema = z
   )
   // A production deployment serving session cookies over plaintext HTTP would
   // expose every session to anyone on the network path. Refuse to start.
+  .refine((env) => env.NODE_ENV !== 'production' || env.BILLING_SIMULATION !== true, {
+    message:
+      'BILLING_SIMULATION cannot be true when NODE_ENV=production: it lets a business mark itself as paid',
+    path: ['BILLING_SIMULATION'],
+  })
   .refine((env) => env.NODE_ENV !== 'production' || env.COOKIE_SECURE, {
     message: 'COOKIE_SECURE must be true when NODE_ENV=production',
     path: ['COOKIE_SECURE'],
@@ -265,3 +281,7 @@ export function loadServerEnv(source: NodeJS.ProcessEnv = process.env): ServerEn
 
 export const isProduction = (env: ServerEnv): boolean => env.NODE_ENV === 'production';
 export const isTest = (env: ServerEnv): boolean => env.NODE_ENV === 'test';
+
+/** Whether customers may change plan and simulate payments themselves. Never in production. */
+export const billingSimulationEnabled = (env: ServerEnv): boolean =>
+  env.NODE_ENV !== 'production' && env.BILLING_SIMULATION !== false;

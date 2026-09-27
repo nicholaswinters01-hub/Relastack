@@ -47,6 +47,7 @@ export default async function BillingPage() {
         <BillingManager
           subscription={billing.subscription}
           summary={billing.summary}
+          account={billing.account}
           plans={plans}
           canManage={canManage}
         />

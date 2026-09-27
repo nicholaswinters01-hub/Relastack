@@ -1,7 +1,9 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { SERVER_ENV } from '../config.provider';
 import { EventsService } from '../notifications/events.service';
+import { makeTestEnv } from '../test-support/test-env';
 import { PrismaService } from '../prisma/prisma.service';
 import { BillingService } from './billing.service';
 
@@ -60,8 +62,10 @@ describe('BillingService', () => {
   let membershipCount: ReturnType<typeof vi.fn>;
   let planFindUnique: ReturnType<typeof vi.fn>;
   let service: BillingService;
+  let env = makeTestEnv();
 
   beforeEach(async () => {
+    env = makeTestEnv();
     findUnique = vi.fn().mockResolvedValue(makeSubscription());
     update = vi.fn().mockResolvedValue(makeSubscription());
     locationCount = vi.fn().mockResolvedValue(0);
@@ -89,6 +93,7 @@ describe('BillingService', () => {
         // The outbox is a collaborator here, not the thing under test: these
         // cases are about what effectiveStatus decides, not what it announces.
         { provide: EventsService, useValue: { emit: vi.fn() } },
+        { provide: SERVER_ENV, useValue: env },
       ],
     }).compile();
 
@@ -163,6 +168,50 @@ describe('BillingService', () => {
       );
 
       expect((await service.resolveFor(TENANT))?.accessLevel).toBe('full');
+    });
+
+    it('treats paid time that ran out as a payment due, keeping full access', async () => {
+      // Otherwise one recorded month would mean "paying" for ever.
+      findUnique.mockResolvedValue(
+        makeSubscription({ status: 'ACTIVE', periodEndsAt: ago(3 * DAY) }),
+      );
+
+      const resolved = await service.resolveFor(TENANT);
+
+      expect(resolved?.status).toBe('PAST_DUE');
+      expect(resolved?.accessLevel).toBe('full');
+    });
+
+    it('narrows to read-only once the grace after unpaid time is over', async () => {
+      // BUSINESS promises 14 days of grace, counted from the end of the paid time.
+      findUnique.mockResolvedValue(
+        makeSubscription({ status: 'ACTIVE', periodEndsAt: ago(15 * DAY) }),
+      );
+
+      const resolved = await service.resolveFor(TENANT);
+
+      expect(resolved?.status).toBe('SUSPENDED');
+      expect(resolved?.accessLevel).toBe('read-only');
+    });
+  });
+
+  describe('while payments are recorded by hand', () => {
+    const handBilled = () =>
+      new BillingService(
+        { withTenant: vi.fn(), client: { plan: { findUnique: planFindUnique } } } as never,
+        { emit: vi.fn() } as never,
+        makeTestEnv({ BILLING_SIMULATION: 'false' }),
+      );
+
+    it('refuses to let a business choose a plan, which would mark it paying', async () => {
+      await expect(handBilled().changePlan(TENANT, 'business')).rejects.toThrow(NotFoundException);
+      expect(planFindUnique).not.toHaveBeenCalled();
+    });
+
+    it('refuses the simulated payment events', async () => {
+      await expect(handBilled().applyEvent(TENANT, 'payment_succeeded')).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 

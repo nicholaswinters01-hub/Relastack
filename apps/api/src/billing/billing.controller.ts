@@ -38,7 +38,7 @@ export class BillingController {
       this.billing.getSummary(tenant),
     ]);
 
-    return { subscription, summary };
+    return { subscription, summary, account: await this.billing.getAccount(tenant) };
   }
 
   /** The public price list. Any member may see what the company could move to. */
@@ -58,7 +58,11 @@ export class BillingController {
   ): Promise<SubscriptionResponse> {
     const subscription = await this.billing.changePlan(tenant, body.planKey);
 
-    return { subscription, summary: await this.billing.getSummary(tenant) };
+    return {
+      subscription,
+      summary: await this.billing.getSummary(tenant),
+      account: await this.billing.getAccount(tenant),
+    };
   }
 
   /**
@@ -79,6 +83,10 @@ export class BillingController {
   ): Promise<SubscriptionResponse> {
     const subscription = await this.billing.applyEvent(tenant, body.event);
 
-    return { subscription, summary: await this.billing.getSummary(tenant) };
+    return {
+      subscription,
+      summary: await this.billing.getSummary(tenant),
+      account: await this.billing.getAccount(tenant),
+    };
   }
 }

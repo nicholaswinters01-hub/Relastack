@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { billingAccountSchema } from './billing';
 
 /**
  * Plans, subscriptions and add-ons.
@@ -53,11 +54,26 @@ export function accessLevelFor(status: SubscriptionStatus): AccessLevel {
  * A lapsed grace period or trial becomes read-only the moment it lapses, not
  * whenever a background job next runs. Computed on read so the clock is
  * always right; the hourly sweep only persists what is already true.
+ *
+ * A paid period that has run out with nothing recorded after it is a missed
+ * payment: the grace period starts where the paid time ended. Without this a
+ * business paid for one month would be "paying" for ever.
  */
 export function effectiveSubscriptionStatus(
-  subscription: { status: SubscriptionStatus; graceEndsAt: Date | null; trialEndsAt: Date | null },
+  subscription: {
+    status: SubscriptionStatus;
+    graceEndsAt: Date | null;
+    trialEndsAt: Date | null;
+    periodEndsAt: Date;
+    plan: { gracePeriodDays: number };
+  },
   now: number = Date.now(),
 ): SubscriptionStatus {
+  if (subscription.status === 'ACTIVE' && subscription.periodEndsAt.getTime() <= now) {
+    const graceEndsAt = lapsedGraceEndsAt(subscription.periodEndsAt, subscription.plan);
+    return graceEndsAt.getTime() <= now ? 'SUSPENDED' : 'PAST_DUE';
+  }
+
   if (subscription.status === 'PAST_DUE' && subscription.graceEndsAt) {
     if (subscription.graceEndsAt.getTime() <= now) return 'SUSPENDED';
   }
@@ -69,6 +85,29 @@ export function effectiveSubscriptionStatus(
   }
 
   return subscription.status;
+}
+
+/**
+ * When full access ends, if a payment is overdue now.
+ *
+ * A paid period that ran out is past due before the sweep has recorded it, and
+ * the stored grace date is still empty then; this fills it in so the page can
+ * give the real date.
+ */
+export function effectiveGraceEndsAt(
+  subscription: Parameters<typeof effectiveSubscriptionStatus>[0],
+  now: number = Date.now(),
+): Date | null {
+  if (effectiveSubscriptionStatus(subscription, now) !== 'PAST_DUE') return null;
+
+  return subscription.status === 'ACTIVE'
+    ? lapsedGraceEndsAt(subscription.periodEndsAt, subscription.plan)
+    : subscription.graceEndsAt;
+}
+
+/** When full access ends for a business whose paid period ran out. */
+export function lapsedGraceEndsAt(periodEndsAt: Date, plan: { gracePeriodDays: number }): Date {
+  return new Date(periodEndsAt.getTime() + plan.gracePeriodDays * 24 * 60 * 60 * 1000);
 }
 
 /**
@@ -155,6 +194,7 @@ export type BillingSummary = z.infer<typeof billingSummarySchema>;
 export const subscriptionResponseSchema = z.object({
   subscription: subscriptionSchema,
   summary: billingSummarySchema,
+  account: billingAccountSchema,
 });
 
 export type SubscriptionResponse = z.infer<typeof subscriptionResponseSchema>;

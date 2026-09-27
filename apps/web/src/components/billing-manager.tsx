@@ -2,14 +2,25 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import type { BillingSummary, Plan, Subscription } from '@platform/shared';
+import type { BillingAccount, BillingSummary, Plan, Subscription } from '@platform/shared';
+import { SUPPORT_EMAIL } from '@/lib/brand';
 
 interface Props {
   subscription: Subscription;
   summary: BillingSummary;
+  account: BillingAccount;
   plans: Plan[];
   canManage: boolean;
 }
+
+const METHOD_LABEL: Record<string, string> = {
+  CHECK: 'Check',
+  BANK_TRANSFER: 'Bank transfer',
+  CARD: 'Card',
+  CASH: 'Cash',
+  COMPLIMENTARY: 'Complimentary',
+  OTHER: 'Other',
+};
 
 const money = (cents: number) =>
   (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD' });
@@ -25,7 +36,7 @@ const day = (iso: string) =>
  * not paid for is the entitlement guard — both asserted in the e2e suite by
  * calling the endpoints directly.
  */
-export function BillingManager({ subscription, summary, plans, canManage }: Props) {
+export function BillingManager({ subscription, summary, account, plans, canManage }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +67,13 @@ export function BillingManager({ subscription, summary, plans, canManage }: Prop
 
   const isLapsed = subscription.accessLevel === 'read-only';
   const inGrace = subscription.status === 'PAST_DUE' && subscription.graceEndsAt;
+  // Paid time that simply ran out, as opposed to a card that was declined.
+  const renewalDue = inGrace && account.paidThrough !== null;
+  const contact = (
+    <a href={`mailto:${SUPPORT_EMAIL}`} className="underline underline-offset-4">
+      {SUPPORT_EMAIL}
+    </a>
+  );
 
   return (
     <div className="mt-8 flex flex-col gap-8">
@@ -65,19 +83,28 @@ export function BillingManager({ subscription, summary, plans, canManage }: Prop
           <h2 className="font-semibold text-[var(--color-bad)]">This account is read-only</h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
             {subscription.status === 'CANCELLED'
-              ? 'Your subscription has ended. Everything you created is still here and you can still read and export it. Choose a plan below to start making changes again.'
-              : 'Your subscription is not active. You can still see and export everything, but changes are paused until billing is up to date.'}
+              ? 'Your subscription has ended. Everything you created is still here and you can still read and export it.'
+              : 'Your subscription is not active. You can still see and export everything, but changes are paused until billing is up to date.'}{' '}
+            {account.selfServe ? (
+              'Choose a plan below to start making changes again.'
+            ) : (
+              <>To pick up where you left off, email {contact} and we will sort it out with you.</>
+            )}
           </p>
         </div>
       )}
 
       {inGrace && (
         <div className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-5">
-          <h2 className="font-semibold">A payment did not go through</h2>
+          <h2 className="font-semibold">
+            {renewalDue ? 'Your payment is due' : 'A payment did not go through'}
+          </h2>
           <p className="mt-2 text-sm text-[var(--color-muted)]">
+            {renewalDue && <>Your paid time ended on {day(account.paidThrough!)}. </>}
             Nothing has changed yet — you have full access until{' '}
             <strong>{day(subscription.graceEndsAt!)}</strong>. After that the account becomes
-            read-only until the payment succeeds.
+            read-only until it is paid.
+            {!account.selfServe && <> To renew, email {contact}.</>}
           </p>
         </div>
       )}
@@ -141,6 +168,62 @@ export function BillingManager({ subscription, summary, plans, canManage }: Prop
       </section>
 
       {/* --------------------------------------------------------------- */}
+      <section className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+          Your account
+        </h2>
+
+        <dl className="mt-4 flex flex-col gap-2 text-sm">
+          <div className="flex justify-between gap-4">
+            <dt className="text-[var(--color-muted)]">Paid through</dt>
+            <dd>{account.paidThrough ? day(account.paidThrough) : 'Nothing paid yet'}</dd>
+          </div>
+          {account.interval && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--color-muted)]">Billed</dt>
+              <dd>{account.interval === 'ANNUAL' ? 'Annually' : 'Monthly'}</dd>
+            </div>
+          )}
+          {account.creditBalanceCents > 0 && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-[var(--color-muted)]">Credit with us</dt>
+              <dd className="font-mono">{money(account.creditBalanceCents)}</dd>
+            </div>
+          )}
+        </dl>
+
+        {!account.selfServe && (
+          <p className="mt-4 text-sm text-[var(--color-muted)]">
+            To pay, renew, or change plan, email {contact}. We will set it up and it shows here as
+            soon as it is done.
+          </p>
+        )}
+
+        {account.payments.length > 0 && (
+          <ul className="mt-5 flex flex-col divide-y divide-[var(--color-line)] border-t border-[var(--color-line)] text-sm">
+            {account.payments.map((payment) => (
+              <li key={payment.id} className="flex flex-wrap justify-between gap-2 py-3">
+                <span>
+                  {day(payment.coversFrom)} – {day(payment.coversUntil)}
+                  <span className="block text-xs text-[var(--color-muted)]">
+                    {METHOD_LABEL[payment.method] ?? payment.method}, received {day(payment.paidAt)}
+                  </span>
+                </span>
+                <span className="font-mono">
+                  {money(payment.amountCents)}
+                  {payment.creditAppliedCents > 0 && (
+                    <span className="block text-right text-xs text-[var(--color-muted)]">
+                      + {money(payment.creditAppliedCents)} credit
+                    </span>
+                  )}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* --------------------------------------------------------------- */}
       <section>
         <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
           Plans
@@ -182,7 +265,7 @@ export function BillingManager({ subscription, summary, plans, canManage }: Prop
                   )}
                 </div>
 
-                {canManage && !current && (
+                {canManage && account.selfServe && !current && (
                   <button
                     onClick={() => post('/api/v1/billing/plan', { planKey: plan.key }, plan.key)}
                     disabled={busy !== null || tooManyLocations}
@@ -198,7 +281,7 @@ export function BillingManager({ subscription, summary, plans, canManage }: Prop
       </section>
 
       {/* --------------------------------------------------------------- */}
-      {canManage && (
+      {canManage && account.selfServe && (
         <section className="rounded-xl border border-dashed border-[var(--color-line)] p-5">
           <h2 className="text-sm font-semibold">Simulate a billing event</h2>
           <p className="mt-1 text-sm text-[var(--color-muted)]">

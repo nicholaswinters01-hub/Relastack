@@ -69,6 +69,19 @@ business would unlock everything it owns. Every look and every change is
 written to `staff_audit_events` in the same transaction, changes with a
 required reason; the application role has no UPDATE or DELETE there.
 
+**Billing is by hand** (Phase 19b) until Phase 18 connects a payment provider.
+Staff record payments in `billing_payments`; a recorded payment is the only
+thing that makes a business paying, and in production a business cannot choose
+a plan or simulate a payment itself (`BILLING_SIMULATION`, refused in
+production). A payment covers a calendar month or year, and the subscription is
+**recomputed from the payments** after every change rather than nudged. Paid
+time runs out: an `ACTIVE` subscription past `periodEndsAt` is past due, with
+grace counted from the end of the paid time. Payments are never edited or
+deleted, only voided once — the application role holds UPDATE on the void
+columns alone. Credit is an append-only ledger in `billing_credits` whose
+balance is always the sum. Every money change locks the business's
+subscription row first, so credit cannot be spent twice.
+
 Tasks are part of **core**, not a module: Scheduling and Automation both build
 on them, and gating the foundation would gate everything standing on it. A task
 hangs off a customer or stands alone, and Phase 9 jobs attach through a second
@@ -248,6 +261,11 @@ Recorded because each one cost real time and none is obvious.
   it that way is that `customers`, `jobs`, `tasks`, `customer_notes` and the
   rest have no `*_staff_*` policy. Adding one is a product decision, not a
   convenience; the staff e2e suite fails if staff can read a customer.
+- **A refusal test must reach the case the rule exists for.** "Staff cannot
+  give a business that has paid a trial" was tested on a business that was
+  still paying, which an older rule already refused, so deleting the new rule
+  broke nothing. The rule is for a payer whose paid time has lapsed. Break
+  each guard once and watch its test fail.
 - **Backticks inside `node -e "..."` run as shell commands.** Bash expands them
   before Node sees the script. Several edits to prose came out garbled this
   way, and one silently executed a pnpm command. Use the Edit/Write tools for
@@ -291,8 +309,8 @@ next phase without it.
 | 16    | Inventory                                                    |          |
 | 17    | Custom module framework                                      |          |
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
-| 19a   | Staff console: businesses, support actions, audit trail      | Review   |
-| 19b   | Billing by hand: annual plans, payments, credits             | Next     |
+| 19a   | Staff console: businesses, support actions, audit trail      | Complete |
+| 19b   | Billing by hand: annual plans, payments, credits             | Review   |
 | 19c   | Help desk: in-app requests and replies (needs email)         |          |
 | 20a   | Deployment: Render + Neon + Vercel, invite-only (pulled fwd) | **Now**  |
 | 20    | Production hardening                                         |          |

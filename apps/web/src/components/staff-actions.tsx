@@ -6,10 +6,28 @@ import { useState, type FormEvent } from 'react';
 interface Field {
   name: string;
   label: string;
-  type: 'date' | 'select';
+  /**
+   * `date` sends the end of that day as an instant, `day` sends midday (for
+   * "when did this happen", where the end of the day could be tomorrow in UTC),
+   * `money` takes dollars and sends whole cents.
+   */
+  type: 'date' | 'day' | 'select' | 'money' | 'text';
   options?: Array<{ value: string; label: string }>;
   defaultValue?: string;
+  /** Left out of the request when empty. Everything else is required. */
+  optional?: boolean;
+  hint?: string;
 }
+
+/** "29", "29.5", "$1,200.00" → cents. Null when it is not an amount. */
+function toCents(value: string): number | null {
+  const cleaned = value.replace(/[$,\s]/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(cleaned)) return null;
+  return Math.round(Number(cleaned) * 100);
+}
+
+const inputClass =
+  'rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5';
 
 interface StaffActionProps {
   label: string;
@@ -50,14 +68,32 @@ export function StaffAction({
     setError(null);
 
     const form = new FormData(event.currentTarget);
-    const body: Record<string, string> = { ...fixed, reason: String(form.get('reason') ?? '') };
+    const body: Record<string, string | number> = {
+      ...fixed,
+      reason: String(form.get('reason') ?? ''),
+    };
 
     for (const field of fields) {
-      const value = String(form.get(field.name) ?? '');
-      // A date input gives a bare day; the API wants an instant. End of that
-      // day, local time, so "extend to the 30th" includes the 30th.
-      body[field.name] =
-        field.type === 'date' ? new Date(`${value}T23:59:00`).toISOString() : value;
+      const value = String(form.get(field.name) ?? '').trim();
+      if (value === '' && field.optional) continue;
+
+      if (field.type === 'money') {
+        const cents = toCents(value);
+        if (cents === null) {
+          setError(`${field.label}: enter an amount like 29 or 29.50`);
+          setBusy(false);
+          return;
+        }
+        body[field.name] = cents;
+      } else if (field.type === 'date') {
+        // A date input gives a bare day; the API wants an instant. End of that
+        // day, local time, so "extend to the 30th" includes the 30th.
+        body[field.name] = new Date(`${value}T23:59:00`).toISOString();
+      } else if (field.type === 'day') {
+        body[field.name] = new Date(`${value}T12:00:00`).toISOString();
+      } else {
+        body[field.name] = value;
+      }
     }
 
     try {
@@ -134,28 +170,30 @@ export function StaffAction({
 
       {fields.map((field) => (
         <label key={field.name} className="flex flex-col gap-1">
-          <span className="text-xs text-[var(--color-muted)]">{field.label}</span>
-          {field.type === 'date' ? (
-            <input
-              type="date"
-              name={field.name}
-              required
-              defaultValue={field.defaultValue}
-              className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5"
-            />
-          ) : (
-            <select
-              name={field.name}
-              defaultValue={field.defaultValue}
-              className="rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-2 py-1.5"
-            >
+          <span className="text-xs text-[var(--color-muted)]">
+            {field.label}
+            {field.optional && ' (optional)'}
+          </span>
+          {field.type === 'select' ? (
+            <select name={field.name} defaultValue={field.defaultValue} className={inputClass}>
               {field.options?.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
             </select>
+          ) : (
+            <input
+              type={field.type === 'date' || field.type === 'day' ? 'date' : 'text'}
+              inputMode={field.type === 'money' ? 'decimal' : undefined}
+              name={field.name}
+              required={!field.optional}
+              defaultValue={field.defaultValue}
+              placeholder={field.type === 'money' ? '0.00' : undefined}
+              className={inputClass}
+            />
           )}
+          {field.hint && <span className="text-xs text-[var(--color-muted)]">{field.hint}</span>}
         </label>
       ))}
 

@@ -17,6 +17,7 @@ export * from './permission';
 export * from './invitation';
 export * from './module';
 export * from './subscription';
+export * from './billing';
 export * from './customer';
 export * from './task';
 export * from './job';

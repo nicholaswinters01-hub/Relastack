@@ -266,12 +266,21 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
         );
 
         const pastDue = type === EVENT_TYPES.SUBSCRIPTION_PAST_DUE;
+        // Paid time running out is not a declined card, and nothing is being
+        // retried: payments are arranged with us directly for now.
+        const periodEnded = data.reason === 'period_ended';
 
         return owners.map((owner) => ({
           membershipId: owner.membershipId,
-          title: pastDue ? 'A payment did not go through' : 'Your account is now read-only',
+          title: pastDue
+            ? periodEnded
+              ? 'Your payment is due'
+              : 'A payment did not go through'
+            : 'Your account is now read-only',
           body: pastDue
-            ? 'Nothing has changed yet — you keep full access while we retry. Update your billing details to avoid interruption.'
+            ? periodEnded
+              ? 'Your paid time has ended. Nothing has changed yet — you keep full access for a grace period while you renew.'
+              : 'Nothing has changed yet — you keep full access while we retry. Update your billing details to avoid interruption.'
             : 'Your subscription is not active, so changes are paused. Everything is still here and still exportable.',
           linkPath: '/billing',
         }));

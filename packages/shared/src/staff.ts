@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { organizationStatusSchema } from './organization';
+import { billingIntervalSchema, creditKindSchema, paymentMethodSchema } from './billing';
 import { subscriptionStatusSchema } from './subscription';
 
 /**
@@ -27,6 +28,12 @@ export const staffOverviewSchema = z.object({
   suspended: z.number().int().nonnegative(),
   /** Plan + locations + add-ons for paying businesses, before any credits. */
   estimatedMonthlyRevenueCents: z.number().int().nonnegative(),
+  /** Paying businesses whose paid time runs out within 30 days: who to chase. */
+  renewalsDueSoon: z.number().int().nonnegative(),
+  /** Money recorded as received in the last 30 days, voids excluded. */
+  collectedLast30DaysCents: z.number().int().nonnegative(),
+  /** Credit businesses hold with us that has not been spent yet. */
+  creditOutstandingCents: z.number().int().nonnegative(),
 });
 export type StaffOverview = z.infer<typeof staffOverviewSchema>;
 
@@ -34,6 +41,7 @@ export const staffBusinessFilterSchema = z.enum([
   'all',
   'trialing',
   'trial-ending',
+  'renewal-due',
   'past-due',
   'read-only',
   'suspended',
@@ -55,6 +63,8 @@ export const staffBusinessSummarySchema = z.object({
   planName: z.string().nullable(),
   subscriptionStatus: subscriptionStatusSchema.nullable(),
   trialEndsAt: z.string().datetime().nullable(),
+  /** End of the paid time, for a business that has paid and has not lapsed. */
+  paidThrough: z.string().datetime().nullable(),
   locationCount: z.number().int().nonnegative(),
   memberCount: z.number().int().nonnegative(),
   ownerEmail: z.string().nullable(),
@@ -78,6 +88,57 @@ export const staffAuditEventSchema = z.object({
   createdAt: z.string().datetime(),
 });
 export type StaffAuditEvent = z.infer<typeof staffAuditEventSchema>;
+
+export const staffPaymentSchema = z.object({
+  id: z.string().uuid(),
+  amountCents: z.number().int().nonnegative(),
+  creditAppliedCents: z.number().int().nonnegative(),
+  method: paymentMethodSchema,
+  interval: billingIntervalSchema,
+  planKey: z.string(),
+  reference: z.string().nullable(),
+  paidAt: z.string().datetime(),
+  coversFrom: z.string().datetime(),
+  coversUntil: z.string().datetime(),
+  recordedByEmail: z.string(),
+  note: z.string().nullable(),
+  voidedAt: z.string().datetime().nullable(),
+  voidedByEmail: z.string().nullable(),
+  voidReason: z.string().nullable(),
+});
+export type StaffPayment = z.infer<typeof staffPaymentSchema>;
+
+export const staffCreditEntrySchema = z.object({
+  id: z.string().uuid(),
+  kind: creditKindSchema,
+  amountCents: z.number().int(),
+  reason: z.string(),
+  staffEmail: z.string(),
+  createdAt: z.string().datetime(),
+});
+export type StaffCreditEntry = z.infer<typeof staffCreditEntrySchema>;
+
+/** Where a business stands with us: paid time, what is left of it, and credit. */
+export const staffBillingSchema = z.object({
+  paidThrough: z.string().datetime().nullable(),
+  /** Of the latest unvoided payment. */
+  interval: billingIntervalSchema.nullable(),
+  daysLeft: z.number().int().nonnegative(),
+  /** Everything paid for time not yet over, and how much of that is unused. */
+  paidForCurrentTimeCents: z.number().int().nonnegative(),
+  unusedCents: z.number().int().nonnegative(),
+  creditBalanceCents: z.number().int(),
+  /** Where the next recorded payment's coverage would start. */
+  nextCoverageStartsAt: z.string().datetime(),
+  /** The current plan's price, as a starting point for the amount. */
+  suggestedCents: z.object({
+    MONTHLY: z.number().int().nonnegative(),
+    ANNUAL: z.number().int().nonnegative(),
+  }),
+  payments: z.array(staffPaymentSchema),
+  credits: z.array(staffCreditEntrySchema),
+});
+export type StaffBilling = z.infer<typeof staffBillingSchema>;
 
 export const staffBusinessDetailSchema = z.object({
   business: z.object({
@@ -152,6 +213,7 @@ export const staffBusinessDetailSchema = z.object({
   plans: z.array(
     z.object({ key: z.string(), name: z.string(), maxLocations: z.number().int().nullable() }),
   ),
+  billing: staffBillingSchema,
 });
 export type StaffBusinessDetail = z.infer<typeof staffBusinessDetailSchema>;
 
@@ -179,6 +241,29 @@ export type StaffActionRequest = z.infer<typeof staffActionRequestSchema>;
 
 export const reissueInvitationResponseSchema = z.object({ acceptUrl: z.string().url() });
 export type ReissueInvitationResponse = z.infer<typeof reissueInvitationResponseSchema>;
+
+/** A million dollars. Anything larger is a typo, not a payment. */
+const MAX_CENTS = 100_000_000;
+
+const centsSchema = z.number().int('Whole cents only').max(MAX_CENTS, 'That amount is too large');
+
+export const recordPaymentRequestSchema = z.object({
+  amountCents: centsSchema.nonnegative('An amount cannot be negative'),
+  /** Credit to spend on this period, from the business's balance. */
+  creditAppliedCents: centsSchema.nonnegative().optional(),
+  method: paymentMethodSchema,
+  interval: billingIntervalSchema,
+  paidAt: z.string().datetime({ offset: true }),
+  reference: z.string().trim().max(120).optional(),
+  reason: staffReasonSchema,
+});
+export type RecordPaymentRequest = z.infer<typeof recordPaymentRequestSchema>;
+
+export const creditRequestSchema = z.object({
+  amountCents: centsSchema.positive('Enter an amount'),
+  reason: staffReasonSchema,
+});
+export type CreditRequest = z.infer<typeof creditRequestSchema>;
 
 export const addStaffNoteRequestSchema = z.object({
   body: z.string().trim().min(1, 'Write something').max(5000),

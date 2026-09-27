@@ -11,13 +11,17 @@ import {
 } from '@nestjs/common';
 import {
   addStaffNoteRequestSchema,
+  creditRequestSchema,
   extendTrialRequestSchema,
+  recordPaymentRequestSchema,
   setBusinessStatusRequestSchema,
   staffActionRequestSchema,
   staffBusinessQuerySchema,
   staffChangePlanRequestSchema,
   type AddStaffNoteRequest,
+  type CreditRequest,
   type ExtendTrialRequest,
+  type RecordPaymentRequest,
   type ReissueInvitationResponse,
   type SetBusinessStatusRequest,
   type StaffActionRequest,
@@ -30,6 +34,7 @@ import {
 } from '@platform/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { CurrentStaff, StaffOnly, type StaffIdentity } from './staff.decorators';
+import { StaffBillingService } from './staff-billing.service';
 import { StaffService } from './staff.service';
 
 /**
@@ -41,7 +46,10 @@ import { StaffService } from './staff.service';
 @StaffOnly()
 @Controller('staff')
 export class StaffController {
-  constructor(private readonly staff: StaffService) {}
+  constructor(
+    private readonly staff: StaffService,
+    private readonly billing: StaffBillingService,
+  ) {}
 
   /** Lets the web app decide whether to show the Staff link. 404 for everyone else. */
   @Get('me')
@@ -135,6 +143,47 @@ export class StaffController {
     @Body(new ZodValidationPipe(staffActionRequestSchema)) body: StaffActionRequest,
   ): Promise<ReissueInvitationResponse> {
     return { acceptUrl: await this.staff.reissueInvitation(staff, id, invitationId, body.reason) };
+  }
+
+  @Post('businesses/:id/payments')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  recordPayment(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(recordPaymentRequestSchema)) body: RecordPaymentRequest,
+  ): Promise<void> {
+    return this.billing.recordPayment(staff, id, body);
+  }
+
+  @Post('businesses/:id/payments/:paymentId/void')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  voidPayment(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('paymentId', ParseUUIDPipe) paymentId: string,
+    @Body(new ZodValidationPipe(staffActionRequestSchema)) body: StaffActionRequest,
+  ): Promise<void> {
+    return this.billing.voidPayment(staff, id, paymentId, body.reason);
+  }
+
+  @Post('businesses/:id/credits')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  grantCredit(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(creditRequestSchema)) body: CreditRequest,
+  ): Promise<void> {
+    return this.billing.grantCredit(staff, id, body.amountCents, body.reason);
+  }
+
+  @Post('businesses/:id/credits/remove')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  removeCredit(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(creditRequestSchema)) body: CreditRequest,
+  ): Promise<void> {
+    return this.billing.removeCredit(staff, id, body.amountCents, body.reason);
   }
 
   @Post('businesses/:id/notes')

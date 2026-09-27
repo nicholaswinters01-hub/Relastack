@@ -151,6 +151,8 @@ model Organization {
   notifications          Notification[]
   customFieldDefinitions CustomFieldDefinition[]
   staffNotes             StaffNote[]
+  billingPayments        BillingPayment[]
+  billingCredits         BillingCredit[]
 
   @@map("organizations")
 }
@@ -1431,4 +1433,111 @@ model StaffNote {
 
   @@index([organizationId, createdAt])
   @@map("staff_notes")
+}
+
+// ---------------------------------------------------------------------------
+// Billing by hand (Phase 19b)
+// ---------------------------------------------------------------------------
+
+enum BillingInterval {
+  MONTHLY
+  ANNUAL
+
+  @@map("billing_interval")
+}
+
+enum PaymentMethod {
+  CARD
+  BANK_TRANSFER
+  CHECK
+  CASH
+  /// Nothing was paid: a founder's demo account, a research participant.
+  COMPLIMENTARY
+  OTHER
+
+  @@map("payment_method")
+}
+
+/// Money received from a business, recorded by staff.
+///
+/// Until Phase 18 connects a payment provider, this is what makes a business
+/// "paying". A payment covers a stretch of time; the subscription is paid
+/// through the latest one.
+///
+/// Never edited and never deleted. A mistake is VOIDED, which the application
+/// role can do exactly once and to nothing else: it holds UPDATE on the void
+/// columns only, and only while the payment is unvoided.
+model BillingPayment {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// Money received. Zero for a complimentary period.
+  amountCents        Int @map("amount_cents")
+  /// Credit the business had with us, spent on this period.
+  creditAppliedCents Int @default(0) @map("credit_applied_cents")
+
+  method    PaymentMethod
+  interval  BillingInterval
+  /// The plan paid for, at the time.
+  planKey   String          @map("plan_key")
+  /// Check number, transfer id: whatever finds it in the bank statement.
+  reference String?
+
+  paidAt      DateTime @map("paid_at")
+  coversFrom  DateTime @map("covers_from")
+  coversUntil DateTime @map("covers_until")
+
+  recordedByUserId String  @map("recorded_by_user_id") @db.Uuid
+  recordedByEmail  String  @map("recorded_by_email")
+  note             String?
+
+  voidedAt         DateTime? @map("voided_at")
+  voidedByUserId   String?   @map("voided_by_user_id") @db.Uuid
+  voidedByEmail    String?   @map("voided_by_email")
+  voidReason       String?   @map("void_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  credits      BillingCredit[]
+
+  @@index([organizationId, coversUntil])
+  @@index([paidAt])
+  @@map("billing_payments")
+}
+
+enum CreditKind {
+  /// Given by staff: an outage, a goodwill gesture, a refund kept as credit.
+  GRANTED
+  /// Spent on a payment.
+  APPLIED
+  /// The payment it was spent on was voided, so it comes back.
+  RESTORED
+  /// Taken back by staff.
+  REMOVED
+
+  @@map("credit_kind")
+}
+
+/// Dollar credit a business holds with us, as a ledger.
+///
+/// The balance is the sum and is never stored, so it cannot drift from the
+/// entries that explain it. Append-only, like the audit trail.
+model BillingCredit {
+  id             String     @id @default(uuid()) @db.Uuid
+  organizationId String     @map("organization_id") @db.Uuid
+  kind           CreditKind
+  /// Positive adds to the balance, negative spends or removes it.
+  amountCents    Int        @map("amount_cents")
+  reason         String
+  paymentId      String?    @map("payment_id") @db.Uuid
+  staffUserId    String     @map("staff_user_id") @db.Uuid
+  staffEmail     String     @map("staff_email")
+  createdAt      DateTime   @default(now()) @map("created_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  payment      BillingPayment? @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("billing_credits")
 }

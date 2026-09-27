@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ConfigValidationError, loadServerEnv } from './index';
+import { billingSimulationEnabled, ConfigValidationError, loadServerEnv } from './index';
 
 const validEnv = {
   DATABASE_URL: 'postgresql://user:pass@localhost:5432/db?schema=public',
@@ -248,6 +248,24 @@ describe('loadServerEnv — deployment settings', () => {
   it('rejects a short access code', () => {
     expect(() => loadServerEnv({ ...validEnv, SIGNUP_ACCESS_CODE: 'short' })).toThrow(
       /at least 8 characters/,
+    );
+  });
+
+  it('turns billing simulation on outside production and off in it', () => {
+    expect(billingSimulationEnabled(loadServerEnv(validEnv))).toBe(true);
+    expect(billingSimulationEnabled(loadServerEnv(production))).toBe(false);
+  });
+
+  it('lets billing simulation be switched off outside production', () => {
+    const env = loadServerEnv({ ...validEnv, BILLING_SIMULATION: 'false' });
+
+    expect(billingSimulationEnabled(env)).toBe(false);
+  });
+
+  it('refuses to start in production with billing simulation on', () => {
+    // A business could mark itself as paid.
+    expect(() => loadServerEnv({ ...production, BILLING_SIMULATION: 'true' })).toThrow(
+      /BILLING_SIMULATION cannot be true/,
     );
   });
 });

@@ -51,8 +51,8 @@ export const NOTIFIABLE: Array<{ type: EventType; label: string; description: st
   },
   {
     type: EVENT_TYPES.SUBSCRIPTION_PAST_DUE,
-    label: 'A payment fails',
-    description: 'Owners only. Your card was declined and the grace period has started.',
+    label: 'A payment is due or fails',
+    description: 'Owners only. A payment is due or was declined, and the grace period has started.',
   },
 ];
 
