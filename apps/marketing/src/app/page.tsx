@@ -36,11 +36,19 @@ export default async function HomePage({ searchParams }: Props) {
     <main className="mx-auto max-w-3xl px-6 py-20 sm:py-28">
       {/* ------------------------------------------------------------- */}
       <header>
-        <div className="flex flex-wrap items-baseline gap-3">
-          <Wordmark className="text-2xl" />
-          <span className="font-mono text-xs uppercase tracking-widest text-[var(--color-muted)]">
-            in development
-          </span>
+        <div className="flex flex-wrap items-baseline justify-between gap-3">
+          <div className="flex flex-wrap items-baseline gap-3">
+            <Wordmark className="text-2xl" />
+            <span className="font-mono text-xs uppercase tracking-widest text-[var(--color-muted)]">
+              in development
+            </span>
+          </div>
+          <a
+            href={`${BRAND.appUrl}/login`}
+            className="text-sm font-medium underline-offset-4 hover:underline"
+          >
+            Sign in
+          </a>
         </div>
 
         <h1 className="mt-8 text-4xl font-semibold leading-tight tracking-tight sm:text-5xl">
@@ -71,6 +79,16 @@ export default async function HomePage({ searchParams }: Props) {
             How we handle your data
           </Link>
           .
+        </p>
+        {/* Deliberately quiet: the waitlist stays the main thing to do here. */}
+        <p className="mt-4 text-sm text-[var(--color-muted)]">
+          Have an access code?{' '}
+          <a
+            href={`${BRAND.appUrl}/register`}
+            className="font-medium text-[var(--color-accent-ink)] underline underline-offset-4"
+          >
+            Create your account →
+          </a>
         </p>
       </section>
 

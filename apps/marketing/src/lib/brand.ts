@@ -40,6 +40,9 @@ export const BRAND = {
    */
   contactEmail: 'hello@relastack.com',
 
+  /** Where the product itself lives: sign-in, and sign-up for people with an access code. */
+  appUrl: 'https://app.relastack.com',
+
   /** PLACEHOLDER — the jurisdiction whose law governs the privacy notice. */
   jurisdiction: 'the United States',
 } as const;
