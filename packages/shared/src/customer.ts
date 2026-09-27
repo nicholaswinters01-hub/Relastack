@@ -42,6 +42,31 @@ const optionalEmail = z
     'Enter a valid email address',
   );
 
+/*
+ * For editing: an emptied box means "remove this", which only null can say.
+ * The create versions above turn it into "not given", which on an edit would
+ * silently keep the old value while reporting success.
+ */
+const clearableText = (max: number, label: string) =>
+  z
+    .string()
+    .trim()
+    .max(max, `${label} is too long`)
+    .transform((value) => (value === '' ? null : value))
+    .nullable()
+    .optional();
+
+const clearableEmail = z
+  .string()
+  .trim()
+  .transform((value) => (value === '' ? null : value))
+  .nullable()
+  .optional()
+  .refine(
+    (value) => value == null || z.string().email().safeParse(value).success,
+    'Enter a valid email address',
+  );
+
 export const CUSTOMER_NAME_MAX_LENGTH = 120;
 
 // ---------------------------------------------------------------------------
@@ -381,6 +406,18 @@ export type CreateCustomerRequest = z.infer<typeof createCustomerRequestSchema>;
 
 export const updateCustomerRequestSchema = z.object({
   ...customerFields,
+  companyName: clearableText(CUSTOMER_NAME_MAX_LENGTH, 'Company name'),
+  firstName: clearableText(CUSTOMER_NAME_MAX_LENGTH, 'First name'),
+  lastName: clearableText(CUSTOMER_NAME_MAX_LENGTH, 'Last name'),
+  email: clearableEmail,
+  phone: clearableText(40, 'Phone'),
+  addressLine1: clearableText(200, 'Address'),
+  addressLine2: clearableText(200, 'Address'),
+  city: clearableText(100, 'City'),
+  region: clearableText(100, 'Region'),
+  postalCode: clearableText(20, 'Postal code'),
+  country: clearableText(100, 'Country'),
+  source: clearableText(100, 'Source'),
   /** Owners only: to match the numbers of a system the business is leaving. */
   accountNumber: z.number().int().min(1).max(ACCOUNT_NUMBER_MAX).optional(),
   type: customerTypeSchema.optional(),
