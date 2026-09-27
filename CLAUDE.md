@@ -310,7 +310,7 @@ next phase without it.
 | 17    | Custom module framework                                      |          |
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
 | 19a   | Staff console: businesses, support actions, audit trail      | Complete |
-| 19b   | Billing by hand: annual plans, payments, credits             | Review   |
+| 19b   | Billing by hand: annual plans, payments, credits             | Complete |
 | 19c   | Help desk: in-app requests and replies (needs email)         |          |
 | 20a   | Deployment: Render + Neon + Vercel, invite-only (pulled fwd) | **Now**  |
 | 20    | Production hardening                                         |          |
