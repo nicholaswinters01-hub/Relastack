@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppNav } from '@/components/app-nav';
-import { KIND_LABEL } from '@/components/support-forms';
+import { KIND_LABEL } from '@/lib/support-labels';
 import { getStaffIdentity } from '@/lib/staff-api';
 import { getStaffSupport } from '@/lib/support-api';
 

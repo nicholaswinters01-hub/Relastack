@@ -82,6 +82,15 @@ columns alone. Credit is an append-only ledger in `billing_credits` whose
 balance is always the sum. Every money change locks the business's
 subscription row first, so credit cannot be spent twice.
 
+The **help desk** (Phase 19c, design in docs/design/help-desk.md) lets anyone
+in a business ask for help from `/help`, including a read-only business (rule
+13). RLS keeps each business to its own requests; within one, the service shows
+a request only to whoever opened it and to holders of organization-wide
+`organization.write`, 404 to anyone else. Messages are append-only for everyone.
+Staff read and reply through `withStaff()`; a staff reply may insert exactly one
+event type (`support.replied`) into `domain_events`, raw and without RETURNING
+because staff cannot read that table back, and the outbox emails the asker.
+
 Tasks are part of **core**, not a module: Scheduling and Automation both build
 on them, and gating the foundation would gate everything standing on it. A task
 hangs off a customer or stands alone, and Phase 9 jobs attach through a second
@@ -267,6 +276,10 @@ Recorded because each one cost real time and none is obvious.
   still paying, which an older rule already refused, so deleting the new rule
   broke nothing. The rule is for a payer whose paid time has lapsed. Break
   each guard once and watch its test fail.
+- **A value exported from a `'use client'` file is blank in a server
+  component.** It arrives as a client reference, not the object: the help
+  pages rendered "·" where "Question · Replied" belonged. Keep shared constants
+  in a plain module (`lib/support-labels.ts`).
 - **Backticks inside `node -e "..."` run as shell commands.** Bash expands them
   before Node sees the script. Several edits to prose came out garbled this
   way, and one silently executed a pnpm command. Use the Edit/Write tools for
@@ -312,7 +325,7 @@ next phase without it.
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
 | 19a   | Staff console: businesses, support actions, audit trail      | Complete |
 | 19b   | Billing by hand: annual plans, payments, credits             | Complete |
-| 19c   | Help desk: in-app requests and replies (needs email)         |          |
+| 19c   | Help desk: in-app requests and replies (needs email)         | Review   |
 | 20a   | Deployment: Render + Neon + Vercel, invite-only (pulled fwd) | **Now**  |
 | 20    | Production hardening                                         |          |
 

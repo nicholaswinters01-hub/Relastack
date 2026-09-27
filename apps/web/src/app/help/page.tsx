@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { AppNav } from '@/components/app-nav';
-import { KIND_LABEL, NewSupportRequestForm, STATUS_LABEL } from '@/components/support-forms';
+import { NewSupportRequestForm } from '@/components/support-forms';
+import { KIND_LABEL, STATUS_LABEL } from '@/lib/support-labels';
 import { getCurrentOrganization } from '@/lib/api';
 import { getSupportRequests } from '@/lib/support-api';
 

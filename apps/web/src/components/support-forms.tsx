@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { SupportMessage } from '@platform/shared';
+import { KIND_LABEL } from '@/lib/support-labels';
 
 const inputClass =
   'rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm';
@@ -24,18 +25,6 @@ async function post(path: string, body: unknown): Promise<string | null> {
     return 'Could not reach the server.';
   }
 }
-
-export const KIND_LABEL: Record<string, string> = {
-  QUESTION: 'Question',
-  PROBLEM: 'Something is wrong',
-  IDEA: 'Idea or request',
-};
-
-export const STATUS_LABEL: Record<string, string> = {
-  OPEN: 'Waiting on RelaStack',
-  WAITING_ON_CUSTOMER: 'Replied',
-  RESOLVED: 'Resolved',
-};
 
 /** A new help request. */
 export function NewSupportRequestForm() {

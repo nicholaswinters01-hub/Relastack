@@ -1,12 +1,8 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { AppNav } from '@/components/app-nav';
-import {
-  KIND_LABEL,
-  STATUS_LABEL,
-  SupportReplyForm,
-  SupportThread,
-} from '@/components/support-forms';
+import { SupportReplyForm, SupportThread } from '@/components/support-forms';
+import { KIND_LABEL, STATUS_LABEL } from '@/lib/support-labels';
 import { getSupportRequest } from '@/lib/support-api';
 
 export const dynamic = 'force-dynamic';
