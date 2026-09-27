@@ -145,6 +145,9 @@ export const serverEnvSchema = z
      */
     EMAIL_POSTAL_ADDRESS: z.string().default(''),
 
+    /** Told whenever a business opens a help request, so nobody has to watch the console. */
+    SUPPORT_NOTIFY_EMAIL: z.string().email().default("hello@relastack.com"),
+
     /** Where links in email point. No trailing slash. */
     APP_URL: z.string().default('http://localhost:3000'),
 

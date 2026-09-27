@@ -178,6 +178,7 @@ model Organization {
   staffNotes             StaffNote[]
   billingPayments        BillingPayment[]
   billingCredits         BillingCredit[]
+  supportRequests        SupportRequest[]
 
   @@map("organizations")
 }
@@ -1565,4 +1566,74 @@ model BillingCredit {
 
   @@index([organizationId, createdAt])
   @@map("billing_credits")
+}
+
+// ---------------------------------------------------------------------------
+// Help desk (Phase 19c)
+// ---------------------------------------------------------------------------
+
+enum SupportKind {
+  QUESTION
+  PROBLEM
+  IDEA
+
+  @@map("support_kind")
+}
+
+enum SupportStatus {
+  /// Waiting on us.
+  OPEN
+  /// We replied and asked something; waiting on them.
+  WAITING_ON_CUSTOMER
+  RESOLVED
+
+  @@map("support_status")
+}
+
+/// A question, problem or idea a business sends us from inside the app.
+///
+/// Row-level security keeps each business to its own; within a business the
+/// service shows a request only to whoever opened it and to owners.
+model SupportRequest {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  /// Kept as well as the id, so the request survives the person being removed.
+  openedByUserId String @map("opened_by_user_id") @db.Uuid
+  openedByEmail  String @map("opened_by_email")
+
+  kind       SupportKind
+  subject    String
+  status     SupportStatus @default(OPEN)
+  resolvedAt DateTime?     @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages     SupportMessage[]
+
+  @@index([organizationId, createdAt])
+  @@index([status, updatedAt])
+  @@map("support_requests")
+}
+
+/// One message in a help request. Append-only: nobody edits or deletes one.
+model SupportMessage {
+  id             String @id @default(uuid()) @db.Uuid
+  requestId      String @map("request_id") @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  authorUserId String  @map("author_user_id") @db.Uuid
+  authorEmail  String  @map("author_email")
+  /// Written by RelaStack staff rather than the business.
+  fromStaff    Boolean @map("from_staff")
+  body         String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  request SupportRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@map("support_messages")
 }
