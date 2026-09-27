@@ -5,6 +5,7 @@ import {
   updateOrganizationRequestSchema,
   type OrganizationMembersResponse,
   type OrganizationResponse,
+  type SetupProgress,
   type UpdateOrganizationRequest,
 } from '@platform/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
@@ -57,6 +58,13 @@ export class OrganizationsController {
       permissions: permissions.toJSON(),
       membershipId,
     };
+  }
+
+  /** The "Get started" checklist. For whoever runs the business. */
+  @Get('current/setup')
+  @RequirePermission(PERMISSIONS.ORGANIZATION_WRITE)
+  setup(@CurrentTenant() tenant: TenantContext): Promise<SetupProgress> {
+    return this.organizations.setupProgress(tenant);
   }
 
   @Get('current/members')

@@ -88,3 +88,18 @@ export const organizationMembersResponseSchema = z.object({
 });
 
 export type OrganizationMembersResponse = z.infer<typeof organizationMembersResponseSchema>;
+
+/**
+ * How far a business has got with setting itself up, for the "Get started"
+ * card. Worked out from the account itself each time, so it can never
+ * disagree with what is really there.
+ */
+export const setupProgressSchema = z.object({
+  hasName: z.boolean(),
+  hasModules: z.boolean(),
+  hasLocation: z.boolean(),
+  hasTeammate: z.boolean(),
+  hasCustomer: z.boolean(),
+  hasJob: z.boolean(),
+});
+export type SetupProgress = z.infer<typeof setupProgressSchema>;

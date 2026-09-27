@@ -19,6 +19,7 @@ import {
   jobsResponseSchema,
   jobResponseSchema,
   groupsResponseSchema,
+  setupProgressSchema,
   tasksResponseSchema,
   taskResponseSchema,
   type CustomerDetail,
@@ -38,6 +39,7 @@ import {
   type NotificationsResponse,
   type Job,
   type MemberGroup,
+  type SetupProgress,
   type JobsResponse,
   type Task,
   type TasksResponse,
@@ -441,5 +443,17 @@ export async function getGroups(): Promise<MemberGroup[]> {
     return parsed.success ? parsed.data.groups : [];
   } catch {
     return [];
+  }
+}
+
+/** The "Get started" checklist, or null for anyone who does not run the business. */
+export async function getSetupProgress(): Promise<SetupProgress | null> {
+  try {
+    const response = await serverFetch('/api/v1/organizations/current/setup');
+    if (!response.ok) return null;
+    const parsed = setupProgressSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
   }
 }

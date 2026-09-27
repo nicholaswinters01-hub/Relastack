@@ -6,10 +6,12 @@ import type {
   TransactionClient,
 } from '@platform/db';
 import {
+  MODULES,
   PERMISSIONS,
   SYSTEM_ROLE_IDS,
   type Organization,
   type OrganizationMember,
+  type SetupProgress,
   type UpdateOrganizationRequest,
 } from '@platform/shared';
 import { BillingService } from '../billing/billing.service';
@@ -235,5 +237,39 @@ export class OrganizationsService {
       groupIds: membership.groupMemberships.map((link) => link.groupId),
       joinedAt: membership.createdAt.toISOString(),
     }));
+  }
+
+  /**
+   * What the business has set up so far, for the "Get started" card.
+   *
+   * Counts rather than stored ticks, so a step is done when the thing exists
+   * and undone if it is removed. Owners and admins only (the route says so);
+   * they see the whole business, so these counts disclose nothing new.
+   */
+  async setupProgress(context: TenantContext): Promise<SetupProgress> {
+    const user = await this.prisma.client.user.findUnique({
+      where: { id: context.userId },
+      select: { firstName: true },
+    });
+
+    const counts = await this.prisma.withTenant(context, async (tx) => ({
+      modules: await tx.organizationModule.count({
+        where: { enabled: true, moduleKey: { not: MODULES.CORE } },
+      }),
+      locations: await tx.location.count(),
+      members: await tx.organizationMembership.count(),
+      invitations: await tx.invitation.count({ where: { status: 'PENDING' } }),
+      customers: await tx.customer.count(),
+      jobs: await tx.job.count(),
+    }));
+
+    return {
+      hasName: Boolean(user?.firstName),
+      hasModules: counts.modules > 0,
+      hasLocation: counts.locations > 0,
+      hasTeammate: counts.members > 1 || counts.invitations > 0,
+      hasCustomer: counts.customers > 0,
+      hasJob: counts.jobs > 0,
+    };
   }
 }
