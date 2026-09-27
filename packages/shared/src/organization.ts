@@ -52,6 +52,8 @@ export const organizationMemberSchema = z.object({
   firstName: z.string().nullable(),
   lastName: z.string().nullable(),
   roles: z.array(roleAssignmentSchema),
+  /** Employee groups this person is in. Labels only; they grant nothing. */
+  groupIds: z.array(z.string().uuid()),
   joinedAt: z.string().datetime(),
 });
 

@@ -27,6 +27,7 @@ import { StaffGuard } from './staff/staff.guard';
 import { StaffModule } from './staff/staff.module';
 import { SupportModule } from './support/support.module';
 import { SearchModule } from './search/search.module';
+import { GroupsModule } from './groups/groups.module';
 
 /**
  * Application root.
@@ -76,6 +77,7 @@ import { SearchModule } from './search/search.module';
     StaffModule,
     SupportModule,
     SearchModule,
+    GroupsModule,
   ],
   providers: [
     // ORDER MATTERS. Guards run in registration order, so rate limiting is

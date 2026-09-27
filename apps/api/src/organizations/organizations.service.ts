@@ -213,6 +213,7 @@ export class OrganizationsService {
         include: {
           user: true,
           roleAssignments: { include: { role: true, locations: true } },
+          groupMemberships: { select: { groupId: true } },
         },
         orderBy: { createdAt: 'asc' },
       }),
@@ -231,6 +232,7 @@ export class OrganizationsService {
         scope: assignment.scope,
         locationIds: assignment.locations.map((link) => link.locationId),
       })),
+      groupIds: membership.groupMemberships.map((link) => link.groupId),
       joinedAt: membership.createdAt.toISOString(),
     }));
   }
