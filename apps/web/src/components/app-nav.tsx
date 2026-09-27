@@ -29,7 +29,8 @@ import { getStaffIdentity } from '@/lib/staff-api';
 interface Entry {
   href: string;
   label: string;
-  permission: PermissionKey;
+  /** Left out for links everyone in a business may use, such as Help. */
+  permission?: PermissionKey;
   /** Only shown when this module is enabled. Core links leave it undefined. */
   module?: string;
 }
@@ -59,6 +60,7 @@ const ENTRIES: Entry[] = [
   { href: '/team', label: 'Team', permission: PERMISSIONS.MEMBER_READ },
   { href: '/modules', label: 'Modules', permission: PERMISSIONS.ORGANIZATION_READ },
   { href: '/billing', label: 'Billing', permission: PERMISSIONS.ORGANIZATION_READ },
+  { href: '/help', label: 'Help' },
 ];
 
 export async function AppNav({ current }: { current: string }) {
@@ -78,7 +80,7 @@ export async function AppNav({ current }: { current: string }) {
   const visible = ENTRIES.filter(
     (entry) =>
       (entry.module === undefined || enabled.has(entry.module)) &&
-      canAnywhere(organization.permissions, entry.permission),
+      (entry.permission === undefined || canAnywhere(organization.permissions, entry.permission)),
   );
 
   return (

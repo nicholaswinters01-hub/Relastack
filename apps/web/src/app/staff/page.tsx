@@ -58,6 +58,7 @@ export default async function StaffPage({
         { label: 'Est. monthly revenue', value: money(overview.estimatedMonthlyRevenueCents) },
         { label: 'Collected (30 days)', value: money(overview.collectedLast30DaysCents) },
         { label: 'Credit we owe', value: money(overview.creditOutstandingCents) },
+        { label: 'Help requests waiting', value: String(overview.openSupportRequests) },
       ]
     : [];
 
@@ -67,9 +68,15 @@ export default async function StaffPage({
       <main className="mx-auto max-w-5xl px-6 py-12">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-3xl font-semibold tracking-tight">Staff</h1>
-          <Link href="/staff/audit" className="text-sm underline underline-offset-4">
-            Activity log
-          </Link>
+          <span className="flex gap-4 text-sm">
+            <Link href="/staff/help" className="underline underline-offset-4">
+              Help requests
+              {overview && overview.openSupportRequests > 0 && ` (${overview.openSupportRequests})`}
+            </Link>
+            <Link href="/staff/audit" className="underline underline-offset-4">
+              Activity log
+            </Link>
+          </span>
         </div>
         <p className="mt-2 text-sm text-[var(--color-muted)]">
           Account information only. What a business keeps about its own customers is not visible
