@@ -8,7 +8,11 @@ services:
   - type: web
     name: relastack-api
     runtime: node
-    plan: starter
+    # Free while in research: sleeps after 15 idle minutes and takes about a
+    # minute to wake. Switch to `starter` (always on) once businesses use it
+    # daily — and move the migration back into a preDeployCommand, which Render
+    # does not document as available on free instances.
+    plan: free
     # Same region as the web tier (Vercel iad1) and the database (Neon
     # us-east-1), so a page render is not three cross-country round trips.
     region: virginia
@@ -21,10 +25,12 @@ services:
       pnpm db:generate &&
       pnpm build:packages &&
       pnpm --filter @platform/api build
-    # Migrations run before the new version takes traffic, as the owner role.
-    # A failure here stops the deploy and the old version keeps serving.
-    preDeployCommand: node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma
-    startCommand: node apps/api/dist/main.js
+    # Migrations run as the owner role, then the API starts. A failed migration
+    # stops the start, so a broken schema never serves traffic. On every wake
+    # from sleep this is a no-op that takes a second or two.
+    startCommand: >-
+      node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma &&
+      node apps/api/dist/main.js
     # Liveness only. The full health check touches the database, and polling
     # it would keep a database that sleeps when idle from ever sleeping.
     healthCheckPath: /api/v1/health/live

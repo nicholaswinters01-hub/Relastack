@@ -44,9 +44,14 @@ repository, and fill in the values it asks for:
 - `DATABASE_URL`, `DATABASE_URL_APP` from step 1
 - `SIGNUP_ACCESS_CODE` — the code you give invited businesses (8+ characters)
 
-Render generates `INTERNAL_API_SECRET` itself. Migrations run as the
-pre-deploy step on every deploy; if they fail, the deploy stops and the
-previous version keeps serving.
+Render generates `INTERNAL_API_SECRET` itself.
+
+The service runs on Render's **free** plan while in research: it sleeps
+after 15 minutes without traffic and takes about a minute to wake. Migrations
+run at startup, before the API listens; a failed migration stops the start,
+so a broken schema never serves traffic. When businesses use it daily, switch
+the plan to `starter` (always on, about $7/month) and move the migration into
+a `preDeployCommand`, so a failure leaves the previous version serving instead.
 
 The health check is `/api/v1/health/live`, which does not touch the database.
 The full `/api/v1/health` does, and is refused without the internal secret —
