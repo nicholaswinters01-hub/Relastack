@@ -2,7 +2,7 @@
 
 Status: **approved 2026-09-27.** Answers: no groups are made for a business (it names
 its own; the form only suggests an example), a colour per group, and
-`/employees` with `/team` redirecting. **Built 2026-09-28, awaiting review.**
+`/employees` with `/team` redirecting. **Complete: built 2026-09-28 and approved by the product owner.**
 Not built yet: group names in quick search results, and the members list
 `?groupId=` filter (the page filters on screen instead).
 
