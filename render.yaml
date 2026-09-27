@@ -19,8 +19,13 @@ services:
     # --prod=false: NODE_ENV=production is set for the build too, and pnpm
     # would otherwise skip the dev dependencies the build needs (Prisma,
     # TypeScript, the Nest CLI).
+    # pnpm goes into the home directory, not -g: Render's global node_modules
+    # is read-only (EROFS). On PATH first, so the pnpm calls nested inside our
+    # package scripts use this exact version too.
     buildCommand: >-
-      npm install -g pnpm@10.34.5 &&
+      npm install --prefix "$HOME/.pnpm-cli" pnpm@10.34.5 &&
+      export PATH="$HOME/.pnpm-cli/node_modules/.bin:$PATH" &&
+      pnpm --version &&
       pnpm install --frozen-lockfile --prod=false &&
       pnpm db:generate &&
       pnpm build:packages &&
