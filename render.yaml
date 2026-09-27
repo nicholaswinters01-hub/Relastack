@@ -1,0 +1,69 @@
+# The API on Render. Applied as a Blueprint: Render reads this file and asks
+# only for the values marked `sync: false`.
+#
+# See docs/deploy.md for the order to do things in. In short: the database
+# must exist, with the platform_app role created, before the first deploy.
+
+services:
+  - type: web
+    name: relastack-api
+    runtime: node
+    plan: starter
+    # Same region as the web tier (Vercel iad1) and the database (Neon
+    # us-east-1), so a page render is not three cross-country round trips.
+    region: virginia
+    # Only redeploy when something the API is built from changes.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - packages/**
+        - package.json
+        - pnpm-lock.yaml
+        - render.yaml
+    # --prod=false: NODE_ENV=production is set for the build too, and pnpm
+    # would otherwise skip the dev dependencies the build needs (Prisma,
+    # TypeScript, the Nest CLI).
+    buildCommand: >-
+      npm install -g pnpm@10.34.5 &&
+      pnpm install --frozen-lockfile --prod=false &&
+      pnpm db:generate &&
+      pnpm build:packages &&
+      pnpm --filter @platform/api build
+    # Migrations run before the new version takes traffic, as the owner role.
+    # A failure here stops the deploy and the old version keeps serving.
+    preDeployCommand: node_modules/.bin/prisma migrate deploy --schema packages/db/prisma/schema.prisma
+    startCommand: node apps/api/dist/main.js
+    # Liveness only. The full health check touches the database, and polling
+    # it would keep a database that sleeps when idle from ever sleeping.
+    healthCheckPath: /api/v1/health/live
+    envVars:
+      - key: NODE_VERSION
+        value: '24'
+      - key: NODE_ENV
+        value: production
+      - key: API_PORT
+        value: '10000'
+      - key: LOG_LEVEL
+        value: info
+      - key: COOKIE_SECURE
+        value: 'true'
+      - key: RATE_LIMIT_ENABLED
+        value: 'true'
+      - key: APP_URL
+        value: https://app.relastack.com
+      - key: CORS_ORIGINS
+        value: https://app.relastack.com
+      - key: EMAIL_FROM
+        value: RelaStack <hello@relastack.com>
+      # Owner role: runs migrations only.
+      - key: DATABASE_URL
+        sync: false
+      # platform_app: serves every request, subject to row-level security.
+      - key: DATABASE_URL_APP
+        sync: false
+      # Render generates it. Copy the same value into the web tier on Vercel.
+      - key: INTERNAL_API_SECRET
+        generateValue: true
+      # The code you hand to businesses you invite. At least 8 characters.
+      - key: SIGNUP_ACCESS_CODE
+        sync: false

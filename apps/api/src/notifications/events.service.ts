@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { TenantContext, TransactionClient } from '@platform/db';
 import type { EventType } from '@platform/shared';
 import { PrismaService } from '../prisma/prisma.service';
+import { DispatcherService } from './dispatcher.service';
 
 /**
  * Recording that something happened.
@@ -19,7 +20,10 @@ import { PrismaService } from '../prisma/prisma.service';
 export class EventsService {
   private readonly logger = new Logger(EventsService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dispatcher: DispatcherService,
+  ) {}
 
   /**
    * Record an event inside a caller's transaction.
@@ -37,6 +41,8 @@ export class EventsService {
     await tx.domainEvent.create({
       data: { organizationId, type, payload: payload as never },
     });
+
+    this.dispatcher.nudge();
   }
 
   /**

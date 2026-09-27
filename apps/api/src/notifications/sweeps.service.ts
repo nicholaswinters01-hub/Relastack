@@ -10,9 +10,7 @@ import { EVENT_TYPES } from '@platform/shared';
 import { SERVER_ENV } from '../config.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobSeriesService } from '../scheduling/job-series.service';
-
-/** How often the periodic work runs. Hourly is ample for both jobs below. */
-const SWEEP_INTERVAL_MS = 60 * 60 * 1000;
+import { DispatcherService } from './dispatcher.service';
 
 /**
  * The work that has to happen on a clock rather than in a request.
@@ -39,6 +37,7 @@ export class SweepsService implements OnModuleInit, OnModuleDestroy {
   constructor(
     private readonly prisma: PrismaService,
     private readonly series: JobSeriesService,
+    private readonly dispatcher: DispatcherService,
     @Inject(SERVER_ENV) private readonly env: ServerEnv,
   ) {}
 
@@ -47,9 +46,11 @@ export class SweepsService implements OnModuleInit, OnModuleDestroy {
     // timers at all racing its assertions.
     if (this.env.DISPATCH_INTERVAL_SECONDS === 0) return;
 
+    // The only background timer in the process. One wake-up an hour is what
+    // lets a database that sleeps when idle actually sleep.
     this.timer = setInterval(() => {
       void this.run().catch((error) => this.logger.error('Sweep failed', error));
-    }, SWEEP_INTERVAL_MS);
+    }, this.env.DISPATCH_INTERVAL_SECONDS * 1000);
 
     this.timer.unref?.();
   }
@@ -63,7 +64,13 @@ export class SweepsService implements OnModuleInit, OnModuleDestroy {
     this.running = true;
 
     try {
-      return { lapsed: await this.lapseSubscriptions(), booked: await this.extendSeries() };
+      const result = { lapsed: await this.lapseSubscriptions(), booked: await this.extendSeries() };
+
+      // Also the fallback for delivery: anything a nudge missed, including the
+      // read-only notices lapsing just queued, goes out now.
+      await this.dispatcher.drain();
+
+      return result;
     } finally {
       this.running = false;
     }

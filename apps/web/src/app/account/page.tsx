@@ -31,9 +31,6 @@ export default async function AccountPage() {
     <>
       <AppNav current="account" />
       <main className="mx-auto max-w-2xl px-6 py-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-          Phase 4 — Roles and permissions
-        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           {organization?.organization.name ?? 'Your account'}
         </h1>

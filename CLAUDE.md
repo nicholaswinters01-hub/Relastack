@@ -10,7 +10,9 @@ businesses. Priced by **business location**, not per user. Organizations
 activate modules (CRM, Scheduling, Employees, Inventory, …) at the company
 level.
 
-**Current phase: 11 complete (Notifications).** Customers, the work to be done
+**Current phase: 20a in progress (deployment, pulled forward).** Feature work is
+paused for market research; the product is being put online so research
+participants can use it. See docs/deploy.md. Customers, the work to be done
 about them, and the work booked into a day. Entitlement derives from a plan
 plus purchased add-ons, and a lapsed subscription narrows the account to
 read-only rather than locking it. Business logic still asks only "is this
@@ -198,6 +200,32 @@ Recorded because each one cost real time and none is obvious.
   preferences list is built from the catalogue, so a row for a mistyped type
   would never be looked at: somebody would believe they had switched something
   off and keep being told about it. Validate the key against the catalogue.
+- **Hosted Postgres never gives you a superuser.** Neon, RDS and Render all
+  refuse `ALTER ROLE ... NOSUPERUSER` from their owner role, so a migration
+  that works locally can fail on the first production deploy. Check new
+  migrations by running them as a non-superuser owner in a throwaway database
+  (`CREATE ROLE x LOGIN CREATEROLE BYPASSRLS`, `CREATE DATABASE ... OWNER x`).
+- **Prisma never recovers from connections the server closed.** After Neon
+  sleeps, or any restart, every query failed until the process restarted:
+  40 of 40, then 10 of 10 five seconds later. `createPrismaClient` sets a
+  60-second idle limit and resets the pool and retries once on P1017. Do not
+  remove either; the delivery e2e suite fails without the retry.
+- **Behind the web tier, every request comes from the same few addresses.**
+  Rate limits keyed on the socket address lump everyone together.
+  `trustProxy: true` is worse: anyone can then choose their own address. The
+  API believes the web tier's `x-client-ip` only when `x-internal-secret`
+  matches. Use `clientIpOf(request)`, never `request.ip`.
+- **Tailwind v4 flattens `@theme`, whatever it is nested in.** A second
+  `@theme` inside `@media (prefers-color-scheme: dark)` does not apply only in
+  dark mode — it wins for everyone. Override the custom properties on `:root`
+  inside the media query instead. Both apps shipped with this bug.
+- **`NODE_ENV=production` during a build makes pnpm skip dev dependencies.**
+  Builds need them (Prisma, TypeScript, the Nest CLI). Hosts that set it for
+  the build too need `pnpm install --prod=false`.
+- **Backticks inside `node -e "..."` run as shell commands.** Bash expands them
+  before Node sees the script. Several edits to prose came out garbled this
+  way, and one silently executed a pnpm command. Use the Edit/Write tools for
+  anything containing backticks.
 
 ## Commands
 
@@ -214,31 +242,32 @@ pnpm db:reset   # DESTROYS local data
 Each phase ends with a full stop for product-owner approval. Do not begin the
 next phase without it.
 
-| Phase | Scope                                                       | Status   |
-| ----- | ----------------------------------------------------------- | -------- |
-| 0     | Project setup                                               | Complete |
-| 1     | Authentication, sessions, rate limiting                     | Complete |
-| 2     | Organizations, membership, tenant isolation, RLS            | Complete |
-| 3     | Locations, location membership                              | Complete |
-| 4     | Roles and scoped permissions                                | Complete |
-| 5     | Module registry and entitlement enforcement                 | Complete |
-| 6     | Plans, subscriptions, add-ons                               | Complete |
-| 7     | CRM: leads, customers, contacts, notes, tags, custom fields | Complete |
-| 8     | Tasks and basic workflow infrastructure                     | Complete |
-| 9     | Scheduling: jobs, crews, conflicts                          | Complete |
-| 9b    | Recurring jobs                                              | Complete |
-| 10    | Reporting and dashboards                                    | Complete |
-| 11    | Notifications and the event system                          | Complete |
-| 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers | **Next** |
-| 12    | Automation engine (trigger → condition → action)            |          |
-| 13    | Public website API                                          |          |
-| 14    | Website module                                              |          |
-| 15    | Customer portal                                             |          |
-| 16    | Inventory                                                   |          |
-| 17    | Custom module framework                                     |          |
-| 18    | Payment provider integration, invoice sync to QuickBooks    |          |
-| 19    | Internal admin platform                                     |          |
-| 20    | Production hardening                                        |          |
+| Phase | Scope                                                        | Status   |
+| ----- | ------------------------------------------------------------ | -------- |
+| 0     | Project setup                                                | Complete |
+| 1     | Authentication, sessions, rate limiting                      | Complete |
+| 2     | Organizations, membership, tenant isolation, RLS             | Complete |
+| 3     | Locations, location membership                               | Complete |
+| 4     | Roles and scoped permissions                                 | Complete |
+| 5     | Module registry and entitlement enforcement                  | Complete |
+| 6     | Plans, subscriptions, add-ons                                | Complete |
+| 7     | CRM: leads, customers, contacts, notes, tags, custom fields  | Complete |
+| 8     | Tasks and basic workflow infrastructure                      | Complete |
+| 9     | Scheduling: jobs, crews, conflicts                           | Complete |
+| 9b    | Recurring jobs                                               | Complete |
+| 10    | Reporting and dashboards                                     | Complete |
+| 11    | Notifications and the event system                           | Complete |
+| 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers  | Held     |
+| 12    | Automation engine (trigger → condition → action)             |          |
+| 13    | Public website API                                           |          |
+| 14    | Website module                                               |          |
+| 15    | Customer portal                                              |          |
+| 16    | Inventory                                                    |          |
+| 17    | Custom module framework                                      |          |
+| 18    | Payment provider integration, invoice sync to QuickBooks     |          |
+| 19    | Internal admin platform                                      |          |
+| 20a   | Deployment: Render + Neon + Vercel, invite-only (pulled fwd) | **Now**  |
+| 20    | Production hardening                                         |          |
 
 Accounting and mail are **integrated, never rebuilt** (docs/adr/0004).
 QuickBooks keeps the books; invoices push to it from Phase 18. Mail sending

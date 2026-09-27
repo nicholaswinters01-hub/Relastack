@@ -8,6 +8,7 @@ import {
   type ThrottlerStorage,
 } from '@nestjs/throttler';
 import { SERVER_ENV, type ServerEnv } from '../config.provider';
+import { clientIpOf } from './internal-gate';
 
 /**
  * ThrottlerGuard with a configurable off switch.
@@ -32,6 +33,11 @@ export class AppThrottlerGuard extends ThrottlerGuard {
     @Inject(SERVER_ENV) private readonly env: ServerEnv,
   ) {
     super(options, storageService, reflector);
+  }
+
+  /** Per real client. Every request arrives from the web tier, so the socket address alone would lump everyone together. */
+  protected override async getTracker(request: Record<string, unknown>): Promise<string> {
+    return clientIpOf(request);
   }
 
   protected override async shouldSkip(context: ExecutionContext): Promise<boolean> {

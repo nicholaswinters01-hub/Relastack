@@ -36,9 +36,6 @@ export default async function BillingPage() {
     <>
       <AppNav current="billing" />
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-          Phase 6 — Billing
-        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           {organization.organization.name}
         </h1>

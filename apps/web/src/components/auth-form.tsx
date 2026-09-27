@@ -28,6 +28,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
   const [organizationName, setOrganizationName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [accessCode, setAccessCode] = useState('');
   const [errors, setErrors] = useState<FieldError[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -40,7 +41,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setFormError(null);
 
     const payload = isRegister
-      ? { email, password, firstName, lastName, organizationName }
+      ? { email, password, firstName, lastName, organizationName, accessCode }
       : { email, password };
     const schema = isRegister ? registerRequestSchema : loginRequestSchema;
     const parsed = schema.safeParse(payload);
@@ -58,8 +59,8 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setSubmitting(true);
 
     try {
-      // Relative URL: goes through the Next.js rewrite so the browser treats
-      // the API as same-origin and keeps the session cookie.
+      // Relative URL: goes through the /api relay so the browser treats the
+      // API as same-origin and keeps the session cookie.
       const response = await fetch(`/api/v1/auth/${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -96,11 +97,22 @@ export function AuthForm({ mode }: { mode: Mode }) {
       </h1>
       <p className="mt-2 text-sm text-[var(--color-muted)]">
         {isRegister
-          ? 'Sets up your business. You can invite your team once roles arrive in Phase 4.'
+          ? 'Sets up your business. You can invite your team once you are in.'
           : 'Welcome back.'}
       </p>
 
       <form onSubmit={handleSubmit} noValidate className="mt-8 flex flex-col gap-4">
+        {isRegister && (
+          <Field
+            label="Access code"
+            value={accessCode}
+            onChange={setAccessCode}
+            autoComplete="off"
+            error={errorFor('accessCode')}
+            hint="RelaStack is invite-only for now. Your code came with your invitation."
+          />
+        )}
+
         {isRegister && (
           <Field
             label="Business name"

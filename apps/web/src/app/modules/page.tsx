@@ -23,9 +23,6 @@ export default async function ModulesPage() {
     <>
       <AppNav current="modules" />
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-          Phase 5 — Modules
-        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">
           {organization.organization.name}
         </h1>

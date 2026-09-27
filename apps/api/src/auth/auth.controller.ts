@@ -12,6 +12,7 @@ import {
 } from '@platform/shared';
 import type { User } from '@platform/db';
 import { loadServerEnv } from '@platform/config';
+import { clientIpOf } from '../common/internal-gate';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { AuthService } from './auth.service';
 import { CookieService } from './cookie.service';
@@ -53,7 +54,7 @@ export class AuthController {
     const userAgent = request.headers['user-agent'];
 
     return {
-      ipAddress: request.ip,
+      ipAddress: clientIpOf(request),
       userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
     };
   }

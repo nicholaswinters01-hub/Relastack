@@ -149,13 +149,60 @@ export const serverEnvSchema = z
     APP_URL: z.string().default('http://localhost:3000'),
 
     /**
-     * How often the outbox is drained, in seconds.
+     * How often background work runs unprompted, in seconds: the sweeps, and
+     * the fallback drain for notifications a nudge missed. New events are
+     * delivered within seconds regardless; this is only the safety net.
      *
-     * Zero disables the dispatcher entirely, which is what the test suite uses
-     * so that a background timer cannot race the assertions.
+     * Deliberately long. Hosted Postgres that sleeps when idle only sleeps if
+     * nothing wakes it, and a short interval would keep it awake for good.
+     *
+     * Zero disables all background delivery, which is what the test suite
+     * uses so that a timer cannot race the assertions.
      */
-    DISPATCH_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(3600).default(10),
+    DISPATCH_INTERVAL_SECONDS: z.coerce.number().int().min(0).max(3600).default(3600),
+
+    // --- Deployment -------------------------------------------------------
+    /**
+     * Shared with the web tier, which sends it on every request.
+     *
+     * When set, the API answers nothing else (health/live aside) — and it is
+     * the only reason the client IP the web tier reports can be believed. Every
+     * request reaches the API via the web tier's servers, so without a trusted
+     * IP every user shares a handful of addresses and one busy user rate-limits
+     * everyone. Required in production.
+     */
+    INTERNAL_API_SECRET: z
+      .string()
+      .min(32, 'INTERNAL_API_SECRET must be at least 32 characters')
+      .optional(),
+
+    /**
+     * Required to register a new business, when set. Invitations to an existing
+     * business never need it: the invitation link is the authorization.
+     */
+    SIGNUP_ACCESS_CODE: z
+      .string()
+      .min(8, 'SIGNUP_ACCESS_CODE must be at least 8 characters')
+      .optional(),
+
+    /** Production must either set SIGNUP_ACCESS_CODE or say this explicitly. */
+    SIGNUP_OPEN: booleanFromString.default(false),
   })
+  .refine((env) => env.NODE_ENV !== 'production' || env.INTERNAL_API_SECRET !== undefined, {
+    message: 'INTERNAL_API_SECRET must be set when NODE_ENV=production',
+    path: ['INTERNAL_API_SECRET'],
+  })
+  // Fails closed: forgetting the code in production must not quietly open
+  // sign-up to anyone who finds the site.
+  .refine(
+    (env) =>
+      env.NODE_ENV !== 'production' || env.SIGNUP_OPEN || env.SIGNUP_ACCESS_CODE !== undefined,
+    {
+      message:
+        'Set SIGNUP_ACCESS_CODE, or SIGNUP_OPEN=true to allow anyone to register, when NODE_ENV=production',
+      path: ['SIGNUP_ACCESS_CODE'],
+    },
+  )
   // A production deployment serving session cookies over plaintext HTTP would
   // expose every session to anyone on the network path. Refuse to start.
   .refine((env) => env.NODE_ENV !== 'production' || env.COOKIE_SECURE, {

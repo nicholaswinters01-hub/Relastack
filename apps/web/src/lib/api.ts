@@ -1,5 +1,5 @@
 import { cache } from 'react';
-import { cookies } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import {
   invitationsResponseSchema,
   modulesResponseSchema,
@@ -36,16 +36,16 @@ import {
   type JobsResponse,
   type TasksResponse,
 } from '@platform/shared';
+import { API_URL, internalHeaders } from '@/lib/internal-api';
 
 /**
  * Server-side API access.
  *
- * Server Components call the API directly rather than through the Next.js
- * rewrite — there is no browser in the loop, so there is no origin to match,
+ * Server Components call the API directly rather than through the /api
+ * relay — there is no browser in the loop, so there is no origin to match,
  * and going direct avoids a pointless extra hop. The session cookie has to be
  * forwarded by hand, because a server-side fetch carries no cookie jar.
  */
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
 export async function serverFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const cookieStore = await cookies();
@@ -56,7 +56,11 @@ export async function serverFetch(path: string, init: RequestInit = {}): Promise
 
   return fetch(`${API_URL}${path}`, {
     ...init,
-    headers: { ...init.headers, ...(cookieHeader ? { cookie: cookieHeader } : {}) },
+    headers: {
+      ...init.headers,
+      ...internalHeaders(await headers()),
+      ...(cookieHeader ? { cookie: cookieHeader } : {}),
+    },
     cache: 'no-store',
   });
 }

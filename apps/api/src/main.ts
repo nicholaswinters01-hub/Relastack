@@ -14,6 +14,7 @@ import helmet from '@fastify/helmet';
 import { loadServerEnv } from '@platform/config';
 import { AppModule } from './app.module';
 import { fastifyCookiePlugin } from './common/fastify-cookie';
+import { registerInternalGate } from './common/internal-gate';
 
 async function bootstrap(): Promise<void> {
   // Validate configuration before building the application. A misconfigured
@@ -22,7 +23,10 @@ async function bootstrap(): Promise<void> {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter({ trustProxy: true }),
+    // false: X-Forwarded-For is set by whoever sends the request, so trusting it
+    // lets anyone pick their own address for rate limiting. The web tier's
+    // report of the real client is believed only through the internal gate.
+    new FastifyAdapter({ trustProxy: false }),
     { logger: logLevelsFor(env.LOG_LEVEL) },
   );
 
@@ -60,6 +64,8 @@ async function bootstrap(): Promise<void> {
   // an attacker cannot forge a token that exists in the sessions table.
   // See common/fastify-cookie.ts for why the plugin is imported via a helper.
   await app.getHttpAdapter().getInstance().register(fastifyCookiePlugin);
+
+  registerInternalGate(app.getHttpAdapter().getInstance(), env.INTERNAL_API_SECRET);
 
   // Explicit allow-list. `credentials: true` is required because sessions
   // (Phase 1) will be carried in httpOnly cookies.

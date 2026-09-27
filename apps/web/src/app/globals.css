@@ -10,8 +10,14 @@
   --color-bad: #dc2626;
 }
 
+/*
+ * A plain :root override, not a second @theme. Tailwind flattens every @theme
+ * into one unconditional block whatever it is nested in, so the dark values
+ * used to win for everyone, in every theme. Custom properties under :root do
+ * cascade the way @media implies.
+ */
 @media (prefers-color-scheme: dark) {
-  @theme {
+  :root {
     --color-canvas: #0b0f16;
     --color-surface: #151b24;
     --color-ink: #e8eaed;

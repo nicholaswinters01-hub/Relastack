@@ -62,9 +62,6 @@ export default async function HomePage() {
     <>
       <AppNav current="dashboard" />
       <main className="mx-auto max-w-4xl px-6 py-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-          Phase 10 — Dashboard
-        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{greeting}</h1>
         <p className="mt-3 text-[var(--color-muted)]">
           Where {organization.organization.name} stands over the last thirty days.

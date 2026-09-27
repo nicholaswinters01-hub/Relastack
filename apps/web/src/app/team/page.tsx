@@ -31,9 +31,6 @@ export default async function TeamPage() {
     <>
       <AppNav current="team" />
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-          Phase 4 — Roles and permissions
-        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Your team</h1>
         <p className="mt-3 text-[var(--color-muted)]">
           Employees join by invitation. Signing up directly always creates a new business, so there

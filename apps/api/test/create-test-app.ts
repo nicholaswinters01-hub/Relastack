@@ -2,7 +2,9 @@ import { Test } from '@nestjs/testing';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import { createPrismaClient, type PrismaClient } from '@platform/db';
 import { AppModule } from '../src/app.module';
+import { loadServerEnv } from '@platform/config';
 import { fastifyCookiePlugin } from '../src/common/fastify-cookie';
+import { registerInternalGate } from '../src/common/internal-gate';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 export interface TestApp {
@@ -33,8 +35,8 @@ export function createPrivilegedTestClient(): PrismaClient {
 /**
  * Boot the real application for end-to-end testing.
  *
- * Mirrors main.ts in the ways that matter to behaviour — the cookie plugin and
- * the global route prefix. Helmet and CORS are omitted: they add response
+ * Mirrors main.ts in the ways that matter to behaviour — the cookie plugin, the
+ * internal gate and the global route prefix. Helmet and CORS are omitted: they add response
  * headers but change no application logic.
  */
 export async function createTestApp(): Promise<TestApp> {
@@ -43,6 +45,7 @@ export async function createTestApp(): Promise<TestApp> {
   const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
 
   await app.getHttpAdapter().getInstance().register(fastifyCookiePlugin);
+  registerInternalGate(app.getHttpAdapter().getInstance(), loadServerEnv().INTERNAL_API_SECRET);
   app.setGlobalPrefix('api/v1');
 
   await app.init();

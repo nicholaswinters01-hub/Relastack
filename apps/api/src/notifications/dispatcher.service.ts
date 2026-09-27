@@ -24,9 +24,14 @@ const MAX_ATTEMPTS = 5;
 /**
  * Drains the outbox.
  *
- * Turns events into notifications, and notifications into email. Runs on a
- * timer rather than in the request that caused the event, so a slow provider
+ * Turns events into notifications, and notifications into email. Runs out of
+ * band rather than in the request that caused the event, so a slow provider
  * never makes somebody wait to save a task.
+ *
+ * Prompted, not polled. Each recorded event nudges a drain moments later, and
+ * the hourly sweep drains whatever a nudge missed. A short poll would keep the
+ * database awake around the clock; hosted Postgres that sleeps when idle
+ * (Neon) is only free if it is actually left idle.
  *
  * **Single instance.** Two copies of the API would both claim the same events.
  * Delivery is idempotent — the unique pair on (event, membership) refuses a
@@ -38,8 +43,13 @@ const MAX_ATTEMPTS = 5;
 @Injectable()
 export class DispatcherService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DispatcherService.name);
-  private timer: NodeJS.Timeout | null = null;
   private running = false;
+  /** A drain was asked for while one was running; run again when it finishes. */
+  private again = false;
+  private soon: NodeJS.Timeout | null = null;
+  private soonRequestedAt = 0;
+  private later: NodeJS.Timeout | null = null;
+  private startup: NodeJS.Timeout | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -47,26 +57,64 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
     @Inject(SERVER_ENV) private readonly env: ServerEnv,
   ) {}
 
-  onModuleInit(): void {
-    const seconds = this.env.DISPATCH_INTERVAL_SECONDS;
+  private get enabled(): boolean {
+    // Zero disables all background delivery. The e2e suite drains by hand so a
+    // timer can never race an assertion.
+    return this.env.DISPATCH_INTERVAL_SECONDS !== 0;
+  }
 
-    // Zero disables it entirely. The e2e suite drains by hand so a background
-    // timer cannot race an assertion.
-    if (seconds === 0) {
+  onModuleInit(): void {
+    if (!this.enabled) {
       this.logger.log('Dispatcher disabled (DISPATCH_INTERVAL_SECONDS=0)');
       return;
     }
 
-    this.timer = setInterval(() => {
-      void this.drain().catch((error) => this.logger.error('Dispatch failed', error));
-    }, seconds * 1000);
-
-    // Never hold the process open on our account.
-    this.timer.unref?.();
+    // Anything left undelivered by a crash or a redeploy goes out at startup
+    // rather than waiting for the first hourly sweep.
+    // Its own timer: sharing the quick-delivery slot made every event in the
+    // first five seconds wait for this instead.
+    this.startup = this.schedule(5_000, () => (this.startup = null));
   }
 
   onModuleDestroy(): void {
-    if (this.timer) clearInterval(this.timer);
+    for (const timer of [this.soon, this.later, this.startup]) {
+      if (timer) clearTimeout(timer);
+    }
+  }
+
+  /**
+   * An event was just recorded: deliver it shortly.
+   *
+   * Called from inside the transaction that wrote the event, so a drain run
+   * right now would not see it — the row is not committed yet. Two passes
+   * cover that: one a second later, postponed by further activity for at
+   * most five seconds, and one fifteen seconds after the last nudge for a
+   * slow commit. Anything slower still is picked up by the hourly sweep.
+   */
+  nudge(): void {
+    if (!this.enabled) return;
+
+    const now = Date.now();
+    if (!this.soon) this.soonRequestedAt = now;
+
+    if (!this.soon || now - this.soonRequestedAt < 5_000) {
+      if (this.soon) clearTimeout(this.soon);
+      this.soon = this.schedule(1_000, () => (this.soon = null));
+    }
+
+    if (this.later) clearTimeout(this.later);
+    this.later = this.schedule(15_000, () => (this.later = null));
+  }
+
+  private schedule(delay: number, onFire: () => void): NodeJS.Timeout {
+    const timer = setTimeout(() => {
+      onFire();
+      void this.drain().catch((error) => this.logger.error('Dispatch failed', error));
+    }, delay);
+
+    // Never hold the process open on our account.
+    timer.unref?.();
+    return timer;
   }
 
   /**
@@ -76,7 +124,10 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
    * timer tick start alongside it and process the same rows twice.
    */
   async drain(limit = 50): Promise<number> {
-    if (this.running) return 0;
+    if (this.running) {
+      this.again = true;
+      return 0;
+    }
     this.running = true;
 
     try {
@@ -130,6 +181,15 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
       return handled;
     } finally {
       this.running = false;
+
+      // Events recorded mid-drain may have been committed after the read.
+      if (this.again) {
+        this.again = false;
+        if (!this.soon) {
+          this.soonRequestedAt = Date.now();
+          this.soon = this.schedule(0, () => (this.soon = null));
+        }
+      }
     }
   }
 

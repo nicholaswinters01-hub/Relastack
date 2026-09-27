@@ -60,6 +60,8 @@ export const registerRequestSchema = z
      * so every self-registration is a new business signing up.
      */
     organizationName: organizationNameSchema,
+    /** Checked by the API only when the deployment requires one. */
+    accessCode: z.string().trim().max(200).optional(),
   })
   // A password that is merely the email address passes a length check but is
   // among the first things any credential-stuffing attempt tries.

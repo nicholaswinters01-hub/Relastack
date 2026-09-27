@@ -23,12 +23,16 @@ export interface CreatePrismaClientOptions {
    * fails on it.
    */
   logErrors?: boolean;
+
+  /** Told when a closed connection forced a reconnect. This package never logs itself. */
+  onReconnect?: () => void;
 }
 
 export function createPrismaClient({
   databaseUrl,
   logQueries = false,
   logErrors = true,
+  onReconnect,
 }: CreatePrismaClientOptions): PrismaClient {
   // Note this package never reads process.env — configuration is validated
   // once, in @platform/config, and passed in. Deciding here would put a second
@@ -38,10 +42,90 @@ export function createPrismaClient({
   if (logQueries) log.unshift('query');
   if (logErrors) log.push('error');
 
-  return new PrismaClient({
-    datasources: { db: { url: databaseUrl } },
+  const base = new PrismaClient({
+    datasources: { db: { url: withIdleLimit(databaseUrl) } },
     log,
   });
+
+  // Queries made outside a transaction (session lookups, mostly) get the same
+  // recovery as transactions do below. The cast keeps call sites on the plain
+  // PrismaClient type; an extension changes no method's shape.
+  const client = base.$extends({
+    query: {
+      $allOperations: ({ args, query }) => withReconnect(base, () => query(args)),
+    },
+  }) as unknown as PrismaClient;
+
+  if (onReconnect) {
+    reconnectListeners.set(base, onReconnect);
+    reconnectListeners.set(client, onReconnect);
+  }
+
+  return client;
+}
+
+const reconnectListeners = new WeakMap<object, () => void>();
+
+/**
+ * Connections idle longer than this are discarded rather than reused.
+ *
+ * Hosted Postgres that sleeps when idle (Neon, after five minutes) closes every
+ * connection as it goes. Prisma does not notice: it keeps handing out the dead
+ * ones, and every query fails until the process restarts — measured, not
+ * assumed. A limit well under five minutes means a connection old enough to
+ * have been closed is never reused. An explicit value in the URL wins.
+ */
+const IDLE_LIMIT_SECONDS = 60;
+
+function withIdleLimit(url: string): string {
+  if (/[?&]max_idle_connection_lifetime=/.test(url)) return url;
+
+  const separator = url.includes('?') ? '&' : '?';
+  return `${url}${separator}max_idle_connection_lifetime=${IDLE_LIMIT_SECONDS}`;
+}
+
+/** Prisma's code for "Server has closed the connection". */
+const CONNECTION_CLOSED = 'P1017';
+
+const resets = new WeakMap<object, Promise<void>>();
+
+/**
+ * Retry once on a fresh pool if the server closed the connection.
+ *
+ * The idle limit covers a database that slept. This covers one that dropped
+ * connections still in use — a restart, a failover — where Prisma, left alone,
+ * never recovers. Disconnecting discards the whole pool; the retry reconnects.
+ *
+ * Safe to retry because a transaction on a closed connection was never
+ * committed. The narrow exception — the server committing and then dropping
+ * the connection before replying — could repeat a write, which is far rarer
+ * than the outage it prevents.
+ */
+export async function withReconnect<T>(client: PrismaClient, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (error) {
+    if ((error as { code?: string } | null)?.code !== CONNECTION_CLOSED) throw error;
+
+    reconnectListeners.get(client)?.();
+
+    // Shared, so a burst of failing requests resets the pool once, not once each.
+    let reset = resets.get(client);
+    if (!reset) {
+      reset = client.$disconnect().finally(() => resets.delete(client));
+      resets.set(client, reset);
+    }
+    await reset;
+
+    return work();
+  }
+}
+
+function transaction<T>(
+  client: PrismaClient,
+  work: (tx: TransactionClient) => Promise<T>,
+): Promise<T> {
+  return withReconnect(client, () => client.$transaction(work));
 }
 
 /**
@@ -109,7 +193,7 @@ export async function withTenant<T>(
     throw new InvalidTenantContextError('userId', context.userId);
   }
 
-  return client.$transaction(async (tx) => {
+  return transaction(client, async (tx) => {
     await tx.$executeRawUnsafe(
       `SET LOCAL app.current_organization_id = '${context.organizationId}'`,
     );
@@ -139,7 +223,7 @@ export async function withUserOnly<T>(
     throw new InvalidTenantContextError('userId', userId);
   }
 
-  return client.$transaction(async (tx) => {
+  return transaction(client, async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL app.current_user_id = '${userId}'`);
 
     return work(tx);
@@ -164,7 +248,7 @@ export async function withOrganization<T>(
     throw new InvalidTenantContextError('organizationId', organizationId);
   }
 
-  return client.$transaction(async (tx) => {
+  return transaction(client, async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL app.current_organization_id = '${organizationId}'`);
 
     return work(tx);
@@ -194,7 +278,7 @@ export async function withInvitationToken<T>(
     throw new InvalidTenantContextError('invitationTokenHash', tokenHash);
   }
 
-  return client.$transaction(async (tx) => {
+  return transaction(client, async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL app.current_invitation_token = '${tokenHash}'`);
 
     return work(tx);
@@ -225,7 +309,7 @@ export async function withPlatformWorker<T>(
   client: PrismaClient,
   work: (tx: TransactionClient) => Promise<T>,
 ): Promise<T> {
-  return client.$transaction(async (tx) => {
+  return transaction(client, async (tx) => {
     await tx.$executeRawUnsafe(`SET LOCAL app.platform_worker = 'on'`);
 
     return work(tx);

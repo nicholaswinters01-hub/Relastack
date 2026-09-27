@@ -1,5 +1,6 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, timingSafeEqual } from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   Inject,
   Injectable,
@@ -57,6 +58,29 @@ export class AuthService {
   }
 
   /**
+   * Invite-only sign-up, when the deployment asks for it.
+   *
+   * Checked before the password is hashed, so a wrong code costs nothing. The
+   * answer is the same field error whether the code is missing or wrong, and
+   * the comparison takes the same time either way.
+   */
+  private assertAccessCode(given: string | undefined): void {
+    const expected = this.env.SIGNUP_ACCESS_CODE;
+    if (!expected || this.env.SIGNUP_OPEN) return;
+
+    const a = Buffer.from(given ?? '');
+    const b = Buffer.from(expected);
+
+    if (a.length !== b.length || !timingSafeEqual(a, b)) {
+      throw new BadRequestException({
+        statusCode: 400,
+        message: 'Validation failed',
+        errors: [{ field: 'accessCode', message: 'That access code is not valid' }],
+      });
+    }
+  }
+
+  /**
    * Register a new account, which creates a new business.
    *
    * Self-registration always means an owner signing their company up.
@@ -73,6 +97,8 @@ export class AuthService {
    * cannot reference a value the database has not produced yet.
    */
   async register(input: RegisterRequest, context: SessionContext = {}): Promise<AuthResult> {
+    this.assertAccessCode(input.accessCode);
+
     const passwordHash = await this.passwords.hash(input.password);
 
     const userId = randomUUID();

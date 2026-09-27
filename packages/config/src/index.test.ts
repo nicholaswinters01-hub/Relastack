@@ -92,6 +92,8 @@ describe('loadServerEnv — session and rate-limit settings', () => {
       NODE_ENV: 'production',
       COOKIE_SECURE: 'true',
       DATABASE_URL_APP: 'postgresql://app:pass@localhost:5432/db',
+      INTERNAL_API_SECRET: 'x'.repeat(32),
+      SIGNUP_ACCESS_CODE: 'an-access-code',
     });
 
     expect(env.NODE_ENV).toBe('production');
@@ -139,6 +141,8 @@ describe('loadServerEnv — production safety rules', () => {
       COOKIE_SECURE: 'true',
       RATE_LIMIT_ENABLED: 'true',
       DATABASE_URL_APP: 'postgresql://app:pass@localhost:5432/db',
+      INTERNAL_API_SECRET: 'x'.repeat(32),
+      SIGNUP_ACCESS_CODE: 'an-access-code',
     });
 
     expect(env.NODE_ENV).toBe('production');
@@ -153,6 +157,8 @@ describe('loadServerEnv — application database role', () => {
     NODE_ENV: 'production',
     COOKIE_SECURE: 'true',
     RATE_LIMIT_ENABLED: 'true',
+    INTERNAL_API_SECRET: 'x'.repeat(32),
+    SIGNUP_ACCESS_CODE: 'an-access-code',
   };
 
   it('allows DATABASE_URL_APP to be omitted outside production', () => {
@@ -186,5 +192,62 @@ describe('loadServerEnv — application database role', () => {
     expect(() =>
       loadServerEnv({ ...validEnv, DATABASE_URL_APP: 'mysql://app:pass@localhost:3306/db' }),
     ).toThrow(ConfigValidationError);
+  });
+});
+
+/** A copy of an environment with one setting removed. */
+function without(env: Record<string, string>, key: string): Record<string, string> {
+  const copy = { ...env };
+  delete copy[key];
+  return copy;
+}
+
+describe('loadServerEnv — deployment settings', () => {
+  const production = {
+    ...validEnv,
+    NODE_ENV: 'production',
+    COOKIE_SECURE: 'true',
+    DATABASE_URL_APP: 'postgresql://app:pass@localhost:5432/db',
+    INTERNAL_API_SECRET: 'x'.repeat(32),
+    SIGNUP_ACCESS_CODE: 'an-access-code',
+  };
+
+  it('needs neither setting outside production', () => {
+    const env = loadServerEnv(validEnv);
+
+    expect(env.INTERNAL_API_SECRET).toBeUndefined();
+    expect(env.SIGNUP_ACCESS_CODE).toBeUndefined();
+    expect(env.SIGNUP_OPEN).toBe(false);
+  });
+
+  it('refuses to start in production without the internal secret', () => {
+    const rest = without(production, 'INTERNAL_API_SECRET');
+
+    expect(() => loadServerEnv(rest)).toThrow(/INTERNAL_API_SECRET must be set/);
+  });
+
+  it('rejects a short internal secret', () => {
+    expect(() => loadServerEnv({ ...validEnv, INTERNAL_API_SECRET: 'too-short' })).toThrow(
+      /at least 32 characters/,
+    );
+  });
+
+  it('refuses to start in production with neither an access code nor open sign-up', () => {
+    // Forgetting the code must not quietly open sign-up to anyone.
+    const rest = without(production, 'SIGNUP_ACCESS_CODE');
+
+    expect(() => loadServerEnv(rest)).toThrow(/Set SIGNUP_ACCESS_CODE, or SIGNUP_OPEN=true/);
+  });
+
+  it('allows production with open sign-up when it is said explicitly', () => {
+    const rest = without(production, 'SIGNUP_ACCESS_CODE');
+
+    expect(loadServerEnv({ ...rest, SIGNUP_OPEN: 'true' }).SIGNUP_OPEN).toBe(true);
+  });
+
+  it('rejects a short access code', () => {
+    expect(() => loadServerEnv({ ...validEnv, SIGNUP_ACCESS_CODE: 'short' })).toThrow(
+      /at least 8 characters/,
+    );
   });
 });

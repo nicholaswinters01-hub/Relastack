@@ -28,6 +28,7 @@ import { Public } from '../auth/auth.decorators';
 import { CookieService } from '../auth/cookie.service';
 import type { FastifyReply, FastifyRequest } from '../auth/fastify.types';
 import { SessionService } from '../auth/session.service';
+import { clientIpOf } from '../common/internal-gate';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { SERVER_ENV, type ServerEnv } from '../config.provider';
 import type { PermissionSet } from '../rbac/permission-set';
@@ -112,7 +113,7 @@ export class InvitationsController {
 
     const userAgent = request.headers['user-agent'];
     const session = await this.sessions.issue(userId, {
-      ipAddress: request.ip,
+      ipAddress: clientIpOf(request),
       userAgent: Array.isArray(userAgent) ? userAgent[0] : userAgent,
     });
 

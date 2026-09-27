@@ -61,9 +61,6 @@ export default async function CustomersPage({ searchParams }: Props) {
     <>
       <AppNav current="customers" />
       <main className="mx-auto max-w-4xl px-6 py-16">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-muted)]">
-          Phase 7 — CRM
-        </p>
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Customers</h1>
         <p className="mt-3 text-[var(--color-muted)]">
           Leads and customers are the same record at different stages, so converting one keeps every
