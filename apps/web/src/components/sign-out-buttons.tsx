@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { announce } from '@/lib/live-sync';
 
 export function SignOutButtons() {
   const router = useRouter();
@@ -19,6 +20,7 @@ export function SignOutButtons() {
       });
 
       router.push('/login');
+      announce({ type: 'signed-out' });
       router.refresh();
     } finally {
       setPending(null);

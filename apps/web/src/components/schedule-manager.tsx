@@ -11,6 +11,7 @@ import {
   type Location,
   type OrganizationMember,
 } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   jobs: Job[];
@@ -168,7 +169,7 @@ export function ScheduleManager({
     setError(null);
 
     try {
-      const response = await fetch(path, {
+      const response = await apiWrite(path, {
         method,
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

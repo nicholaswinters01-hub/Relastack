@@ -10,6 +10,7 @@ import {
   type Location,
   type Tag,
 } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   customers: Customer[];
@@ -72,7 +73,7 @@ export function CustomersManager({
     const type = String(form.get('type') ?? 'PERSON');
 
     try {
-      const response = await fetch('/api/v1/customers', {
+      const response = await apiWrite('/api/v1/customers', {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

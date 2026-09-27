@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { apiWrite } from '@/lib/live-sync';
 
 /**
  * Your own name, editable in place.
@@ -30,7 +31,7 @@ export function ProfileNameForm({
     setError(null);
 
     try {
-      const response = await fetch('/api/v1/auth/me', {
+      const response = await apiWrite('/api/v1/auth/me', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

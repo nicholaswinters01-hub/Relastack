@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { Notification } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 /**
  * The bell.
@@ -29,7 +30,7 @@ export function NotificationBell({
     setBusy(true);
 
     try {
-      await fetch('/api/v1/notifications/read', {
+      await apiWrite('/api/v1/notifications/read', {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

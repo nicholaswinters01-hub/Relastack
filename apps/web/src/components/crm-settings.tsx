@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { TAG_COLORS, type CustomFieldDefinition, type Tag } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   tags: Tag[];
@@ -28,7 +29,7 @@ export function CrmSettings({ tags, fields }: Props) {
     setError(null);
 
     try {
-      const response = await fetch(path, {
+      const response = await apiWrite(path, {
         method,
         credentials: 'include',
         ...(body === undefined

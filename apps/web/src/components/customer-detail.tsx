@@ -9,6 +9,7 @@ import {
   type CustomFieldDefinition,
   type Tag,
 } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   customer: CustomerDetail;
@@ -43,7 +44,7 @@ export function CustomerDetailView({ customer, tags, fields, canWrite, membershi
     setError(null);
 
     try {
-      const response = await fetch(path, {
+      const response = await apiWrite(path, {
         method,
         credentials: 'include',
         ...(body === undefined

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ModuleState } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   modules: ModuleState[];
@@ -32,7 +33,7 @@ export function ModulesManager({ modules, canManage }: Props) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/modules/${module.key}`, {
+      const response = await apiWrite(`/api/v1/modules/${module.key}`, {
         method: module.enabled ? 'DELETE' : 'POST',
         credentials: 'include',
       });

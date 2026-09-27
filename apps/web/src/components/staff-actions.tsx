@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Field {
   name: string;
@@ -97,7 +98,7 @@ export function StaffAction({
     }
 
     try {
-      const response = await fetch(`/api/v1/staff/${path}`, {
+      const response = await apiWrite(`/api/v1/staff/${path}`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },
@@ -248,7 +249,7 @@ export function StaffNoteForm({ businessId }: { businessId: string }) {
     setError(null);
 
     try {
-      const response = await fetch(`/api/v1/staff/businesses/${businessId}/notes`, {
+      const response = await apiWrite(`/api/v1/staff/businesses/${businessId}/notes`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

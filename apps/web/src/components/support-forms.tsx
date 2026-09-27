@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { SupportMessage } from '@platform/shared';
 import { KIND_LABEL } from '@/lib/support-labels';
+import { apiWrite } from '@/lib/live-sync';
 
 const inputClass =
   'rounded-lg border border-[var(--color-line)] bg-[var(--color-surface)] px-3 py-2 text-sm';
@@ -12,7 +13,7 @@ const buttonClass =
 
 async function post(path: string, body: unknown): Promise<string | null> {
   try {
-    const response = await fetch(path, {
+    const response = await apiWrite(path, {
       method: 'POST',
       credentials: 'include',
       headers: { 'content-type': 'application/json' },
@@ -42,7 +43,7 @@ export function NewSupportRequestForm() {
     setError(null);
 
     try {
-      const response = await fetch('/api/v1/support/requests', {
+      const response = await apiWrite('/api/v1/support/requests', {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

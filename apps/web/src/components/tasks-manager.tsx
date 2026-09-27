@@ -12,6 +12,7 @@ import {
   type TaskStatus,
 } from '@platform/shared';
 import { TaskEditor } from '@/components/task-editor';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   tasks: Task[];
@@ -83,7 +84,7 @@ export function TasksManager({
     setError(null);
 
     try {
-      const response = await fetch(path, {
+      const response = await apiWrite(path, {
         method,
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

@@ -11,6 +11,7 @@ import {
   type ResolvedPermissions,
 } from '@platform/shared';
 import { canAt } from '@/lib/permissions';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   locations: Location[];
@@ -50,7 +51,7 @@ export function LocationsManager({ locations, members, permissions, canCreate }:
 
     setBusy(true);
     try {
-      const response = await fetch('/api/v1/locations', {
+      const response = await apiWrite('/api/v1/locations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -74,7 +75,7 @@ export function LocationsManager({ locations, members, permissions, canCreate }:
   async function toggleAssignment(locationId: string, membershipId: string, assigned: boolean) {
     setBusy(true);
     try {
-      await fetch(
+      await apiWrite(
         assigned
           ? `/api/v1/locations/${locationId}/members/${membershipId}`
           : `/api/v1/locations/${locationId}/members`,

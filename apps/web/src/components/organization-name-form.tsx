@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { ORGANIZATION_NAME_MAX_LENGTH, ORGANIZATION_NAME_MIN_LENGTH } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 /**
  * The business name, editable in place by whoever may change company settings.
@@ -24,7 +25,7 @@ export function OrganizationNameForm({ name, canEdit }: { name: string; canEdit:
     setError(null);
 
     try {
-      const response = await fetch('/api/v1/organizations/current', {
+      const response = await apiWrite('/api/v1/organizations/current', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

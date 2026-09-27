@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { BillingAccount, BillingSummary, Plan, Subscription } from '@platform/shared';
 import { SUPPORT_EMAIL } from '@/lib/brand';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   subscription: Subscription;
@@ -46,7 +47,7 @@ export function BillingManager({ subscription, summary, account, plans, canManag
     setError(null);
 
     try {
-      const response = await fetch(path, {
+      const response = await apiWrite(path, {
         method: 'POST',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

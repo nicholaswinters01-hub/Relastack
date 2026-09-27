@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import type { Invitation, Location, OrganizationMember, RoleScope } from '@platform/shared';
 import { roleLabel } from '@/lib/permissions';
+import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   members: OrganizationMember[];
@@ -42,7 +43,7 @@ export function TeamManager({ members, invitations, locations, canInvite }: Prop
     setBusy(true);
 
     try {
-      const response = await fetch('/api/v1/invitations', {
+      const response = await apiWrite('/api/v1/invitations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -73,7 +74,7 @@ export function TeamManager({ members, invitations, locations, canInvite }: Prop
   async function revoke(id: string) {
     setBusy(true);
     try {
-      await fetch(`/api/v1/invitations/${id}`, { method: 'DELETE', credentials: 'include' });
+      await apiWrite(`/api/v1/invitations/${id}`, { method: 'DELETE', credentials: 'include' });
       router.refresh();
     } finally {
       setBusy(false);

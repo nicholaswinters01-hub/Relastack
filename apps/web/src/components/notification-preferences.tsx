@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import type { NotificationPreference } from '@platform/shared';
+import { apiWrite } from '@/lib/live-sync';
 
 /**
  * What you are told about.
@@ -33,7 +34,7 @@ export function NotificationPreferences({
     setRows(rows.map((r) => (r.type === row.type ? { ...r, [channel]: value } : r)));
 
     try {
-      const response = await fetch('/api/v1/notifications/preferences', {
+      const response = await apiWrite('/api/v1/notifications/preferences', {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'content-type': 'application/json' },

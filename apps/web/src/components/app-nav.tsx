@@ -4,6 +4,7 @@ import { NotificationBell } from '@/components/notification-bell';
 import { getCurrentOrganization, getModules, getNotifications } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
 import { getStaffIdentity } from '@/lib/staff-api';
+import { LiveSync } from './live-sync';
 
 /**
  * The application's navigation.
@@ -85,6 +86,7 @@ export async function AppNav({ current }: { current: string }) {
 
   return (
     <nav className="border-b border-[var(--color-line)] bg-[var(--color-surface)]">
+      <LiveSync />
       <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-1 gap-y-2 px-6 py-3">
         <Link
           href="/account"
