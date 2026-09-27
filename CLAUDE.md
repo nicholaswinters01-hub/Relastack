@@ -56,6 +56,19 @@ Background work runs as a **single instance** and needs
 sweeps are idempotent, so a second copy would duplicate effort rather than
 results.
 
+The **staff console** (`/staff`, Phase 19a) is for the people who run RelaStack.
+Staff are rows in `platform_staff`, granted only with SQL as the owner role;
+the application role cannot write there. Staff see **account information
+only** — businesses, subscriptions, people, locations, modules, invitations —
+never what a business keeps about its own customers. That is enforced by the
+database: `withStaff()` sets `app.staff`, and per-command policies on exactly
+those account tables accept it only when `platform_staff` lists the caller.
+Customer, job, task and note tables have no staff policy, so they read as
+empty. Staff code never uses `withTenant()` for another business — acting AS a
+business would unlock everything it owns. Every look and every change is
+written to `staff_audit_events` in the same transaction, changes with a
+required reason; the application role has no UPDATE or DELETE there.
+
 Tasks are part of **core**, not a module: Scheduling and Automation both build
 on them, and gating the foundation would gate everything standing on it. A task
 hangs off a customer or stands alone, and Phase 9 jobs attach through a second
@@ -230,6 +243,11 @@ Recorded because each one cost real time and none is obvious.
 - **`NODE_ENV=production` during a build makes pnpm skip dev dependencies.**
   Builds need them (Prisma, TypeScript, the Nest CLI). Hosts that set it for
   the build too need `pnpm install --prod=false`.
+- **A staff policy on a customer-data table breaks the staff console's
+  promise.** Staff see account information only, and the only thing keeping
+  it that way is that `customers`, `jobs`, `tasks`, `customer_notes` and the
+  rest have no `*_staff_*` policy. Adding one is a product decision, not a
+  convenience; the staff e2e suite fails if staff can read a customer.
 - **Backticks inside `node -e "..."` run as shell commands.** Bash expands them
   before Node sees the script. Several edits to prose came out garbled this
   way, and one silently executed a pnpm command. Use the Edit/Write tools for
@@ -273,7 +291,9 @@ next phase without it.
 | 16    | Inventory                                                    |          |
 | 17    | Custom module framework                                      |          |
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
-| 19    | Internal admin platform                                      |          |
+| 19a   | Staff console: businesses, support actions, audit trail      | Review   |
+| 19b   | Billing by hand: annual plans, payments, credits             | Next     |
+| 19c   | Help desk: in-app requests and replies (needs email)         |          |
 | 20a   | Deployment: Render + Neon + Vercel, invite-only (pulled fwd) | **Now**  |
 | 20    | Production hardening                                         |          |
 

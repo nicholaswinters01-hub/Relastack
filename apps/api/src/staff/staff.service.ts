@@ -24,6 +24,8 @@ import type { StaffIdentity } from './staff.decorators';
 
 const DAY = 24 * 60 * 60 * 1000;
 const MAX_TRIAL_EXTENSION = 366 * DAY;
+/** A second look at the same business within this window is the same visit. */
+const VIEW_LOG_WINDOW = 30 * 60 * 1000;
 
 /**
  * The staff console.
@@ -226,7 +228,18 @@ export class StaffService {
 
       if (!organization) throw new NotFoundException();
 
-      await this.record(tx, staff, organizationId, 'business.viewed', null, {});
+      // One entry per visit, not per page load: every action refreshes the
+      // page, and logging each refresh buried the actions themselves.
+      const recentLook = await tx.staffAuditEvent.findFirst({
+        where: {
+          organizationId,
+          staffUserId: staff.userId,
+          action: 'business.viewed',
+          createdAt: { gt: new Date(Date.now() - VIEW_LOG_WINDOW) },
+        },
+        select: { id: true },
+      });
+      if (!recentLook) await this.record(tx, staff, organizationId, 'business.viewed', null, {});
 
       const userIds = organization.memberships.map((m) => m.userId);
       const now = new Date();

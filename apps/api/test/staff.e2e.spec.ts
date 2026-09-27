@@ -302,6 +302,21 @@ describe('Staff console (e2e)', () => {
       expect(looks).toBeGreaterThan(0);
     });
 
+    it('records one look per visit, not one per page load', async () => {
+      const before = await privileged.staffAuditEvent.count({
+        where: { organizationId: alphaId, action: 'business.viewed', staffUserId },
+      });
+
+      await request('GET', `/api/v1/staff/businesses/${alphaId}`, staffToken);
+      await request('GET', `/api/v1/staff/businesses/${alphaId}`, staffToken);
+
+      expect(
+        await privileged.staffAuditEvent.count({
+          where: { organizationId: alphaId, action: 'business.viewed', staffUserId },
+        }),
+      ).toBe(before);
+    });
+
     it('answers 404 for a business that does not exist', async () => {
       const response = await request(
         'GET',

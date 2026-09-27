@@ -3,6 +3,7 @@ import { MODULES, PERMISSIONS, type ModuleState, type PermissionKey } from '@pla
 import { NotificationBell } from '@/components/notification-bell';
 import { getCurrentOrganization, getModules, getNotifications } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
+import { getStaffIdentity } from '@/lib/staff-api';
 
 /**
  * The application's navigation.
@@ -65,7 +66,11 @@ export async function AppNav({ current }: { current: string }) {
 
   if (!organization) return null;
 
-  const [modules, inbox] = await Promise.all([getModules(), getNotifications()]);
+  const [modules, inbox, staff] = await Promise.all([
+    getModules(),
+    getNotifications(),
+    getStaffIdentity(),
+  ]);
   const enabled = new Set(
     modules.filter((module: ModuleState) => module.enabled).map((module) => module.key),
   );
@@ -107,6 +112,21 @@ export async function AppNav({ current }: { current: string }) {
         })}
 
         <div className="ml-auto flex items-center gap-1">
+          {/* Shown only to staff, but not what protects the console: the API
+              answers 404 to everyone else whatever this renders. */}
+          {staff && (
+            <Link
+              href="/staff"
+              aria-current={current === 'staff' ? 'page' : undefined}
+              className={`rounded-lg px-3 py-1.5 text-sm ${
+                current === 'staff'
+                  ? 'bg-[var(--color-canvas)] font-medium'
+                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+              }`}
+            >
+              Staff
+            </Link>
+          )}
           <NotificationBell notifications={inbox.notifications} unread={inbox.unread} />
         </div>
 
