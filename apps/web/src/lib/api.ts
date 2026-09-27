@@ -18,6 +18,7 @@ import {
   preferencesResponseSchema,
   jobsResponseSchema,
   jobResponseSchema,
+  groupsResponseSchema,
   tasksResponseSchema,
   taskResponseSchema,
   type CustomerDetail,
@@ -36,6 +37,7 @@ import {
   type NotificationPreference,
   type NotificationsResponse,
   type Job,
+  type MemberGroup,
   type JobsResponse,
   type Task,
   type TasksResponse,
@@ -427,5 +429,17 @@ export async function getTask(id: string): Promise<Task | null> {
     return parsed.success ? parsed.data.task : null;
   } catch {
     return null;
+  }
+}
+
+/** The business's employee groups, or none when the caller may not see the Employees page. */
+export async function getGroups(): Promise<MemberGroup[]> {
+  try {
+    const response = await serverFetch('/api/v1/groups');
+    if (!response.ok) return [];
+    const parsed = groupsResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.groups : [];
+  } catch {
+    return [];
   }
 }

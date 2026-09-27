@@ -10,6 +10,7 @@ import {
   getLocations,
   getModules,
   getOrganizationMembers,
+  getGroups,
 } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
 
@@ -82,7 +83,7 @@ export default async function SchedulePage({ searchParams }: Props) {
 
   const canWrite = canAnywhere(organization.permissions, PERMISSIONS.JOB_WRITE);
 
-  const [{ jobs }, locations, members, { customers }] = await Promise.all([
+  const [{ jobs }, locations, members, groups, { customers }] = await Promise.all([
     getJobs({
       from: from.toISOString(),
       to: to.toISOString(),
@@ -91,6 +92,7 @@ export default async function SchedulePage({ searchParams }: Props) {
     }),
     getLocations(),
     canWrite ? getOrganizationMembers() : Promise.resolve([]),
+    canWrite ? getGroups() : Promise.resolve([]),
     canWrite ? getCustomers({ stage: 'ACTIVE' }) : Promise.resolve({ customers: [] }),
   ]);
 
@@ -107,6 +109,7 @@ export default async function SchedulePage({ searchParams }: Props) {
           jobs={jobs}
           locations={locations}
           members={members}
+          groups={groups}
           customers={customers}
           canWrite={canWrite}
           membershipId={organization.membershipId}

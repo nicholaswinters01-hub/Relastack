@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { PERMISSIONS } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
 import { JobDetail } from '@/components/job-detail';
-import { getCurrentOrganization, getJob, getOrganizationMembers } from '@/lib/api';
+import { getCurrentOrganization, getGroups, getJob, getOrganizationMembers } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
@@ -18,7 +18,9 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   if (!job) notFound();
 
   const canWrite = canAnywhere(organization.permissions, PERMISSIONS.JOB_WRITE);
-  const members = canWrite ? await getOrganizationMembers() : [];
+  const [members, groups] = canWrite
+    ? await Promise.all([getOrganizationMembers(), getGroups()])
+    : [[], []];
   const onCrew = job.assignees.some((a) => a.membershipId === organization.membershipId);
 
   return (
@@ -32,7 +34,13 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
           Schedule
         </Link>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">{job.title}</h1>
-        <JobDetail job={job} members={members} canWrite={canWrite} onCrew={onCrew} />
+        <JobDetail
+          job={job}
+          members={members}
+          groups={groups}
+          canWrite={canWrite}
+          onCrew={onCrew}
+        />
       </main>
     </>
   );

@@ -2,12 +2,21 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import type { Invitation, Location, OrganizationMember, RoleScope } from '@platform/shared';
-import { roleLabel } from '@/lib/permissions';
+import type {
+  Invitation,
+  Location,
+  MemberGroup,
+  OrganizationMember,
+  RoleScope,
+} from '@platform/shared';
+import { EmployeesWithGroups, GroupsManager } from '@/components/employee-groups';
 import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   members: OrganizationMember[];
+  groups: MemberGroup[];
+  /** Organization-wide member.manage: may create groups and put people in them. */
+  canManage: boolean;
   invitations: Invitation[];
   locations: Location[];
   canInvite: boolean;
@@ -21,7 +30,14 @@ interface Props {
  * this renders, and the e2e suite asserts that calling those endpoints
  * directly still fails.
  */
-export function TeamManager({ members, invitations, locations, canInvite }: Props) {
+export function TeamManager({
+  members,
+  groups,
+  canManage,
+  invitations,
+  locations,
+  canInvite,
+}: Props) {
   const router = useRouter();
 
   const [email, setEmail] = useState('');
@@ -177,48 +193,9 @@ export function TeamManager({ members, invitations, locations, canInvite }: Prop
         </form>
       )}
 
-      <section className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
-          People ({members.length})
-        </h2>
+      <EmployeesWithGroups members={members} groups={groups} canManage={canManage} />
 
-        <ul className="mt-4 flex flex-col gap-3">
-          {members.map((member) => {
-            const name =
-              [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
-
-            return (
-              <li
-                key={member.membershipId}
-                className="flex flex-wrap items-baseline justify-between gap-3 border-b border-[var(--color-line)] pb-3 last:border-0 last:pb-0"
-              >
-                <div>
-                  <p className="text-sm font-medium">{name}</p>
-                  <p className="text-xs text-[var(--color-muted)]">{member.email}</p>
-                </div>
-                <div className="text-right">
-                  {member.roles.length === 0 ? (
-                    <span className="font-mono text-xs text-[var(--color-bad)]">no role</span>
-                  ) : (
-                    member.roles.map((role) => (
-                      <p key={role.id} className="font-mono text-xs">
-                        {roleLabel(role.roleKey)}
-                        <span className="text-[var(--color-muted)]">
-                          {' '}
-                          ·{' '}
-                          {role.scope === 'ORGANIZATION'
-                            ? 'whole organization'
-                            : `${role.locationIds.length} location${role.locationIds.length === 1 ? '' : 's'}`}
-                        </span>
-                      </p>
-                    ))
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+      {canManage && <GroupsManager groups={groups} />}
 
       {invitations.length > 0 && (
         <section className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">

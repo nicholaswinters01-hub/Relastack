@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { CrewPicker } from '@/components/crew-picker';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import {
@@ -11,11 +12,14 @@ import {
   type JobStatus,
   type Location,
   type OrganizationMember,
+  type MemberGroup,
 } from '@platform/shared';
 import { apiWrite } from '@/lib/live-sync';
 
 interface Props {
   jobs: Job[];
+  /** Employee groups, for filtering the crew picker. Empty when not visible to this person. */
+  groups: MemberGroup[];
   locations: Location[];
   members: OrganizationMember[];
   customers: Customer[];
@@ -33,9 +37,6 @@ const STATUS_LABEL: Record<JobStatus, string> = {
   CANCELLED: 'Cancelled',
   NO_SHOW: 'No show',
 };
-
-const memberName = (member: OrganizationMember) =>
-  [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
 
 const browserZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
@@ -106,6 +107,7 @@ const PIXELS_PER_HOUR = 56;
  */
 export function ScheduleManager({
   jobs,
+  groups,
   locations,
   members,
   customers,
@@ -418,14 +420,7 @@ export function ScheduleManager({
 
           <fieldset className="flex flex-col gap-1.5">
             <legend className="text-sm text-[var(--color-muted)]">Who is going</legend>
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              {members.map((member) => (
-                <label key={member.membershipId} className="flex items-center gap-2 text-sm">
-                  <input type="checkbox" name="assignees" value={member.membershipId} />
-                  {memberName(member)}
-                </label>
-              ))}
-            </div>
+            <CrewPicker members={members} groups={groups} name="assignees" />
           </fieldset>
 
           <button

@@ -6,10 +6,12 @@ import { useState, type FormEvent } from 'react';
 import {
   type Job,
   type JobStatus,
+  type MemberGroup,
   type OrganizationMember,
   formatAccountNumber,
 } from '@platform/shared';
 import { apiWrite } from '@/lib/live-sync';
+import { CrewPicker } from '@/components/crew-picker';
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   SCHEDULED: 'Scheduled',
@@ -21,9 +23,6 @@ const STATUS_LABEL: Record<JobStatus, string> = {
 
 const FIELD =
   'rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 text-sm';
-
-const memberName = (member: OrganizationMember) =>
-  [member.firstName, member.lastName].filter(Boolean).join(' ') || member.email;
 
 /** In the branch's own zone: the crew reads the time where the job is. */
 function when(job: Job): string {
@@ -42,6 +41,7 @@ function when(job: Job): string {
 interface Props {
   job: Job;
   members: OrganizationMember[];
+  groups: MemberGroup[];
   canWrite: boolean;
   /** On the crew: may move the status whatever their role. */
   onCrew: boolean;
@@ -53,7 +53,7 @@ interface Props {
  * Rescheduling stays on the schedule, where the day's other jobs are in view.
  * This page is for reading a job and changing what it is and who is on it.
  */
-export function JobDetail({ job, members, canWrite, onCrew }: Props) {
+export function JobDetail({ job, members, groups, canWrite, onCrew }: Props) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -203,19 +203,12 @@ export function JobDetail({ job, members, canWrite, onCrew }: Props) {
             </label>
             <fieldset className="flex flex-col gap-1 text-sm">
               <legend className="font-medium">Crew</legend>
-              {members.map((member) => (
-                <label key={member.membershipId} className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    name="crew"
-                    value={member.membershipId}
-                    defaultChecked={job.assignees.some(
-                      (assignee) => assignee.membershipId === member.membershipId,
-                    )}
-                  />
-                  {memberName(member)}
-                </label>
-              ))}
+              <CrewPicker
+                members={members}
+                groups={groups}
+                name="crew"
+                selected={job.assignees.map((assignee) => assignee.membershipId)}
+              />
             </fieldset>
             <div className="flex gap-3">
               <button

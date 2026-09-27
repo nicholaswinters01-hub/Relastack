@@ -61,7 +61,7 @@ const WORK: Entry[] = [
 const ACCOUNT: Entry[] = [
   { href: '/account', label: 'Your account' },
   { href: '/locations', label: 'Locations', permission: PERMISSIONS.LOCATION_READ },
-  { href: '/team', label: 'Team', permission: PERMISSIONS.MEMBER_READ },
+  { href: '/employees', label: 'Employees', permission: PERMISSIONS.MEMBER_READ },
   { href: '/modules', label: 'Modules', permission: PERMISSIONS.ORGANIZATION_READ },
   { href: '/billing', label: 'Billing', permission: PERMISSIONS.ORGANIZATION_READ },
 ];

@@ -73,8 +73,8 @@ export default async function AccountPage() {
               <Link href="/locations" className="underline underline-offset-4">
                 Manage locations
               </Link>
-              <Link href="/team" className="underline underline-offset-4">
-                Your team
+              <Link href="/employees" className="underline underline-offset-4">
+                Employees
               </Link>
               <Link href="/modules" className="underline underline-offset-4">
                 Modules

@@ -4,15 +4,16 @@ import { PERMISSIONS } from '@platform/shared';
 import { TeamManager } from '@/components/team-manager';
 import {
   getCurrentOrganization,
+  getGroups,
   getInvitations,
   getLocations,
   getOrganizationMembers,
 } from '@/lib/api';
-import { canAnywhere } from '@/lib/permissions';
+import { can, canAnywhere } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function TeamPage() {
+export default async function EmployeesPage() {
   const organization = await getCurrentOrganization();
 
   if (!organization) redirect('/login');
@@ -21,17 +22,21 @@ export default async function TeamPage() {
   // people to the branches they run.
   const canInvite = canAnywhere(organization.permissions, PERMISSIONS.MEMBER_INVITE);
 
-  const [members, invitations, locations] = await Promise.all([
+  // Organization-wide, like the API: groups belong to the whole business.
+  const canManage = can(organization.permissions, PERMISSIONS.MEMBER_MANAGE);
+
+  const [members, groups, invitations, locations] = await Promise.all([
     getOrganizationMembers(),
+    getGroups(),
     canInvite ? getInvitations() : Promise.resolve([]),
     getLocations(),
   ]);
 
   return (
     <>
-      <AppNav current="team" />
+      <AppNav current="employees" />
       <main className="mx-auto max-w-3xl px-6 py-16">
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Your team</h1>
+        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Employees</h1>
         <p className="mt-3 text-[var(--color-muted)]">
           Employees join by invitation. Signing up directly always creates a new business, so there
           is no way into your organization without one.
@@ -39,6 +44,8 @@ export default async function TeamPage() {
 
         <TeamManager
           members={members}
+          groups={groups}
+          canManage={canManage}
           invitations={invitations}
           locations={locations}
           canInvite={canInvite}
