@@ -23,6 +23,8 @@ import { AppThrottlerGuard } from './common/app-throttler.guard';
 import { HealthModule } from './health/health.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { SERVER_ENV, type ServerEnv } from './config.provider';
+import { StaffGuard } from './staff/staff.guard';
+import { StaffModule } from './staff/staff.module';
 
 /**
  * Application root.
@@ -69,6 +71,7 @@ import { SERVER_ENV, type ServerEnv } from './config.provider';
     SchedulingModule,
     ReportingModule,
     HealthModule,
+    StaffModule,
   ],
   providers: [
     // ORDER MATTERS. Guards run in registration order, so rate limiting is
@@ -80,6 +83,10 @@ import { SERVER_ENV, type ServerEnv } from './config.provider';
     // Authentication is global: every endpoint is protected unless it carries
     // @Public(). Protection is the default; exposure is the explicit choice.
     { provide: APP_GUARD, useClass: AuthGuard },
+
+    // Staff routes only, and before TenantGuard: those routes skip tenant
+    // resolution, so the staff check must already have run.
+    { provide: APP_GUARD, useClass: StaffGuard },
 
     // Tenant context, also global and also fail-closed. Runs after AuthGuard,
     // so the caller is already known. An endpoint that forgets to declare its

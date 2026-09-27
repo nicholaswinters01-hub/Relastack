@@ -270,4 +270,35 @@ export async function withPlatformWorker<T>(
   });
 }
 
+/**
+ * The staff console, acting as one named staff member.
+ *
+ * Unlocks ACCOUNT information across businesses — organizations, their
+ * subscriptions, people, locations, modules and invitations — plus the staff
+ * audit trail and notes. Nothing a business keeps about its own customers:
+ * customers, jobs, tasks and notes have no staff policy, so they read as empty
+ * here. That is the promise the staff console makes, enforced by the database.
+ *
+ * Setting the flag is not enough on its own. Every staff policy also checks
+ * that platform_staff lists `staffUserId`, and the application role cannot
+ * write to platform_staff. Deliberately NOT combined with a tenant context:
+ * staff never act "as" a business, which would unlock everything it owns.
+ */
+export async function withStaff<T>(
+  client: PrismaClient,
+  staffUserId: string,
+  work: (tx: TransactionClient) => Promise<T>,
+): Promise<T> {
+  if (!UUID_PATTERN.test(staffUserId)) {
+    throw new InvalidTenantContextError('staffUserId', staffUserId);
+  }
+
+  return client.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(`SET LOCAL app.current_user_id = '${staffUserId}'`);
+    await tx.$executeRawUnsafe(`SET LOCAL app.staff = 'on'`);
+
+    return work(tx);
+  });
+}
+
 export { Prisma, PrismaClient };

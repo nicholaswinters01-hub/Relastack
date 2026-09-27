@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import type { TenantContext, TransactionClient } from '@platform/db';
 import {
   accessLevelFor,
+  effectiveSubscriptionStatus,
+  monthlyCharge,
   type AccessLevel,
   type BillingEvent,
   type BillingSummary,
@@ -124,19 +126,7 @@ export class BillingService {
     graceEndsAt: Date | null;
     trialEndsAt: Date | null;
   }): SubscriptionStatus {
-    const now = Date.now();
-
-    if (subscription.status === 'PAST_DUE' && subscription.graceEndsAt) {
-      if (subscription.graceEndsAt.getTime() <= now) return 'SUSPENDED';
-    }
-
-    if (subscription.status === 'TRIALING' && subscription.trialEndsAt) {
-      // An expired trial becomes read-only rather than vanishing, so the
-      // customer can still reach their data and decide to subscribe.
-      if (subscription.trialEndsAt.getTime() <= now) return 'SUSPENDED';
-    }
-
-    return subscription.status;
+    return effectiveSubscriptionStatus(subscription);
   }
 
   async getSubscription(context: TenantContext): Promise<Subscription> {
@@ -214,9 +204,11 @@ export class BillingService {
     if (!subscription) throw new NotFoundException('No subscription found');
 
     const { plan } = subscription;
-    const billableLocations = Math.max(0, activeLocations - plan.includedLocations);
-    const locationChargeCents = billableLocations * plan.perLocationPriceCents;
-    const addOnChargeCents = subscription.addOns.reduce((sum, entry) => sum + entry.priceCents, 0);
+    const { billableLocations, locationChargeCents, addOnChargeCents, totalCents } = monthlyCharge(
+      plan,
+      activeLocations,
+      subscription.addOns.map((entry) => entry.priceCents),
+    );
 
     return {
       activeLocations,
@@ -226,7 +218,7 @@ export class BillingService {
       basePriceCents: plan.basePriceCents,
       locationChargeCents,
       addOnChargeCents,
-      totalCents: plan.basePriceCents + locationChargeCents + addOnChargeCents,
+      totalCents,
       // Reported so the interface can state plainly that adding staff costs
       // nothing. The number is never an input to the total above.
       userCount,

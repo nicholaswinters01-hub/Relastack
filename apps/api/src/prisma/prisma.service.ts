@@ -12,6 +12,7 @@ import {
   withInvitationToken,
   withOrganization,
   withPlatformWorker,
+  withStaff,
   withUserOnly,
   type PrismaClient,
   type TenantContext,
@@ -103,6 +104,11 @@ export class PrismaService implements OnModuleInit, OnModuleDestroy {
    */
   withPlatformWorker<T>(work: (tx: TransactionClient) => Promise<T>): Promise<T> {
     return withPlatformWorker(this.client, work);
+  }
+
+  /** Account information across businesses, as one staff member. See withStaff. */
+  withStaff<T>(staffUserId: string, work: (tx: TransactionClient) => Promise<T>): Promise<T> {
+    return withStaff(this.client, staffUserId, work);
   }
 
   /** Organization context without a user identity. See withOrganization. */

@@ -81,6 +81,8 @@ model User {
   sessions    Session[]
   memberships OrganizationMembership[]
 
+  platformStaff PlatformStaff?
+
   @@map("users")
 }
 
@@ -148,6 +150,7 @@ model Organization {
   events                 DomainEvent[]
   notifications          Notification[]
   customFieldDefinitions CustomFieldDefinition[]
+  staffNotes             StaffNote[]
 
   @@map("organizations")
 }
@@ -1374,4 +1377,58 @@ model NotificationPreference {
   @@id([membershipId, type])
   @@index([organizationId])
   @@map("notification_preferences")
+}
+
+// ---------------------------------------------------------------------------
+// Staff console (Phase 19a)
+// ---------------------------------------------------------------------------
+
+/// The people who run RelaStack, as opposed to its customers.
+///
+/// Granted only with SQL, as the owner role. The application role can read its
+/// own row and nothing else, and cannot write here at all: no code path, bug
+/// or compromised session can make someone staff.
+model PlatformStaff {
+  userId    String   @id @map("user_id") @db.Uuid
+  note      String?
+  grantedAt DateTime @default(now()) @map("granted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("platform_staff")
+}
+
+/// Every look and every action a staff member takes inside a business.
+///
+/// Append-only: the application role has no UPDATE or DELETE on it. Deliberately
+/// no foreign keys, so the record survives the staff account or the business
+/// being deleted; the email is stored for the same reason.
+model StaffAuditEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  staffUserId    String   @map("staff_user_id") @db.Uuid
+  staffEmail     String   @map("staff_email")
+  organizationId String?  @map("organization_id") @db.Uuid
+  action         String
+  reason         String?
+  details        Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([organizationId, createdAt])
+  @@index([createdAt])
+  @@map("staff_audit_events")
+}
+
+/// Internal notes about a business. Never visible to the business itself.
+model StaffNote {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  authorUserId   String   @map("author_user_id") @db.Uuid
+  authorEmail    String   @map("author_email")
+  body           String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("staff_notes")
 }

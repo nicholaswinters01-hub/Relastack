@@ -14,6 +14,7 @@ import { EntitlementService } from '../modules/entitlement.service';
 import type { ModuleRequest } from '../modules/module.decorators';
 import { PermissionService } from '../rbac/permission.service';
 import type { PermissionRequest } from '../rbac/rbac.decorators';
+import { STAFF_ONLY_KEY } from '../staff/staff.decorators';
 import { ALLOW_NO_ORGANIZATION_KEY, type TenantRequest } from './tenant.decorators';
 import { TenantService } from './tenant.service';
 
@@ -61,6 +62,18 @@ export class TenantGuard implements CanActivate {
       // AuthGuard should have rejected this already; reaching here means the
       // guard order in AppModule was changed.
       throw new UnauthorizedException('Authentication required');
+    }
+
+    // Staff routes act on the platform, not as a business. StaffGuard has
+    // already admitted only staff on the same flag, and without a tenant the
+    // permission, module and read-only checks below have nothing to apply to.
+    if (
+      this.reflector.getAllAndOverride<boolean>(STAFF_ONLY_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
+      return true;
     }
 
     const allowNoOrganization = this.reflector.getAllAndOverride<boolean>(

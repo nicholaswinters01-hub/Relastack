@@ -20,9 +20,9 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
 /** Long enough to be usable, short enough that a leaked link expires. */
-const INVITATION_TTL_DAYS = 7;
+export const INVITATION_TTL_DAYS = 7;
 
-const TOKEN_BYTES = 32;
+export const TOKEN_BYTES = 32;
 
 /**
  * Deliberately identical for every invalid invitation — unknown, expired,
@@ -30,6 +30,11 @@ const TOKEN_BYTES = 32;
  * malformed link probe which tokens once existed.
  */
 const INVALID_INVITATION = 'This invitation is not valid or has expired';
+
+/** Only the hash is stored, so a leaked database cannot be replayed as invitations. */
+export function hashInvitationToken(token: string): string {
+  return createHash('sha256').update(token).digest('hex');
+}
 
 @Injectable()
 export class InvitationsService {
@@ -49,7 +54,7 @@ export class InvitationsService {
    * making every lookup expensive.
    */
   private hashToken(token: string): string {
-    return createHash('sha256').update(token).digest('hex');
+    return hashInvitationToken(token);
   }
 
   private toPublic(row: {

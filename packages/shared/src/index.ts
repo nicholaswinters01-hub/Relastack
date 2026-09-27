@@ -24,3 +24,4 @@ export * from './recurrence';
 export * from './job-series';
 export * from './report';
 export * from './notification';
+export * from './staff';

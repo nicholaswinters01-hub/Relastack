@@ -47,6 +47,56 @@ export function accessLevelFor(status: SubscriptionStatus): AccessLevel {
   return ACCESS_BY_STATUS[status];
 }
 
+/**
+ * The status a subscription is really in, now.
+ *
+ * A lapsed grace period or trial becomes read-only the moment it lapses, not
+ * whenever a background job next runs. Computed on read so the clock is
+ * always right; the hourly sweep only persists what is already true.
+ */
+export function effectiveSubscriptionStatus(
+  subscription: { status: SubscriptionStatus; graceEndsAt: Date | null; trialEndsAt: Date | null },
+  now: number = Date.now(),
+): SubscriptionStatus {
+  if (subscription.status === 'PAST_DUE' && subscription.graceEndsAt) {
+    if (subscription.graceEndsAt.getTime() <= now) return 'SUSPENDED';
+  }
+
+  if (subscription.status === 'TRIALING' && subscription.trialEndsAt) {
+    // An expired trial becomes read-only rather than vanishing, so the
+    // customer can still reach their data and decide to subscribe.
+    if (subscription.trialEndsAt.getTime() <= now) return 'SUSPENDED';
+  }
+
+  return subscription.status;
+}
+
+/**
+ * What a business is charged per month: the plan, locations beyond those
+ * included, and add-ons. Never the number of users.
+ */
+export function monthlyCharge(
+  plan: { basePriceCents: number; perLocationPriceCents: number; includedLocations: number },
+  activeLocations: number,
+  addOnPricesCents: number[],
+): {
+  billableLocations: number;
+  locationChargeCents: number;
+  addOnChargeCents: number;
+  totalCents: number;
+} {
+  const billableLocations = Math.max(0, activeLocations - plan.includedLocations);
+  const locationChargeCents = billableLocations * plan.perLocationPriceCents;
+  const addOnChargeCents = addOnPricesCents.reduce((sum, cents) => sum + cents, 0);
+
+  return {
+    billableLocations,
+    locationChargeCents,
+    addOnChargeCents,
+    totalCents: plan.basePriceCents + locationChargeCents + addOnChargeCents,
+  };
+}
+
 export const planSchema = z.object({
   key: z.string(),
   name: z.string(),
