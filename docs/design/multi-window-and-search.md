@@ -1,6 +1,6 @@
 # Two monitors and quick search: design
 
-Status: **approved 2026-09-27** ("go with your suggestions": notes are not searched; colleagues' changes refresh every 60 seconds). Being built.
+Status: **approved 2026-09-27** ("go with your suggestions": notes are not searched; colleagues' changes refresh every 60 seconds). Built and awaiting the product owner's review.
 
 Goal: someone at a desk can spread RelaStack across two screens (schedule on
 one, customers on the other) and jump to anything by typing. We use real

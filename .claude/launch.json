@@ -11,13 +11,19 @@
       "name": "app",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
-      "port": 3000
+      "port": 3000,
+      "env": {
+        "RATE_LIMIT_GLOBAL_PER_MINUTE": "300"
+      }
     },
     {
       "name": "app-hand-billed",
       "runtimeExecutable": "pnpm",
       "runtimeArgs": ["dev"],
-      "env": { "BILLING_SIMULATION": "false" },
+      "env": {
+        "BILLING_SIMULATION": "false",
+        "RATE_LIMIT_GLOBAL_PER_MINUTE": "300"
+      },
       "port": 3000
     }
   ]

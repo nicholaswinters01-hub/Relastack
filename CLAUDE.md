@@ -82,6 +82,16 @@ columns alone. Credit is an append-only ledger in `billing_credits` whose
 balance is always the sum. Every money change locks the business's
 subscription row first, so credit cannot be spent twice.
 
+**Several windows, one person** (docs/design/multi-window-and-search.md). Every
+write in the web app goes through `apiWrite` (`lib/live-sync.ts`), which
+announces a successful change on a `BroadcastChannel`. The other windows
+refresh; a window refreshes on return at most every 15 seconds, and every 60
+seconds while visible, never while hidden. A new component that saves with a
+bare `fetch` leaves the user's other windows stale. **Quick search**
+(`GET /search`) runs no queries of its own: each kind of result comes from the
+service behind its list page, with that page's permission, visibility filter
+and module switch, so it can never show more than the lists.
+
 The **help desk** (Phase 19c, design in docs/design/help-desk.md) lets anyone
 in a business ask for help from `/help`, including a read-only business (rule
 13). RLS keeps each business to its own requests; within one, the service shows
@@ -276,6 +286,11 @@ Recorded because each one cost real time and none is obvious.
   still paying, which an older rule already refused, so deleting the new rule
   broke nothing. The rule is for a payer whose paid time has lapsed. Break
   each guard once and watch its test fail.
+- **A refused request is not a signed-out user.** The organization loader
+  answered null for any failure, so a 429 or a 500 sent people to the sign-in
+  page mid-task. It now throws for 429, 5xx and unreachable, and `app/error.tsx`
+  offers a retry. Each page costs several API calls made by the web tier (the
+  navigation alone makes five), which is why the general limit is 300/min.
 - **A value exported from a `'use client'` file is blank in a server
   component.** It arrives as a client reference, not the object: the help
   pages rendered "·" where "Question · Replied" belonged. Keep shared constants
