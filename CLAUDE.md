@@ -139,8 +139,9 @@ has no reason to come back.
 12. **Prefer configuration and reusable modules** over customer-specific
     branches in core code.
 13. **A lapsed subscription is read-only, never locked out.** Reads always
-    work. `@AllowsWhenReadOnly` belongs on billing endpoints and nowhere else
-    — a customer must always be able to pay their way out.
+    work. `@AllowsWhenReadOnly` belongs on billing and help-desk endpoints and
+    nowhere else — a customer must always be able to pay their way out, and
+    to ask for help doing so (help desk added 2026-09-27, product owner approved).
 
 ## Conventions
 

@@ -1,6 +1,6 @@
-# Help desk (Phase 19c): design for approval
+# Help desk (Phase 19c): design
 
-Status: **proposed, not approved, nothing built.** Open questions at the end.
+Status: **approved 2026-09-27** with the proposed answers to all three questions (see the end). Being built.
 
 ## What it is
 
@@ -19,11 +19,13 @@ this doubles as the feedback channel, kept per business.
   like add-ons), author, `fromStaff`, body, created. **Append-only**: no
   UPDATE or DELETE for the app role, like the audit trail.
 
-## Who sees what (enforced by RLS, not the UI)
+## Who sees what (enforced by the backend, not the UI)
 
-- Business side, through `withTenant()`: whoever opened a request sees it; so
-  do people with organization-wide `organization.write` (owners/admins).
-  Other members do not see colleagues' requests (see question 1).
+- Business side, through `withTenant()`: RLS keeps every business to its own
+  requests. Within a business the service narrows further: whoever opened a
+  request sees it, and so do people with organization-wide
+  `organization.write` (owners/admins). Anyone else gets 404, like every other
+  visibility filter here. Other members do not see colleagues' requests.
 - Staff side, through `withStaff()`: new per-command staff policies on these
   two tables only. SELECT, INSERT of messages naming the caller, UPDATE of
   status. Still **no** staff policy on any customer-data table.
@@ -59,7 +61,7 @@ messages cannot be edited or deleted by anyone; staff cannot post as someone
 else; the daily cap; reply email goes out once even on redelivery; read-only
 business can (or cannot, per question 3) open a request.
 
-## Open questions for the product owner
+## Decisions (approved 2026-09-27: "go with your suggestions")
 
 1. **Who in a business sees a request?** Proposed: the person who opened it,
    plus owners/admins. Alternative: everyone in the business.
