@@ -9,6 +9,7 @@ import {
   type MemberGroup,
   type OrganizationMember,
   formatAccountNumber,
+  wallTimeToInstant,
 } from '@platform/shared';
 import { apiWrite } from '@/lib/live-sync';
 import { CrewPicker } from '@/components/crew-picker';
@@ -59,6 +60,7 @@ export function JobDetail({ job, members, groups, canWrite, onCrew }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<Record<string, unknown> | null>(null);
+  const [rescheduling, setRescheduling] = useState(false);
 
   async function send(body: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
@@ -166,7 +168,12 @@ export function JobDetail({ job, members, groups, canWrite, onCrew }: Props) {
           {conflict && (
             <button
               type="button"
-              onClick={() => void send({ ...conflict, acknowledgeConflicts: true })}
+              onClick={async () => {
+                if (await send({ ...conflict, acknowledgeConflicts: true })) {
+                  setRescheduling(false);
+                  setEditing(false);
+                }
+              }}
               className="mt-2 text-xs underline underline-offset-4"
             >
               Save anyway
@@ -227,16 +234,140 @@ export function JobDetail({ job, members, groups, canWrite, onCrew }: Props) {
               </button>
             </div>
           </form>
+        ) : rescheduling ? (
+          <RescheduleForm
+            job={job}
+            busy={busy}
+            onSubmit={async (times) => {
+              if (await send(times)) setRescheduling(false);
+            }}
+            onCancel={() => setRescheduling(false)}
+          />
         ) : (
-          <button
-            type="button"
-            onClick={() => setEditing(true)}
-            className="self-start rounded-lg border border-[var(--color-line)] px-4 py-2 text-sm"
-          >
-            Edit job
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setRescheduling(true)}
+              className="rounded-lg bg-[var(--color-ink)] px-4 py-2 text-sm font-medium text-[var(--color-canvas)]"
+            >
+              Reschedule
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="rounded-lg border border-[var(--color-line)] px-4 py-2 text-sm"
+            >
+              Edit job
+            </button>
+          </div>
         ))}
     </div>
+  );
+}
+
+/** "2026-09-28" and "09:00", as the branch reads the moment. */
+function wallClock(iso: string, timeZone: string): { day: string; time: string } {
+  const at = new Date(iso);
+  return {
+    day: new Intl.DateTimeFormat('en-CA', {
+      timeZone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(at),
+    time: new Intl.DateTimeFormat('en-GB', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(at),
+  };
+}
+
+const toMinutes = (value: string) => {
+  const [hour, minute] = value.split(':').map(Number);
+  return (hour ?? 0) * 60 + (minute ?? 0);
+};
+
+/**
+ * Moving a job to another day or time.
+ *
+ * Times are typed as the branch reads them and converted with the branch's
+ * zone, by the same helper the booking form and the server use, so all three
+ * agree across a clock change. A clash with the crew's other work warns and
+ * offers "Save anyway", as booking does. The crew is told the job moved.
+ */
+function RescheduleForm({
+  job,
+  busy,
+  onSubmit,
+  onCancel,
+}: {
+  job: Job;
+  busy: boolean;
+  onSubmit: (times: { startsAt: string; endsAt: string }) => void;
+  onCancel: () => void;
+}) {
+  const zone = job.locationTimezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
+  const start = wallClock(job.startsAt, zone);
+  const end = wallClock(job.endsAt, zone);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const day = String(form.get('day') ?? '');
+    const from = String(form.get('from') ?? '');
+    const to = String(form.get('to') ?? '');
+
+    if (toMinutes(to) <= toMinutes(from)) {
+      setProblem('The job has to end after it starts.');
+      return;
+    }
+    setProblem(null);
+    onSubmit({
+      startsAt: wallTimeToInstant(day, toMinutes(from), zone).toISOString(),
+      endsAt: wallTimeToInstant(day, toMinutes(to), zone).toISOString(),
+    });
+  }
+
+  return (
+    <form
+      onSubmit={submit}
+      className="flex flex-col gap-3 rounded-xl border border-[var(--color-line)] p-5"
+    >
+      <p className="text-sm font-medium">Move this job</p>
+      <div className="flex flex-wrap gap-3">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-xs text-[var(--color-muted)]">Day</span>
+          <input type="date" name="day" defaultValue={start.day} required className={FIELD} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-xs text-[var(--color-muted)]">From</span>
+          <input type="time" name="from" defaultValue={start.time} required className={FIELD} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-xs text-[var(--color-muted)]">To</span>
+          <input type="time" name="to" defaultValue={end.time} required className={FIELD} />
+        </label>
+      </div>
+      <p className="text-xs text-[var(--color-muted)]">
+        Times at {job.locationName ?? 'the job'} ({zone}). Everyone on the crew is told it moved.
+      </p>
+      {problem && <p className="text-sm text-[var(--color-bad)]">{problem}</p>}
+      <div className="flex gap-3">
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-[var(--color-ink)] px-4 py-2 text-sm font-medium text-[var(--color-canvas)] disabled:opacity-50"
+        >
+          {busy ? 'Moving…' : 'Move job'}
+        </button>
+        <button type="button" onClick={onCancel} className="text-sm underline underline-offset-4">
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 

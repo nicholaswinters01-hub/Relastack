@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { CrewPicker } from '@/components/crew-picker';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   wallTimeToInstant,
   type Customer,
@@ -97,6 +97,10 @@ const weekStart = (day: string): string => {
 };
 
 const PIXELS_PER_HOUR = 56;
+/** Dragged and arrow-keyed moves snap to quarter hours. */
+const SNAP_MINUTES = 15;
+const snapMinutes = (dy: number) =>
+  Math.round(((dy / PIXELS_PER_HOUR) * 60) / SNAP_MINUTES) * SNAP_MINUTES;
 
 /**
  * The schedule.
@@ -124,7 +128,11 @@ export function ScheduleManager({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<JobConflict[] | null>(null);
-  const [pending, setPending] = useState<Record<string, unknown> | null>(null);
+  const [pending, setPending] = useState<{
+    path: string;
+    method: string;
+    body: Record<string, unknown>;
+  } | null>(null);
 
   function navigate(next: Record<string, string | null>) {
     const query = new URLSearchParams(params.toString());
@@ -183,7 +191,7 @@ export function ScheduleManager({
 
       if (response.status === 409 && payload.code === 'SCHEDULE_CONFLICT') {
         setConflicts(payload.conflicts);
-        setPending(body as Record<string, unknown>);
+        setPending({ path, method, body: body as Record<string, unknown> });
         return false;
       }
 
@@ -199,6 +207,30 @@ export function ScheduleManager({
     } finally {
       setBusy(null);
     }
+  }
+
+  /**
+   * Drag or arrow-key a job to a new time on the same day. The minutes are
+   * added to the time as the branch reads it, then converted with the branch's
+   * zone, so a move across a clock change lands where it looks like it lands.
+   */
+  function move(job: Job, deltaMinutes: number) {
+    const zone = job.locationTimezone ?? browserZone();
+    const day = localDay(job.startsAt, job.locationTimezone);
+    const start = localMinutes(job.startsAt, job.locationTimezone);
+    const length = localMinutes(job.endsAt, job.locationTimezone) - start;
+    const next = Math.min(Math.max(0, start + deltaMinutes), 24 * 60 - length);
+    if (next === start) return;
+
+    void send(
+      `/api/v1/jobs/${job.id}`,
+      'PATCH',
+      {
+        startsAt: wallTimeToInstant(day, next, zone).toISOString(),
+        endsAt: wallTimeToInstant(day, next + length, zone).toISOString(),
+      },
+      job.id,
+    );
   }
 
   async function create(form: FormData) {
@@ -340,11 +372,16 @@ export function ScheduleManager({
               disabled={busy !== null}
               onClick={() =>
                 pending &&
-                send('/api/v1/jobs', 'POST', { ...pending, acknowledgeConflicts: true }, 'force')
+                send(
+                  pending.path,
+                  pending.method,
+                  { ...pending.body, acknowledgeConflicts: true },
+                  'force',
+                )
               }
               className="rounded-lg border border-transparent bg-[var(--color-ink)] px-3 py-2 text-xs font-medium text-[var(--color-canvas)] disabled:opacity-50"
             >
-              {busy === 'force' ? '…' : 'Book anyway'}
+              {busy === 'force' ? '…' : pending?.method === 'PATCH' ? 'Move anyway' : 'Book anyway'}
             </button>
             <button onClick={() => setConflicts(null)} className={NAV}>
               Pick another time
@@ -447,6 +484,7 @@ export function ScheduleManager({
           canWrite={canWrite}
           busy={busy}
           onStatus={(id, status) => send(`/api/v1/jobs/${id}`, 'PATCH', { status }, id)}
+          onMove={move}
         />
       )}
     </div>
@@ -467,13 +505,22 @@ function DayGrid({
   canWrite,
   busy,
   onStatus,
+  onMove,
 }: {
   jobs: Job[];
   membershipId: string;
   canWrite: boolean;
   busy: string | null;
   onStatus: (id: string, status: string) => void;
+  onMove: (job: Job, deltaMinutes: number) => void;
 }) {
+  // While a job is being dragged: which one, and how far.
+  const [drag, setDrag] = useState<{ id: string; dy: number } | null>(null);
+  // Refs as well as state: a quick flick can move and let go before React has
+  // re-rendered with the new state, and the handlers must still see the drag.
+  const dragFrom = useRef(0);
+  const dragging = useRef<{ id: string; dy: number } | null>(null);
+
   if (jobs.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-[var(--color-line)] p-10 text-center text-sm text-[var(--color-muted)]">
@@ -541,7 +588,9 @@ function DayGrid({
               <div
                 key={job.id}
                 style={{
-                  top: ((start - firstHour * 60) / 60) * PIXELS_PER_HOUR,
+                  top:
+                    ((start - firstHour * 60) / 60) * PIXELS_PER_HOUR +
+                    (drag?.id === job.id ? drag.dy : 0),
                   height: Math.max(24, ((end - start) / 60) * PIXELS_PER_HOUR - 3),
                   left: `${(column / columns.length) * 100}%`,
                   width: `calc(${100 / columns.length}% - 6px)`,
@@ -552,6 +601,58 @@ function DayGrid({
                     : 'border-[var(--color-ink)] bg-[var(--color-surface)]'
                 }`}
               >
+                {canWrite && (
+                  <button
+                    type="button"
+                    aria-label={`Move ${job.title}: drag, or use the up and down arrow keys`}
+                    title="Drag to move"
+                    disabled={busy !== null}
+                    onPointerDown={(event) => {
+                      // Keeps the drag going when the pointer outruns the handle; not
+                      // essential, so a browser refusing it must not stop the drag.
+                      try {
+                        event.currentTarget.setPointerCapture(event.pointerId);
+                      } catch {
+                        // ignore
+                      }
+                      dragFrom.current = event.clientY;
+                      dragging.current = { id: job.id, dy: 0 };
+                      setDrag(dragging.current);
+                    }}
+                    onPointerMove={(event) => {
+                      if (dragging.current?.id === job.id) {
+                        dragging.current = { id: job.id, dy: event.clientY - dragFrom.current };
+                        setDrag(dragging.current);
+                      }
+                    }}
+                    onPointerUp={(event) => {
+                      const current = dragging.current;
+                      if (current?.id !== job.id) return;
+                      const minutes = snapMinutes(event.clientY - dragFrom.current);
+                      dragging.current = null;
+                      setDrag(null);
+                      if (minutes !== 0) onMove(job, minutes);
+                    }}
+                    onPointerCancel={() => {
+                      dragging.current = null;
+                      setDrag(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'ArrowUp' || event.key === 'ArrowDown') {
+                        event.preventDefault();
+                        onMove(job, event.key === 'ArrowUp' ? -SNAP_MINUTES : SNAP_MINUTES);
+                      }
+                    }}
+                    className="float-right cursor-grab touch-none select-none px-1 text-[var(--color-muted)] active:cursor-grabbing"
+                  >
+                    ⠿
+                  </button>
+                )}
+                {drag?.id === job.id && snapMinutes(drag.dy) !== 0 && (
+                  <p className="font-mono text-[11px] font-semibold">
+                    → {clock(start + snapMinutes(drag.dy))}
+                  </p>
+                )}
                 <Link
                   href={`/jobs/${job.id}`}
                   className="block truncate font-semibold underline-offset-4 hover:underline"
