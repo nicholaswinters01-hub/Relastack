@@ -12,14 +12,6 @@ services:
     # Same region as the web tier (Vercel iad1) and the database (Neon
     # us-east-1), so a page render is not three cross-country round trips.
     region: virginia
-    # Only redeploy when something the API is built from changes.
-    buildFilter:
-      paths:
-        - apps/api/**
-        - packages/**
-        - package.json
-        - pnpm-lock.yaml
-        - render.yaml
     # --prod=false: NODE_ENV=production is set for the build too, and pnpm
     # would otherwise skip the dev dependencies the build needs (Prisma,
     # TypeScript, the Nest CLI).
