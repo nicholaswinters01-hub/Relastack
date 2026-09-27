@@ -2,7 +2,9 @@
 
 Status: **approved 2026-09-27.** Answers: no groups are made for a business (it names
 its own; the form only suggests an example), a colour per group, and
-`/employees` with `/team` redirecting. Being built.
+`/employees` with `/team` redirecting. **Built 2026-09-28, awaiting review.**
+Not built yet: group names in quick search results, and the members list
+`?groupId=` filter (the page filters on screen instead).
 
 The idea (product owner, 2026-09-27): call the people page "Employees", and
 let a business group its people, so it can look at just the field crew or just

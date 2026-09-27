@@ -92,6 +92,13 @@ bare `fetch` leaves the user's other windows stale. **Quick search**
 service behind its list page, with that page's permission, visibility filter
 and module switch, so it can never show more than the lists.
 
+**Employee groups** (docs/design/employees-and-groups.md) are labels a
+business gives its people ("Field crew", "Office"); each business names its
+own, and none are created for it. They **grant nothing**: no permission,
+visibility or scope code may read them, and an e2e test proves joining one
+leaves permissions unchanged. Managed with organization-wide `member.manage`.
+The people page is `/employees` (`/team` redirects).
+
 The **help desk** (Phase 19c, design in docs/design/help-desk.md) lets anyone
 in a business ask for help from `/help`, including a read-only business (rule
 13). RLS keeps each business to its own requests; within one, the service shows
