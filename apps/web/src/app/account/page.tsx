@@ -2,8 +2,10 @@ import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
 import { getCurrentOrganization, getCurrentUser, getNotificationPreferences } from '@/lib/api';
-import { roleLabel } from '@/lib/permissions';
+import { can, roleLabel } from '@/lib/permissions';
+import { PERMISSIONS } from '@platform/shared';
 import { NotificationPreferences } from '@/components/notification-preferences';
+import { OrganizationNameForm } from '@/components/organization-name-form';
 import { SignOutButtons } from '@/components/sign-out-buttons';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +49,15 @@ export default async function AccountPage() {
             </h2>
 
             <dl className="mt-4">
-              <Row label="Name" value={organization.organization.name} />
+              <Row
+                label="Name"
+                value={
+                  <OrganizationNameForm
+                    name={organization.organization.name}
+                    canEdit={can(organization.permissions, PERMISSIONS.ORGANIZATION_WRITE)}
+                  />
+                }
+              />
               <Row label="Slug" value={organization.organization.slug} />
               <Row label="Status" value={organization.organization.status} />
               <Row
@@ -111,7 +121,7 @@ export default async function AccountPage() {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-baseline justify-between gap-6 border-b border-[var(--color-line)] py-3 last:border-0">
       <dt className="text-sm text-[var(--color-muted)]">{label}</dt>

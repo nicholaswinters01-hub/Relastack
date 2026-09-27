@@ -46,6 +46,7 @@ const ACTION_LABEL: Record<string, string> = {
   'member.signed-out': 'Signed someone out everywhere',
   'invitation.reissued': 'Sent a new invitation link',
   'note.added': 'Added a note',
+  'business.renamed': 'Renamed the business',
   'payment.recorded': 'Recorded a payment',
   'payment.voided': 'Voided a payment',
   'credit.granted': 'Gave credit',
