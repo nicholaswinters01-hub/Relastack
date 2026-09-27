@@ -8,6 +8,8 @@ import { listen } from '@/lib/live-sync';
 const COLLEAGUE_REFRESH_MS = 60_000;
 /** Several changes in quick succession become one refresh. */
 const DEBOUNCE_MS = 300;
+/** Coming back to a window refreshes it at most this often. */
+const RETURN_REFRESH_MS = 15_000;
 
 /**
  * Refreshes this window's data when it may be out of date.
@@ -25,9 +27,20 @@ export function LiveSync() {
   const pending = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    let last = Date.now();
+    let missedChange = false;
     const refresh = () => {
       if (pending.current) clearTimeout(pending.current);
-      pending.current = setTimeout(() => router.refresh(), DEBOUNCE_MS);
+      pending.current = setTimeout(() => {
+        last = Date.now();
+        router.refresh();
+      }, DEBOUNCE_MS);
+    };
+    // Switching between windows on two monitors happens constantly, and each
+    // refresh costs several API calls. Coming back refreshes at most this
+    // often; a real change announced by another window always refreshes.
+    const refreshIfQuiet = () => {
+      if (Date.now() - last >= RETURN_REFRESH_MS) refresh();
     };
 
     const stop = listen((message) => {
@@ -35,14 +48,21 @@ export function LiveSync() {
         window.location.href = '/login';
         return;
       }
-      // A hidden window catches up when it is shown again, below.
       if (document.visibilityState === 'visible') refresh();
+      // A hidden window catches up the moment it is shown again.
+      else missedChange = true;
     });
 
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refresh();
+      if (document.visibilityState !== 'visible') return;
+      if (missedChange) {
+        missedChange = false;
+        refresh();
+      } else {
+        refreshIfQuiet();
+      }
     };
-    const onFocus = () => refresh();
+    const onFocus = () => refreshIfQuiet();
 
     const timer = setInterval(() => {
       if (document.visibilityState === 'visible') refresh();

@@ -72,7 +72,7 @@ describe('loadServerEnv — session and rate-limit settings', () => {
     expect(env.COOKIE_DOMAIN).toBeUndefined();
     expect(env.RATE_LIMIT_LOGIN_PER_MINUTE).toBe(5);
     expect(env.RATE_LIMIT_REGISTER_PER_HOUR).toBe(10);
-    expect(env.RATE_LIMIT_GLOBAL_PER_MINUTE).toBe(120);
+    expect(env.RATE_LIMIT_GLOBAL_PER_MINUTE).toBe(300);
   });
 
   it('parses COOKIE_SECURE from a string', () => {

@@ -94,8 +94,15 @@ export const serverEnvSchema = z
      */
     RATE_LIMIT_ENABLED: booleanFromString.default(true),
 
-    /** Requests per minute allowed per IP against general endpoints. */
-    RATE_LIMIT_GLOBAL_PER_MINUTE: z.coerce.number().int().positive().default(120),
+    /**
+     * Requests per minute allowed per person (per IP) against general endpoints.
+     *
+     * Every page is built from several API calls the web tier makes on the
+     * person's behalf (the navigation alone makes five), and open windows
+     * refresh one another. 120 was reachable by one busy person on two
+     * monitors. Sign-in and sign-up keep their own, much smaller, limits.
+     */
+    RATE_LIMIT_GLOBAL_PER_MINUTE: z.coerce.number().int().positive().default(300),
 
     /** Login attempts allowed per minute per IP. Deliberately small. */
     RATE_LIMIT_LOGIN_PER_MINUTE: z.coerce.number().int().positive().default(5),

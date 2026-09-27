@@ -77,7 +77,7 @@ export async function serverFetch(path: string, init: RequestInit = {}): Promise
  * that merely wants to know "is someone logged in" should not have to
  * distinguish those cases.
  */
-export async function getCurrentUser(): Promise<PublicUser | null> {
+const loadCurrentUser = async (): Promise<PublicUser | null> => {
   try {
     const response = await serverFetch('/api/v1/auth/me');
     if (!response.ok) return null;
@@ -89,18 +89,34 @@ export async function getCurrentUser(): Promise<PublicUser | null> {
   } catch {
     return null;
   }
-}
+};
+
+/** Deduplicated for the render pass: the navigation and the page both ask. */
+export const getCurrentUser = cache(loadCurrentUser);
 
 /**
  * The caller's organization and their role in it, or null.
  *
- * Null covers every failure the same way — signed out, no membership,
- * suspended organization, API unreachable. The page decides what to show; it
- * should not have to distinguish causes it cannot act on.
+ * Null means "not in a business": signed out, no membership, or a suspended
+ * organization. Pages send that to the sign-in page.
+ *
+ * A busy or unreachable API is NOT that. Answering null for a 429 or a 500
+ * signed people out mid-task; it throws instead, and the error page offers a
+ * retry with the session untouched.
  */
 const loadCurrentOrganization = async (): Promise<OrganizationResponse | null> => {
+  let response: Response;
   try {
-    const response = await serverFetch('/api/v1/organizations/current');
+    response = await serverFetch('/api/v1/organizations/current');
+  } catch {
+    throw new Error('RelaStack could not be reached');
+  }
+
+  if (response.status === 429 || response.status >= 500) {
+    throw new Error('RelaStack is busy');
+  }
+
+  try {
     if (!response.ok) return null;
 
     const parsed = organizationResponseSchema.safeParse(await response.json());
