@@ -307,6 +307,32 @@ describe('Locations (e2e)', () => {
       expect(response.statusCode).toBe(403);
     });
 
+    it('lets an owner fix a name, clear a field, and set a location inactive and back', async () => {
+      const id = downtownId;
+      const original = json(
+        await request('GET', `/api/v1/locations/${id}`, alphaOwner.token),
+      ).location;
+      const edit = (changes: Record<string, unknown>) =>
+        request('PATCH', `/api/v1/locations/${id}`, alphaOwner.token, {
+          name: original.name,
+          timezone: original.timezone,
+          ...changes,
+        });
+
+      try {
+        const renamed = await edit({ name: 'Tama', city: '' });
+        expect(renamed.statusCode, renamed.body).toBe(200);
+        expect(json(renamed).location.name).toBe('Tama');
+        expect(json(renamed).location.city).toBeNull();
+
+        expect(json(await edit({ name: 'Tampa' })).location.name).toBe('Tampa');
+        expect(json(await edit({ status: 'INACTIVE' })).location.status).toBe('INACTIVE');
+        expect(json(await edit({ status: 'ACTIVE' })).location.status).toBe('ACTIVE');
+      } finally {
+        await edit({ city: original.city ?? '', status: original.status });
+      }
+    });
+
     it('forbids a member from editing a location they can see', async () => {
       const response = await request(
         'PATCH',

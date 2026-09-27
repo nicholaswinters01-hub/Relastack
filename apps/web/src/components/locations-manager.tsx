@@ -12,6 +12,7 @@ import {
 } from '@platform/shared';
 import { canAt } from '@/lib/permissions';
 import { apiWrite } from '@/lib/live-sync';
+import { LocationEditor, TimezoneSelect } from '@/components/location-edit';
 
 interface Props {
   locations: Location[];
@@ -33,6 +34,7 @@ export function LocationsManager({ locations, members, permissions, canCreate }:
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [timezone, setTimezone] = useState('America/New_York');
+  const [editing, setEditing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [openLocation, setOpenLocation] = useState<string | null>(null);
@@ -116,12 +118,7 @@ export function LocationsManager({ locations, members, permissions, canCreate }:
               placeholder="City"
               className="min-w-36 flex-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 text-sm outline-none"
             />
-            <input
-              value={timezone}
-              onChange={(e) => setTimezone(e.target.value)}
-              placeholder="Timezone"
-              className="min-w-48 flex-1 rounded-lg border border-[var(--color-line)] bg-[var(--color-canvas)] px-3 py-2 font-mono text-sm outline-none"
-            />
+            <TimezoneSelect value={timezone} onChange={setTimezone} />
             <button
               type="submit"
               disabled={busy}
@@ -156,6 +153,16 @@ export function LocationsManager({ locations, members, permissions, canCreate }:
                   </p>
                 </div>
                 <div className="flex items-center gap-3">
+                  {canAt(permissions, PERMISSIONS.LOCATION_WRITE, location.id) &&
+                    editing !== location.id && (
+                      <button
+                        type="button"
+                        onClick={() => setEditing(location.id)}
+                        className="text-xs underline underline-offset-4"
+                      >
+                        Edit
+                      </button>
+                    )}
                   <span className="font-mono text-xs text-[var(--color-muted)]">
                     {location.memberCount} assigned
                   </span>
@@ -166,10 +173,14 @@ export function LocationsManager({ locations, members, permissions, canCreate }:
                         : 'text-[var(--color-muted)]'
                     }`}
                   >
-                    {location.status}
+                    {location.status === 'ACTIVE' ? 'active' : 'inactive'}
                   </span>
                 </div>
               </div>
+
+              {editing === location.id && (
+                <LocationEditor location={location} onDone={() => setEditing(null)} />
+              )}
 
               {canAt(permissions, PERMISSIONS.LOCATION_ASSIGN, location.id) &&
                 members.length > 0 && (
