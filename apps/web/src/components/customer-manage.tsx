@@ -224,7 +224,8 @@ export function CustomerRemoval({
         (archived ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <span className="text-[var(--color-muted)]">
-              Hidden from lists and search results; nothing was deleted.
+              Hidden from the customer list; search still finds them, marked Archived. Nothing was
+              deleted.
             </span>
             <button
               type="button"
@@ -238,8 +239,8 @@ export function CustomerRemoval({
         ) : confirmingArchive ? (
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm">
             <span>
-              Remove {customer.displayName}? They are hidden from lists; notes and history are kept,
-              and you can restore them.
+              Remove {customer.displayName}? They leave the customer list; notes and history are
+              kept, and you can restore them.
             </span>
             <button
               type="button"

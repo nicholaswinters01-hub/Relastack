@@ -286,6 +286,13 @@ Recorded because each one cost real time and none is obvious.
   still paying, which an older rule already refused, so deleting the new rule
   broke nothing. The rule is for a payer whose paid time has lapsed. Break
   each guard once and watch its test fail.
+- **Deleting a customer for good takes their jobs, series and tasks with it.**
+  Every customer reference cascades. The warning said "jobs and tasks stay"
+  until a check of the schema caught it before release; the confirmation now
+  names everything that goes. Archive is the normal "remove". Account
+  numbers are handed out by a trigger on `customers`
+  (`assign_customer_account_number`), so every insert path gets one; a chosen
+  number moves the counter past it, so automatic ones never collide.
 - **A refused request is not a signed-out user.** The organization loader
   answered null for any failure, so a 429 or a 500 sent people to the sign-in
   page mid-task. It now throws for 429, 5xx and unreachable, and `app/error.tsx`
