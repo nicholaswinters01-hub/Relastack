@@ -440,9 +440,10 @@ export class CustomersService {
 
       const merged = {
         type: input.type ?? existing.type,
-        companyName: input.companyName ?? existing.companyName,
-        firstName: input.firstName ?? existing.firstName,
-        lastName: input.lastName ?? existing.lastName,
+        // undefined keeps the old value; null clears it.
+        companyName: input.companyName !== undefined ? input.companyName : existing.companyName,
+        firstName: input.firstName !== undefined ? input.firstName : existing.firstName,
+        lastName: input.lastName !== undefined ? input.lastName : existing.lastName,
       };
 
       const displayName = CustomersService.displayNameFor(merged);
@@ -540,9 +541,37 @@ export class CustomersService {
       'delete customers',
     );
 
-    const deleted = await this.prisma.withTenant(context, (tx) =>
-      tx.customer.deleteMany({ where: this.scopedTo(permissions, { id }) }),
-    );
+    const deleted = await this.prisma.withTenant(context, async (tx) => {
+      const customer = await tx.customer.findFirst({
+        where: this.scopedTo(permissions, { id }),
+        select: { id: true },
+      });
+      if (!customer) throw new NotFoundException(NOT_FOUND);
+
+      // Every job, series and task cascades from the customer, so deleting one
+      // with work attached would wipe that history from the schedule and the
+      // reports. Refused, naming what is there; archiving keeps it all.
+      const [jobs, series, tasks] = await Promise.all([
+        tx.job.count({ where: { customerId: id } }),
+        tx.jobSeries.count({ where: { customerId: id } }),
+        tx.task.count({ where: { customerId: id } }),
+      ]);
+      const attached = [
+        jobs > 0 ? `${jobs} job${jobs === 1 ? '' : 's'}` : null,
+        series > 0 ? `${series} recurring series` : null,
+        tasks > 0 ? `${tasks} task${tasks === 1 ? '' : 's'}` : null,
+      ].filter((part): part is string => part !== null);
+
+      if (attached.length > 0) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'CUSTOMER_HAS_WORK',
+          message: `This customer has ${attached.join(', ')}. Remove (archive) them instead, which keeps that history.`,
+        });
+      }
+
+      return tx.customer.deleteMany({ where: { id } });
+    });
 
     if (deleted.count === 0) throw new NotFoundException(NOT_FOUND);
 

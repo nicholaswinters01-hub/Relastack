@@ -176,9 +176,8 @@ export function CustomerEditForm({
  * Removing a customer.
  *
  * "Remove" archives: hidden everywhere, history kept, undoable. Deleting for
- * good is a separate, owner-only step that asks for the name to be typed: it
- * takes the notes, contacts, jobs, recurring visits and tasks with it, and
- * cannot be undone.
+ * good is a separate, owner-only step that asks for the name to be typed. The
+ * API refuses it for a customer with jobs or tasks, whose history would go too.
  */
 export function CustomerRemoval({
   customer,
@@ -273,9 +272,9 @@ export function CustomerRemoval({
           {confirmingDelete ? (
             <div className="flex flex-col gap-2 text-sm">
               <span>
-                This deletes {customer.displayName} for good, and everything attached to them:
-                notes, contacts, every job past and upcoming, recurring visits, and tasks. It cannot
-                be undone. To keep the history, use Remove instead.
+                This deletes {customer.displayName} for good, with their notes and contacts. It
+                cannot be undone. A customer with jobs or tasks cannot be deleted: remove (archive)
+                them instead, which keeps that history.
               </span>
               <label className="flex flex-col gap-1">
                 <span className="text-xs text-[var(--color-muted)]">

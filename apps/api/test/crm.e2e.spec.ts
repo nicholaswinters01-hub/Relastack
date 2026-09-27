@@ -918,6 +918,68 @@ describe('CRM (e2e)', () => {
 
   // =========================================================================
 
+  describe('deleting for good', () => {
+    it('refuses a customer with work attached, and says to archive instead', async () => {
+      const created = await request('POST', '/api/v1/customers', admin.token, {
+        firstName: 'Busy Bea',
+        locationId: downtownId,
+      });
+      const id = json(created).customer.id;
+      const task = await request('POST', '/api/v1/tasks', admin.token, {
+        title: 'Call Bea back',
+        customerId: id,
+        locationId: downtownId,
+      });
+      expect(task.statusCode, task.body).toBe(201);
+
+      const refused = await request('DELETE', `/api/v1/customers/${id}/permanent`, admin.token);
+      expect(refused.statusCode).toBe(409);
+      expect(json(refused).code).toBe('CUSTOMER_HAS_WORK');
+      expect(json(refused).message).toContain('1 task');
+
+      // Nothing was touched.
+      expect((await request('GET', `/api/v1/customers/${id}`, admin.token)).statusCode).toBe(200);
+      expect(
+        (await request('GET', `/api/v1/tasks/${json(task).task.id}`, admin.token)).statusCode,
+      ).toBe(200);
+
+      // Once the work is gone, an owner can delete.
+      await request('DELETE', `/api/v1/tasks/${json(task).task.id}`, admin.token);
+      const allowed = await request('DELETE', `/api/v1/customers/${id}/permanent`, admin.token);
+      expect(allowed.statusCode, allowed.body).toBe(204);
+    });
+  });
+
+  // =========================================================================
+
+  describe('editing', () => {
+    it('clears a field that is emptied, and keeps one that is not mentioned', async () => {
+      const created = await request('POST', '/api/v1/customers', admin.token, {
+        firstName: 'Clearable',
+        lastName: 'Carl',
+        email: 'carl@example.test',
+        phone: '555-0100',
+        locationId: downtownId,
+      });
+      const id = json(created).customer.id;
+
+      const edited = await request('PATCH', `/api/v1/customers/${id}`, admin.token, {
+        email: '',
+        lastName: '',
+      });
+      expect(edited.statusCode, edited.body).toBe(200);
+
+      const customer = json(edited).customer;
+      expect(customer.email).toBeNull();
+      expect(customer.lastName).toBeNull();
+      expect(customer.displayName).toBe('Clearable');
+      // Not mentioned, so untouched.
+      expect(customer.phone).toBe('555-0100');
+    });
+  });
+
+  // =========================================================================
+
   describe('account numbers', () => {
     const create = async (firstName: string) => {
       const response = await request('POST', '/api/v1/customers', admin.token, {

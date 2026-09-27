@@ -289,7 +289,9 @@ Recorded because each one cost real time and none is obvious.
 - **Deleting a customer for good takes their jobs, series and tasks with it.**
   Every customer reference cascades. The warning said "jobs and tasks stay"
   until a check of the schema caught it before release; the confirmation now
-  names everything that goes. Archive is the normal "remove". Account
+  names everything that goes. The API now refuses (409, `CUSTOMER_HAS_WORK`) a
+  customer with any job, series or task (product owner, option C); archive is
+  the normal "remove". Account
   numbers are handed out by a trigger on `customers`
   (`assign_customer_account_number`), so every insert path gets one; a chosen
   number moves the counter past it, so automatic ones never collide.
