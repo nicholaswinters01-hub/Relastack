@@ -50,7 +50,8 @@ export function CustomersManager({
   const params = useSearchParams();
 
   const [search, setSearch] = useState(activeSearch);
-  const [creating, setCreating] = useState(false);
+  // ?new=1 opens the form straight away: quick search's "New customer" lands here.
+  const [creating, setCreating] = useState(params.get('new') === '1');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

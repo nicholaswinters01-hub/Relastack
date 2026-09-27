@@ -27,7 +27,7 @@ export default async function StaffHelpPage({
   return (
     <>
       <AppNav current="staff" />
-      <main className="mx-auto max-w-4xl px-6 py-12">
+      <main className="mx-auto max-w-screen-2xl px-6 py-12">
         <Link
           href="/staff"
           className="text-sm text-[var(--color-muted)] underline underline-offset-4"

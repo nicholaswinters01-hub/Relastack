@@ -65,7 +65,7 @@ export default async function StaffPage({
   return (
     <>
       <AppNav current="staff" />
-      <main className="mx-auto max-w-5xl px-6 py-12">
+      <main className="mx-auto max-w-screen-2xl px-6 py-12">
         <div className="flex flex-wrap items-baseline justify-between gap-3">
           <h1 className="text-3xl font-semibold tracking-tight">Staff</h1>
           <span className="flex gap-4 text-sm">

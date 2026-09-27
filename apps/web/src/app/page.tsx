@@ -36,7 +36,7 @@ export default async function HomePage() {
     return (
       <>
         <AppNav current="dashboard" />
-        <main className="mx-auto max-w-4xl px-6 py-16">
+        <main className="mx-auto max-w-screen-2xl px-6 py-16">
           <h1 className="text-3xl font-semibold tracking-tight">{greeting}</h1>
           <p className="mt-3 text-[var(--color-muted)]">
             {reporting?.entitled
@@ -61,7 +61,7 @@ export default async function HomePage() {
   return (
     <>
       <AppNav current="dashboard" />
-      <main className="mx-auto max-w-4xl px-6 py-16">
+      <main className="mx-auto max-w-screen-2xl px-6 py-16">
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">{greeting}</h1>
         <p className="mt-3 text-[var(--color-muted)]">
           Where {organization.organization.name} stands over the last thirty days.

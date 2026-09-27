@@ -67,7 +67,8 @@ export function TasksManager({
   const router = useRouter();
   const params = useSearchParams();
 
-  const [creating, setCreating] = useState(false);
+  // ?new=1 opens the form straight away: quick search's "New task" lands here.
+  const [creating, setCreating] = useState(params.get('new') === '1');
   const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

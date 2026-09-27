@@ -97,7 +97,7 @@ export default async function SchedulePage({ searchParams }: Props) {
   return (
     <>
       <AppNav current="schedule" />
-      <main className="mx-auto max-w-4xl px-6 py-16">
+      <main className="mx-auto max-w-screen-2xl px-6 py-16">
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Schedule</h1>
         <p className="mt-3 text-[var(--color-muted)]">
           Jobs booked in, with who is going. Times show in the branch&apos;s own zone.

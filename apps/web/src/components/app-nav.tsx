@@ -1,26 +1,24 @@
 import Link from 'next/link';
 import { MODULES, PERMISSIONS, type ModuleState, type PermissionKey } from '@platform/shared';
 import { NotificationBell } from '@/components/notification-bell';
-import { getCurrentOrganization, getModules, getNotifications } from '@/lib/api';
+import { getCurrentOrganization, getCurrentUser, getModules, getNotifications } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
 import { getStaffIdentity } from '@/lib/staff-api';
+import { AccountMenu, type MenuLink } from './account-menu';
+import { CommandPalette, type PaletteAction } from './command-palette';
 import { LiveSync } from './live-sync';
 
 /**
  * The application's navigation.
  *
- * Replaces the ad-hoc footer links each page used to carry, which drifted out
- * of step immediately: the customer screens shipped in Phase 7 and nothing
- * linked to them, so the only way to reach them was typing the URL.
+ * Work on the left: the modules a business works in. On the right, tools and
+ * the person: search, notifications, help, and a menu under their name for
+ * everything about the account and the business.
  *
- * What appears here is a function of two separate questions, and they are
- * genuinely different:
+ * What appears is a function of two separate questions:
  *
  *   entitlement — is this module switched on for the organization?
  *   permission  — may THIS person see it?
- *
- * A Location Manager at a company with the CRM enabled sees Customers; an
- * employee without customer.read does not, even though the module is on.
  *
  * None of this is access control. Hiding a link is a courtesy so people are
  * not offered doors that will not open — the API refuses the request whatever
@@ -30,13 +28,13 @@ import { LiveSync } from './live-sync';
 interface Entry {
   href: string;
   label: string;
-  /** Left out for links everyone in a business may use, such as Help. */
   permission?: PermissionKey;
   /** Only shown when this module is enabled. Core links leave it undefined. */
   module?: string;
 }
 
-const ENTRIES: Entry[] = [
+/** The work. Industry packs join this list as they arrive. */
+const WORK: Entry[] = [
   {
     href: '/',
     label: 'Dashboard',
@@ -57,11 +55,15 @@ const ENTRIES: Entry[] = [
   },
   // Core, so no module gate — tasks are on every plan.
   { href: '/tasks', label: 'Tasks', permission: PERMISSIONS.TASK_READ },
+];
+
+/** The account and the business, under the person's name. */
+const ACCOUNT: Entry[] = [
+  { href: '/account', label: 'Your account' },
   { href: '/locations', label: 'Locations', permission: PERMISSIONS.LOCATION_READ },
   { href: '/team', label: 'Team', permission: PERMISSIONS.MEMBER_READ },
   { href: '/modules', label: 'Modules', permission: PERMISSIONS.ORGANIZATION_READ },
   { href: '/billing', label: 'Billing', permission: PERMISSIONS.ORGANIZATION_READ },
-  { href: '/help', label: 'Help' },
 ];
 
 export async function AppNav({ current }: { current: string }) {
@@ -69,82 +71,84 @@ export async function AppNav({ current }: { current: string }) {
 
   if (!organization) return null;
 
-  const [modules, inbox, staff] = await Promise.all([
+  const [modules, inbox, staff, user] = await Promise.all([
     getModules(),
     getNotifications(),
     getStaffIdentity(),
+    getCurrentUser(),
   ]);
   const enabled = new Set(
     modules.filter((module: ModuleState) => module.enabled).map((module) => module.key),
   );
 
-  const visible = ENTRIES.filter(
-    (entry) =>
-      (entry.module === undefined || enabled.has(entry.module)) &&
-      (entry.permission === undefined || canAnywhere(organization.permissions, entry.permission)),
+  const allowed = (entry: Entry) =>
+    (entry.module === undefined || enabled.has(entry.module)) &&
+    (entry.permission === undefined || canAnywhere(organization.permissions, entry.permission));
+
+  const work = WORK.filter(allowed);
+  const account: MenuLink[] = [
+    ...ACCOUNT.filter(allowed),
+    // Shown only to staff, but not what protects the console: the API
+    // answers 404 to everyone else whatever this renders.
+    ...(staff ? [{ href: '/staff', label: 'Staff console' }] : []),
+  ];
+
+  // What quick search offers before anything is typed. The same doors as the
+  // navigation, plus the forms people open most.
+  const actions: PaletteAction[] = [
+    ...work.map((entry) => ({ label: entry.label, href: entry.href })),
+    ...(enabled.has(MODULES.CRM) &&
+    canAnywhere(organization.permissions, PERMISSIONS.CUSTOMER_WRITE)
+      ? [{ label: 'New customer', href: '/customers?new=1' }]
+      : []),
+    ...(canAnywhere(organization.permissions, PERMISSIONS.TASK_WRITE)
+      ? [{ label: 'New task', href: '/tasks?new=1' }]
+      : []),
+    { label: 'Ask for help', href: '/help' },
+    ...account.map((entry) => ({ label: entry.label, href: entry.href })),
+  ];
+
+  const name =
+    [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'Account';
+
+  const tab = (href: string, label: string, active: boolean) => (
+    <Link
+      key={href}
+      href={href}
+      aria-current={active ? 'page' : undefined}
+      className={`rounded-lg px-3 py-1.5 text-sm ${
+        active
+          ? 'bg-[var(--color-canvas)] font-medium'
+          : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
+      }`}
+    >
+      {label}
+    </Link>
   );
 
   return (
     <nav className="border-b border-[var(--color-line)] bg-[var(--color-surface)]">
       <LiveSync />
-      <div className="mx-auto flex max-w-4xl flex-wrap items-center gap-x-1 gap-y-2 px-6 py-3">
-        <Link
-          href="/account"
-          className="mr-3 font-semibold tracking-tight"
-          aria-current={current === 'account' ? 'page' : undefined}
-        >
+      <div className="mx-auto flex max-w-screen-2xl items-center gap-x-1 gap-y-2 px-6 py-3">
+        <Link href="/" className="mr-3 truncate font-semibold tracking-tight">
           {organization.organization.name}
         </Link>
 
-        {visible.map((entry) => {
-          const active = current === entry.label.toLowerCase();
-
-          return (
-            <Link
-              key={entry.href}
-              href={entry.href}
-              aria-current={active ? 'page' : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm ${
-                active
-                  ? 'bg-[var(--color-canvas)] font-medium'
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              {entry.label}
-            </Link>
-          );
-        })}
-
-        <div className="ml-auto flex items-center gap-1">
-          {/* Shown only to staff, but not what protects the console: the API
-              answers 404 to everyone else whatever this renders. */}
-          {staff && (
-            <Link
-              href="/staff"
-              aria-current={current === 'staff' ? 'page' : undefined}
-              className={`rounded-lg px-3 py-1.5 text-sm ${
-                current === 'staff'
-                  ? 'bg-[var(--color-canvas)] font-medium'
-                  : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-              }`}
-            >
-              Staff
-            </Link>
-          )}
-          <NotificationBell notifications={inbox.notifications} unread={inbox.unread} />
+        <div className="hidden items-center gap-1 md:flex">
+          {work.map((entry) => tab(entry.href, entry.label, current === entry.label.toLowerCase()))}
         </div>
 
-        <Link
-          href="/account"
-          aria-current={current === 'account' ? 'page' : undefined}
-          className={`rounded-lg px-3 py-1.5 text-sm ${
-            current === 'account'
-              ? 'bg-[var(--color-canvas)] font-medium'
-              : 'text-[var(--color-muted)] hover:text-[var(--color-ink)]'
-          }`}
-        >
-          Account
-        </Link>
+        <div className="ml-auto flex items-center gap-1">
+          <CommandPalette actions={actions} />
+          <NotificationBell notifications={inbox.notifications} unread={inbox.unread} />
+          {tab('/help', 'Help', current === 'help')}
+          <AccountMenu
+            name={name}
+            email={user?.email ?? ''}
+            items={account}
+            workItems={work.map((entry) => ({ href: entry.href, label: entry.label }))}
+          />
+        </div>
       </div>
     </nav>
   );

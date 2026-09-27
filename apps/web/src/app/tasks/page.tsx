@@ -48,7 +48,7 @@ export default async function TasksPage({ searchParams }: Props) {
   return (
     <>
       <AppNav current="tasks" />
-      <main className="mx-auto max-w-4xl px-6 py-16">
+      <main className="mx-auto max-w-screen-2xl px-6 py-16">
         <h1 className="mt-2 text-3xl font-semibold tracking-tight">Tasks</h1>
         <p className="mt-3 text-[var(--color-muted)]">
           Work that needs doing, on its own or against a customer. Anything assigned to you shows up
