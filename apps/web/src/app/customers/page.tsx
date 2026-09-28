@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS, type CustomerStage } from '@platform/shared';
 import { CustomersManager } from '@/components/customers-manager';
 import { getCurrentOrganization, getCustomers, getLocations, getModules, getTags } from '@/lib/api';
-import { canAnywhere } from '@/lib/permissions';
+import { can, canAnywhere } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +61,15 @@ export default async function CustomersPage({ searchParams }: Props) {
     <>
       <AppNav current="customers" />
       <main className="mx-auto max-w-screen-2xl px-6 py-16">
-        <h1 className="mt-2 text-3xl font-semibold tracking-tight">Customers</h1>
+        <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight">Customers</h1>
+          {/* Owners and admins: bulk import is a whole-business decision. */}
+          {can(organization.permissions, PERMISSIONS.CUSTOMER_WRITE) && (
+            <Link href="/customers/import" className="text-sm underline underline-offset-4">
+              Import from a spreadsheet
+            </Link>
+          )}
+        </div>
         <p className="mt-3 text-[var(--color-muted)]">
           Leads and customers are the same record at different stages, so converting one keeps every
           note, contact and tag attached to it.
