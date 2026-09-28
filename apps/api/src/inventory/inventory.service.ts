@@ -33,11 +33,20 @@ const decimal = (value: number) => new Prisma.Decimal(value.toString());
 
 type PlaceRow = {
   id: string;
-  kind: 'BRANCH';
+  kind: 'BRANCH' | 'VEHICLE';
   locationId: string;
   employeesCanTake: boolean;
   location: { name: string; status: 'ACTIVE' | 'INACTIVE' };
+  fleetAsset: {
+    id: string;
+    name: string;
+    status: 'ACTIVE' | 'IN_SHOP' | 'RETIRED';
+    assignedMembershipId: string | null;
+  } | null;
 };
+
+/** A van is called by its own name; a branch by the branch's. */
+const placeName = (place: PlaceRow) => place.fleetAsset?.name ?? place.location.name;
 
 type ItemRow = {
   id: string;
@@ -56,6 +65,7 @@ const placeSelect = {
   locationId: true,
   employeesCanTake: true,
   location: { select: { name: true, status: true } },
+  fleetAsset: { select: { id: true, name: true, status: true, assignedMembershipId: true } },
 } as const;
 
 /**
@@ -69,7 +79,8 @@ const placeSelect = {
  * (receive, count, correct, the branch setting) needs inventory.write there.
  * Taking (use, move) needs the same, or the branch's own "employees can take
  * stock" setting plus being able to see that branch. The setting is read here
- * and nowhere else, so it can never reach beyond inventory.
+ * and nowhere else, so it can never reach beyond inventory. A van's usual
+ * driver may also take stock from their own van, wherever it is kept.
  */
 @Injectable()
 export class InventoryService {
@@ -82,10 +93,11 @@ export class InventoryService {
   async overview(
     context: TenantContext,
     permissions: PermissionSet,
+    membershipId: string,
     includeArchived: boolean,
   ): Promise<InventoryResponse> {
     return this.prisma.withTenant(context, async (tx) => {
-      const places = await this.visiblePlaces(tx, permissions);
+      const places = await this.visiblePlaces(tx, permissions, membershipId);
       const items = await tx.inventoryItem.findMany({
         where: includeArchived ? {} : { archivedAt: null },
         orderBy: { name: 'asc' },
@@ -98,7 +110,7 @@ export class InventoryService {
 
       return {
         items: items.map((item) => this.toItem(item, totals.get(item.id))),
-        places: places.map((place) => this.toPlace(place, permissions)),
+        places: places.map((place) => this.toPlace(place, permissions, membershipId)),
       };
     });
   }
@@ -106,16 +118,17 @@ export class InventoryService {
   async item(
     context: TenantContext,
     permissions: PermissionSet,
+    membershipId: string,
     itemId: string,
   ): Promise<ItemDetailResponse> {
     return this.prisma.withTenant(context, async (tx) => {
       const item = await tx.inventoryItem.findUnique({ where: { id: itemId } });
       if (!item) throw new NotFoundException(ITEM_NOT_FOUND);
 
-      const places = await this.visiblePlaces(tx, permissions);
+      const places = await this.visiblePlaces(tx, permissions, membershipId);
       const placeIds = places.map((place) => place.id);
       const totals = await this.totals(tx, placeIds, itemId);
-      const names = new Map(places.map((place) => [place.id, place.location.name]));
+      const names = new Map(places.map((place) => [place.id, placeName(place)]));
 
       const movements = await tx.stockMovement.findMany({
         where: { itemId, placeId: { in: placeIds } },
@@ -125,7 +138,7 @@ export class InventoryService {
 
       return {
         item: this.toItem(item, totals.get(item.id)),
-        places: places.map((place) => this.toPlace(place, permissions)),
+        places: places.map((place) => this.toPlace(place, permissions, membershipId)),
         movements: movements.map((row): StockMovement => ({
           id: row.id,
           itemId: row.itemId,
@@ -141,12 +154,6 @@ export class InventoryService {
         })),
       };
     });
-  }
-
-  /** How many items are low at places the reader can see. For the dashboard. */
-  async lowStockCount(context: TenantContext, permissions: PermissionSet): Promise<number> {
-    const { items } = await this.overview(context, permissions, false);
-    return items.filter((item) => item.low).length;
   }
 
   // -------------------------------------------------------------------------
@@ -227,11 +234,12 @@ export class InventoryService {
   async updatePlace(
     context: TenantContext,
     permissions: PermissionSet,
+    membershipId: string,
     placeId: string,
     input: UpdatePlaceRequest,
   ): Promise<StockPlace> {
     return this.prisma.withTenant(context, async (tx) => {
-      const place = await this.loadPlace(tx, permissions, placeId);
+      const place = await this.loadPlace(tx, permissions, membershipId, placeId);
 
       if (!permissions.hasAt(PERMISSIONS.INVENTORY_WRITE, place.locationId)) {
         throw new ForbiddenException('Only a manager of this branch can change that');
@@ -243,7 +251,7 @@ export class InventoryService {
         select: placeSelect,
       });
 
-      return this.toPlace(updated, permissions);
+      return this.toPlace(updated, permissions, membershipId);
     });
   }
 
@@ -274,16 +282,18 @@ export class InventoryService {
         );
       }
 
-      const place = await this.loadPlace(tx, permissions, input.placeId);
+      const place = await this.loadPlace(tx, permissions, membershipId, input.placeId);
       const toPlace =
-        input.action === 'move' ? await this.loadPlace(tx, permissions, input.toPlaceId) : null;
+        input.action === 'move'
+          ? await this.loadPlace(tx, permissions, membershipId, input.toPlaceId)
+          : null;
       if (toPlace && toPlace.id === place.id) {
         throw new BadRequestException('Choose a different place to move it to');
       }
 
       const taking = input.action === 'use' || input.action === 'move';
       for (const target of toPlace ? [place, toPlace] : [place]) {
-        this.assertAuthority(permissions, target, taking);
+        this.assertAuthority(permissions, membershipId, target, taking);
       }
 
       // Serialise changes to this item at these places, so a count and a use
@@ -326,7 +336,7 @@ export class InventoryService {
         throw new ConflictException({
           statusCode: 409,
           code: 'STOCK_BELOW_ZERO',
-          message: `${place.location.name} has ${onHand.toNumber()} ${item.unit} of ${item.name}. This would leave ${after.toNumber()}.`,
+          message: `${placeName(place)} has ${onHand.toNumber()} ${item.unit} of ${item.name}. This would leave ${after.toNumber()}.`,
           onHand: onHand.toNumber(),
           after: after.toNumber(),
         });
@@ -387,17 +397,28 @@ export class InventoryService {
   // Helpers
   // -------------------------------------------------------------------------
 
-  private visibilityFilter(permissions: PermissionSet): Prisma.StockPlaceWhereInput {
+  /** Places at branches the reader can see, and the van they usually drive. */
+  private visibilityFilter(
+    permissions: PermissionSet,
+    membershipId: string,
+  ): Prisma.StockPlaceWhereInput {
     const allowed = permissions.locationsFor(PERMISSIONS.INVENTORY_READ);
-    return allowed === null ? {} : { locationId: { in: [...allowed] } };
+    if (allowed === null) return {};
+    return {
+      OR: [
+        { locationId: { in: [...allowed] } },
+        { fleetAsset: { assignedMembershipId: membershipId } },
+      ],
+    };
   }
 
   private async visiblePlaces(
     tx: TransactionClient,
     permissions: PermissionSet,
+    membershipId: string,
   ): Promise<PlaceRow[]> {
     return tx.stockPlace.findMany({
-      where: this.visibilityFilter(permissions),
+      where: this.visibilityFilter(permissions, membershipId),
       select: placeSelect,
       orderBy: [{ location: { name: 'asc' } }],
     });
@@ -407,10 +428,11 @@ export class InventoryService {
   private async loadPlace(
     tx: TransactionClient,
     permissions: PermissionSet,
+    membershipId: string,
     placeId: string,
   ): Promise<PlaceRow> {
     const place = await tx.stockPlace.findFirst({
-      where: { AND: [{ id: placeId }, this.visibilityFilter(permissions)] },
+      where: { AND: [{ id: placeId }, this.visibilityFilter(permissions, membershipId)] },
       select: placeSelect,
     });
     if (!place) throw new NotFoundException(PLACE_NOT_FOUND);
@@ -421,22 +443,30 @@ export class InventoryService {
     return permissions.hasAt(PERMISSIONS.INVENTORY_WRITE, place.locationId);
   }
 
-  private canTake(
-    permissions: PermissionSet,
-    place: { locationId: string; employeesCanTake: boolean },
-  ): boolean {
+  private canTake(permissions: PermissionSet, membershipId: string, place: PlaceRow): boolean {
     return (
       this.canManage(permissions, place) ||
+      // Authority from the row: the van's usual driver, like a task's assignee.
+      (place.fleetAsset !== null && place.fleetAsset.assignedMembershipId === membershipId) ||
       (place.employeesCanTake && permissions.hasAt(PERMISSIONS.INVENTORY_READ, place.locationId))
     );
   }
 
-  private assertAuthority(permissions: PermissionSet, place: PlaceRow, taking: boolean): void {
-    if (taking ? this.canTake(permissions, place) : this.canManage(permissions, place)) return;
+  private assertAuthority(
+    permissions: PermissionSet,
+    membershipId: string,
+    place: PlaceRow,
+    taking: boolean,
+  ): void {
+    if (
+      taking ? this.canTake(permissions, membershipId, place) : this.canManage(permissions, place)
+    ) {
+      return;
+    }
 
     throw new ForbiddenException(
       taking
-        ? `${place.location.name} does not let employees take stock. Ask a manager.`
+        ? `${placeName(place)} does not let employees take stock. Ask a manager.`
         : `Only a manager of ${place.location.name} can do that`,
     );
   }
@@ -507,16 +537,17 @@ export class InventoryService {
     }
   }
 
-  private toPlace(place: PlaceRow, permissions: PermissionSet): StockPlace {
+  private toPlace(place: PlaceRow, permissions: PermissionSet, membershipId: string): StockPlace {
     return {
       id: place.id,
       kind: place.kind,
-      name: place.location.name,
+      name: placeName(place),
       locationId: place.locationId,
-      inactive: place.location.status === 'INACTIVE',
+      assetId: place.fleetAsset?.id ?? null,
+      inactive: place.location.status === 'INACTIVE' || place.fleetAsset?.status === 'RETIRED',
       employeesCanTake: place.employeesCanTake,
       canManage: this.canManage(permissions, place),
-      canTake: this.canTake(permissions, place),
+      canTake: this.canTake(permissions, membershipId, place),
     };
   }
 

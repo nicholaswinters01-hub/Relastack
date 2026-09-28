@@ -185,8 +185,9 @@ function PlaceSettings({ places }: { places: StockPlace[] }) {
         Who can take stock
       </h2>
       <p className="mt-1 text-sm text-[var(--color-muted)]">
-        Managers can always record stock. Each branch decides whether its employees may also record
-        using and moving it themselves. Receiving and counting stay with managers.
+        Managers can always record stock. Each branch and vehicle decides whether its employees may
+        also record using and moving it themselves, and a vehicle's usual driver always can.
+        Receiving and counting stay with managers.
       </p>
       <ul className="mt-3 flex flex-col divide-y divide-[var(--color-line)] rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)]">
         {managed.map((place) => (
@@ -225,13 +226,16 @@ export function InventoryManager({
   places,
   canConfigure,
   showingArchived,
+  initialPlaceId,
 }: {
   items: InventoryItem[];
   places: StockPlace[];
   canConfigure: boolean;
   showingArchived: boolean;
+  /** From a link such as "Stock on Van 3". */
+  initialPlaceId?: string;
 }) {
-  const [placeId, setPlaceId] = useState<string>('all');
+  const [placeId, setPlaceId] = useState<string>(initialPlaceId ?? 'all');
   const [query, setQuery] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
   const [adding, setAdding] = useState(false);
@@ -251,7 +255,12 @@ export function InventoryManager({
     return !lowOnly || quantityAt(item).low;
   });
   const lowCount = items.filter((item) => item.low).length;
-  const scopeLabel = places.length === 1 ? places[0]!.name : 'the places you can see';
+  const chosen = places.find((place) => place.id === placeId);
+  const scopeLabel = chosen
+    ? chosen.name
+    : places.length === 1
+      ? places[0]!.name
+      : 'the places you can see';
 
   return (
     <>

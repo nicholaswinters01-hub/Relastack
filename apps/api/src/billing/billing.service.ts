@@ -16,6 +16,7 @@ import {
   type SubscriptionStatus,
   EVENT_TYPES,
   planComparisonExtraSchema,
+  withIncludedModules,
 } from '@platform/shared';
 import { z } from 'zod';
 import { SERVER_ENV } from '../config.provider';
@@ -151,7 +152,9 @@ export class BillingService {
 
     const status = this.effectiveStatus(subscription);
 
-    const entitledModules = new Set<string>([
+    // A pack brings the modules it includes, so entitlement to Pest Control
+    // is entitlement to Fleet and Inventory too.
+    const entitledModules = withIncludedModules([
       ...subscription.plan.modules.map((entry) => entry.moduleKey),
       ...subscription.addOns.map((entry) => entry.moduleKey),
     ]);

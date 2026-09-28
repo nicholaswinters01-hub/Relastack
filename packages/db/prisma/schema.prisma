@@ -186,6 +186,10 @@ model Organization {
   inventoryItems         InventoryItem[]
   stockPlaces            StockPlace[]
   stockMovements         StockMovement[]
+  fleetAssets            FleetAsset[]
+  fleetReadings          FleetReading[]
+  fleetReminders         FleetReminder[]
+  fleetServiceRecords    FleetServiceRecord[]
 
   @@map("organizations")
 }
@@ -223,6 +227,9 @@ model OrganizationMembership {
   notificationPreferences NotificationPreference[]
   groupMemberships        MemberGroupMember[]
   recordedStockMovements  StockMovement[]
+  assignedFleetAssets     FleetAsset[]
+  recordedFleetReadings   FleetReading[]
+  recordedFleetServices   FleetServiceRecord[]
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -285,6 +292,7 @@ model Location {
   jobs            Job[]
   jobSeries       JobSeries[]
   stockPlaces     StockPlace[]
+  fleetAssets     FleetAsset[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -1196,6 +1204,11 @@ model Job {
   assignments JobAssignment[]
   tasks       Task[]
 
+  /// The vehicle the crew takes. Cleared if the vehicle is removed.
+  vehicleId String?     @map("vehicle_id") @db.Uuid
+  vehicle   FleetAsset? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId])
   @@index([organizationId, startsAt])
   @@index([organizationId, status])
   @@index([organizationId, locationId])
@@ -1715,6 +1728,7 @@ model MemberGroupMember {
 /// Where stock can sit. Branches today; Fleet adds vehicles.
 enum StockPlaceKind {
   BRANCH
+  VEHICLE
 
   @@map("stock_place_kind")
 }
@@ -1765,6 +1779,9 @@ model StockPlace {
   kind           StockPlaceKind @default(BRANCH)
   locationId     String         @map("location_id") @db.Uuid
 
+  /// Set for a vehicle; the branch is then its home branch.
+  fleetAssetId String? @unique @map("fleet_asset_id") @db.Uuid
+
   /// Whether employees here may record using and moving stock themselves.
   /// Some shops have a manager oversee every item taken; others do not.
   employeesCanTake Boolean @default(false) @map("employees_can_take")
@@ -1774,6 +1791,7 @@ model StockPlace {
 
   organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   location     Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  fleetAsset   FleetAsset?     @relation(fields: [fleetAssetId], references: [id], onDelete: Cascade)
   movements    StockMovement[]
 
   @@index([organizationId])
@@ -1814,4 +1832,147 @@ model StockMovement {
   @@index([placeId])
   @@index([transferId])
   @@map("stock_movements")
+}
+
+// ---------------------------------------------------------------------------
+// Fleet
+// ---------------------------------------------------------------------------
+
+enum FleetAssetKind {
+  VEHICLE
+  TRAILER
+  EQUIPMENT
+
+  @@map("fleet_asset_kind")
+}
+
+enum FleetAssetStatus {
+  ACTIVE
+  IN_SHOP
+  RETIRED
+
+  @@map("fleet_asset_status")
+}
+
+enum FleetMeter {
+  MILES
+  HOURS
+  NONE
+
+  @@map("fleet_meter")
+}
+
+/// A vehicle, trailer or piece of equipment. Belongs to a home branch, so the
+/// permission someone holds at that branch is the permission they hold over it.
+model FleetAsset {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  locationId     String @map("location_id") @db.Uuid
+
+  name       String
+  kind       FleetAssetKind
+  status     FleetAssetStatus @default(ACTIVE)
+  make       String?
+  model      String?
+  year       Int?
+  plate      String?
+  /// VIN for a vehicle, serial number for equipment.
+  identifier String?
+  meter      FleetMeter       @default(MILES)
+  notes      String?
+
+  /// The usual driver. They may log readings on it whatever their role.
+  assignedMembershipId String? @map("assigned_membership_id") @db.Uuid
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  assigned     OrganizationMembership? @relation(fields: [assignedMembershipId], references: [id], onDelete: SetNull)
+  readings     FleetReading[]
+  reminders    FleetReminder[]
+  services     FleetServiceRecord[]
+  stockPlace   StockPlace?
+  jobs         Job[]
+
+  @@index([organizationId])
+  @@index([locationId])
+  @@map("fleet_assets")
+}
+
+/// What the meter said on a day. Never edited: the latest is current.
+model FleetReading {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  assetId        String   @map("asset_id") @db.Uuid
+  value          Decimal  @db.Decimal(10, 1)
+  readOn         DateTime @map("read_on") @db.Date
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String  @map("recorded_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        FleetAsset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  recordedBy   OrganizationMembership? @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([assetId, readOn])
+  @@map("fleet_readings")
+}
+
+/// Service an asset is due: every so many months, every so many miles or
+/// hours, or once by a date. Marking it done moves the next due point on.
+model FleetReminder {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  assetId        String @map("asset_id") @db.Uuid
+
+  title           String
+  intervalMonths  Int?      @map("interval_months")
+  intervalReading Decimal?  @map("interval_reading") @db.Decimal(10, 1)
+  nextDueOn       DateTime? @map("next_due_on") @db.Date
+  nextDueReading  Decimal?  @map("next_due_reading") @db.Decimal(10, 1)
+
+  /// A one-off reminder is archived once done; so is one somebody removed.
+  archivedAt DateTime? @map("archived_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        FleetAsset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  services     FleetServiceRecord[]
+
+  @@index([organizationId])
+  @@index([assetId])
+  @@map("fleet_reminders")
+}
+
+/// Service that was done.
+model FleetServiceRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  assetId        String   @map("asset_id") @db.Uuid
+  reminderId     String?  @map("reminder_id") @db.Uuid
+  title          String
+  doneOn         DateTime @map("done_on") @db.Date
+  reading        Decimal? @db.Decimal(10, 1)
+  costCents      Int?     @map("cost_cents")
+  note           String?
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  recordedByName String  @map("recorded_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  asset        FleetAsset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  reminder     FleetReminder?          @relation(fields: [reminderId], references: [id], onDelete: SetNull)
+  recordedBy   OrganizationMembership? @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([assetId, doneOn])
+  @@map("fleet_service_records")
 }

@@ -20,6 +20,8 @@ import {
   jobResponseSchema,
   groupsResponseSchema,
   inventoryResponseSchema,
+  fleetResponseSchema,
+  assetDetailResponseSchema,
   itemDetailResponseSchema,
   setupProgressSchema,
   tasksResponseSchema,
@@ -42,6 +44,8 @@ import {
   type Job,
   type MemberGroup,
   type InventoryResponse,
+  type FleetResponse,
+  type AssetDetailResponse,
   type ItemDetailResponse,
   type SetupProgress,
   type JobsResponse,
@@ -482,6 +486,32 @@ export async function getInventoryItem(id: string): Promise<ItemDetailResponse |
     const response = await serverFetch(`/api/v1/inventory/items/${encodeURIComponent(id)}`);
     if (!response.ok) return null;
     const parsed = itemDetailResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Vehicles and equipment the reader can see, or null on any failure. */
+export async function getFleet(includeRetired = false): Promise<FleetResponse | null> {
+  try {
+    const response = await serverFetch(
+      `/api/v1/fleet${includeRetired ? '?includeRetired=true' : ''}`,
+    );
+    if (!response.ok) return null;
+    const parsed = fleetResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One vehicle with its readings and service, or null when missing or not visible. */
+export async function getFleetAsset(id: string): Promise<AssetDetailResponse | null> {
+  try {
+    const response = await serverFetch(`/api/v1/fleet/assets/${encodeURIComponent(id)}`);
+    if (!response.ok) return null;
+    const parsed = assetDetailResponseSchema.safeParse(await response.json());
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

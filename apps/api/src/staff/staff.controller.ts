@@ -26,6 +26,7 @@ import {
   staffActionRequestSchema,
   staffBusinessQuerySchema,
   staffChangePlanRequestSchema,
+  staffPackRequestSchema,
   type AddStaffNoteRequest,
   type CreditRequest,
   type ExtendTrialRequest,
@@ -38,6 +39,7 @@ import {
   type StaffBusinessesResponse,
   type StaffBusinessQuery,
   type StaffChangePlanRequest,
+  type StaffPackRequest,
   type StaffOverview,
 } from '@platform/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
@@ -111,6 +113,23 @@ export class StaffController {
     @Body(new ZodValidationPipe(staffChangePlanRequestSchema)) body: StaffChangePlanRequest,
   ): Promise<void> {
     return this.staff.changePlan(staff, id, body.planKey, body.reason);
+  }
+
+  @Post('businesses/:id/packs')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  setPack(
+    @CurrentStaff() staff: StaffIdentity,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(staffPackRequestSchema)) body: StaffPackRequest,
+  ): Promise<void> {
+    return this.staff.setPack(
+      staff,
+      id,
+      body.moduleKey,
+      body.included,
+      body.priceCents,
+      body.reason,
+    );
   }
 
   @Post('businesses/:id/status')

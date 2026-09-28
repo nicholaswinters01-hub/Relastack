@@ -11,12 +11,12 @@ export const dynamic = 'force-dynamic';
 export default async function InventoryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ archived?: string }>;
+  searchParams: Promise<{ archived?: string; place?: string }>;
 }) {
   const organization = await getCurrentOrganization();
   if (!organization) redirect('/login');
 
-  const { archived } = await searchParams;
+  const { archived, place } = await searchParams;
   const showingArchived = archived === '1';
   const modules = await getModules();
   const inventory = modules.find((module) => module.key === MODULES.INVENTORY);
@@ -65,6 +65,7 @@ export default async function InventoryPage({
               places={data.places}
               canConfigure={can(organization.permissions, PERMISSIONS.INVENTORY_CONFIGURE)}
               showingArchived={showingArchived}
+              initialPlaceId={data.places.some((entry) => entry.id === place) ? place : undefined}
             />
           </>
         )}

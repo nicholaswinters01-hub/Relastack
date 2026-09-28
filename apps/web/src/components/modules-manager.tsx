@@ -88,8 +88,21 @@ export function ModulesManager({ modules, canManage }: Props) {
               {module.isCore && (
                 <span className="font-mono text-xs text-[var(--color-muted)]">always on</span>
               )}
+              {module.kind === 'pack' && (
+                <span className="font-mono text-xs text-[var(--color-muted)]">industry pack</span>
+              )}
             </div>
             <p className="mt-1 text-sm text-[var(--color-muted)]">{module.description}</p>
+            {module.kind === 'pack' && module.includes.length > 0 && (
+              <p className="mt-1 font-mono text-xs text-[var(--color-muted)]">
+                includes {module.includes.map(nameFor).join(', ')}
+              </p>
+            )}
+            {module.kind === 'included' && (
+              <p className="mt-1 font-mono text-xs text-[var(--color-muted)]">
+                comes with an industry pack
+              </p>
+            )}
             {module.dependencies.length > 0 && (
               <p className="mt-1 font-mono text-xs text-[var(--color-muted)]">
                 requires {module.dependencies.map(nameFor).join(', ')}
@@ -123,12 +136,20 @@ export function ModulesManager({ modules, canManage }: Props) {
                 >
                   {busy === module.key ? '…' : module.enabled ? 'Turn off' : 'Turn on'}
                 </button>
-              ) : (
+              ) : module.kind === 'module' ? (
                 <Link
                   href="/billing"
                   className="rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium"
                 >
                   Upgrade
+                </Link>
+              ) : (
+                // Packs are switched on by hand while billing is by hand.
+                <Link
+                  href="/help"
+                  className="rounded-lg border border-[var(--color-line)] px-3 py-1.5 text-xs font-medium"
+                >
+                  Ask about it
                 </Link>
               ))}
           </div>

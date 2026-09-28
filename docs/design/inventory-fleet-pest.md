@@ -1,6 +1,6 @@
 # Inventory, Fleet and the Pest Control pack: design
 
-Status: **approved 2026-09-28** (answers at the end). Pulls Phase 16 (Inventory)
+Status: **approved 2026-09-28** (answers at the end). **Stage 1 complete** (built and approved 2026-09-28). **Stage 2 built** 2026-09-28, awaiting review. Pulls Phase 16 (Inventory)
 forward, with part of Phase 17 (packs extending modules), at the product
 owner's request on 2026-09-28.
 
@@ -232,3 +232,25 @@ not a guess.
    take stock" setting (see stage 1, Permissions).
 4. **Low-stock level:** one per item, company-wide. Per-place levels can come
    later.
+
+## Stage 2 as built (2026-09-28)
+
+- **Packs are plumbing now.** The registry has `kind` and `includes`, and the
+  Pest Control pack is registered. It has no features of its own until stage 3,
+  but it brings Fleet and Inventory. The trial includes it. Staff switch it on
+  for a paying business from the staff console, with a reason and a monthly
+  price, both recorded in the audit trail.
+- **Equipment carries no stock.** Only vehicles and trailers are stock places.
+- **Readings** are append-only. One lower than the last warns and can be
+  recorded anyway.
+- **Reminders** repeat every so many months, miles or hours, whichever comes
+  first, or fall due once by a date. Marking one done counts the next interval
+  from when it was actually done. A one-off reminder is then finished.
+- **Service records** can be removed by a manager. They are not a legal record
+  the way application records will be.
+- **The usual driver** sees their vehicle wherever it is kept, logs its
+  readings, and takes stock from it, whatever their role. Authority comes from
+  the row, like a task's assignee.
+- **A vehicle on a job** is set from the job page by anyone who can book jobs
+  at that branch. A clash names the times, not the other job, which may be at a
+  branch the reader cannot see.

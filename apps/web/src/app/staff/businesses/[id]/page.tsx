@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { MODULE_BY_KEY, MODULE_REGISTRY } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
 import { StaffAction, StaffNoteForm } from '@/components/staff-actions';
 import { getStaffBusiness, getStaffIdentity } from '@/lib/staff-api';
@@ -40,6 +41,8 @@ const ACTION_LABEL: Record<string, string> = {
   'business.viewed': 'Opened this business',
   'trial.extended': 'Extended the trial',
   'plan.changed': 'Changed the plan',
+  'pack.added': 'Switched on an industry pack',
+  'pack.removed': 'Switched off an industry pack',
   'business.suspended': 'Suspended the business',
   'business.reactivated': 'Reactivated the business',
   'member.unlocked': 'Cleared a sign-in lockout',
@@ -154,7 +157,10 @@ export default async function StaffBusinessPage({ params }: { params: Promise<{ 
                   <Fact
                     label="Add-ons"
                     value={subscription.addOns
-                      .map((a) => `${a.moduleKey} (${money(a.priceCents)})`)
+                      .map(
+                        (a) =>
+                          `${MODULE_BY_KEY.get(a.moduleKey)?.name ?? a.moduleKey} (${money(a.priceCents)})`,
+                      )
                       .join(', ')}
                   />
                 )}
@@ -195,6 +201,33 @@ export default async function StaffBusinessPage({ params }: { params: Promise<{ 
                     },
                   ]}
                 />
+                {/* Packs are switched on by hand while billing is by hand. */}
+                {MODULE_REGISTRY.filter((module) => module.kind === 'pack').map((pack) =>
+                  subscription.addOns.some((a) => a.moduleKey === pack.key) ? (
+                    <StaffAction
+                      key={pack.key}
+                      label={`Switch off ${pack.name}`}
+                      path={`businesses/${business.id}/packs`}
+                      fixed={{ moduleKey: pack.key, included: false }}
+                      danger
+                    />
+                  ) : (
+                    <StaffAction
+                      key={pack.key}
+                      label={`Switch on ${pack.name}`}
+                      path={`businesses/${business.id}/packs`}
+                      fixed={{ moduleKey: pack.key, included: true }}
+                      fields={[
+                        {
+                          name: 'priceCents',
+                          label: 'Monthly price for the pack',
+                          type: 'money',
+                          optional: true,
+                        },
+                      ]}
+                    />
+                  ),
+                )}
               </div>
             </>
           )}

@@ -111,6 +111,8 @@ export class EntitlementService implements OnModuleInit {
       isCore: module.isCore,
       dependencies: [...module.dependencies],
       availableFrom: module.availableFrom,
+      kind: module.kind,
+      includes: [...module.includes],
       enabled: enabled.has(module.key),
       // Whether the plan covers it. The interface uses this to distinguish
       // "turn on" from "upgrade to get this", which are very different

@@ -4,6 +4,7 @@ import {
   MODULE_REGISTRY,
   findDependents,
   resolveDependencies,
+  withIncludedModules,
 } from '@platform/shared';
 import { describe, expect, it } from 'vitest';
 
@@ -83,7 +84,43 @@ describe('module registry', () => {
     });
 
     it('returns nothing for a module nothing depends on', () => {
-      expect(findDependents(MODULES.INVENTORY)).toEqual([]);
+      expect(findDependents(MODULES.REPORTING)).toEqual([]);
+    });
+  });
+
+  describe('packs', () => {
+    it('includes only modules that exist', () => {
+      for (const module of MODULE_REGISTRY) {
+        for (const included of module.includes) {
+          expect(MODULE_BY_KEY.has(included), `${module.key} includes ${included}`).toBe(true);
+        }
+      }
+    });
+
+    it('lets only packs include anything', () => {
+      for (const module of MODULE_REGISTRY.filter((entry) => entry.kind !== 'pack')) {
+        expect(module.includes, module.key).toEqual([]);
+      }
+    });
+
+    it('gives every included module a pack that brings it', () => {
+      // One nobody brings could never be had at all.
+      for (const module of MODULE_REGISTRY.filter((entry) => entry.kind === 'included')) {
+        const bringers = MODULE_REGISTRY.filter((entry) => entry.includes.includes(module.key));
+        expect(bringers.length, module.key).toBeGreaterThan(0);
+      }
+    });
+
+    it('turns a pack into the modules it brings', () => {
+      expect([...withIncludedModules([MODULES.CRM, MODULES.PEST_CONTROL])].sort()).toEqual(
+        [MODULES.CRM, MODULES.FLEET, MODULES.INVENTORY, MODULES.PEST_CONTROL].sort(),
+      );
+    });
+
+    it('adds nothing to modules that are not packs', () => {
+      expect([...withIncludedModules([MODULES.CRM, MODULES.SCHEDULING])].sort()).toEqual(
+        [MODULES.CRM, MODULES.SCHEDULING].sort(),
+      );
     });
   });
 });

@@ -8,6 +8,7 @@ import {
   getCurrentOrganization,
   getCurrentUser,
   getDashboard,
+  getFleet,
   getInventory,
   getModules,
   getSetupProgress,
@@ -82,11 +83,16 @@ export default async function HomePage() {
   // branch filter the list does: a manager hears about their branches only.
   const inventoryOn =
     enabled(MODULES.INVENTORY) && canAnywhere(organization.permissions, PERMISSIONS.INVENTORY_READ);
-  const [dashboard, inventory] = await Promise.all([
+  const fleetOn =
+    enabled(MODULES.FLEET) && canAnywhere(organization.permissions, PERMISSIONS.FLEET_READ);
+  const [dashboard, inventory, fleet] = await Promise.all([
     getDashboard(),
     inventoryOn ? getInventory() : Promise.resolve(null),
+    fleetOn ? getFleet() : Promise.resolve(null),
   ]);
   const lowStock = inventory?.items.filter((item) => item.low).length ?? 0;
+  const serviceDue = fleet?.assets.filter((asset) => asset.serviceState !== 'OK') ?? [];
+  const overdue = serviceDue.filter((asset) => asset.serviceState === 'OVERDUE').length;
 
   return (
     <>
@@ -107,6 +113,21 @@ export default async function HomePage() {
               : ''}.{' '}
             <Link href="/inventory" className="underline underline-offset-4">
               See inventory
+            </Link>
+          </p>
+        )}
+
+        {serviceDue.length > 0 && (
+          <p className="mt-3 rounded-xl border border-[var(--color-bad)] bg-[var(--color-surface)] px-4 py-3 text-sm">
+            {serviceDue.length === 1
+              ? `${serviceDue[0]!.name} is due for service`
+              : `${serviceDue.length} vehicles and equipment are due for service`}
+            {overdue > 0 && serviceDue.length > 1 ? ` (${overdue} overdue)` : ''}.{' '}
+            <Link
+              href={serviceDue.length === 1 ? `/fleet/${serviceDue[0]!.id}` : '/fleet'}
+              className="underline underline-offset-4"
+            >
+              See the fleet
             </Link>
           </p>
         )}

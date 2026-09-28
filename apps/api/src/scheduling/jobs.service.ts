@@ -27,6 +27,7 @@ const NOT_FOUND = 'Job not found';
 
 const JOB_INCLUDE = {
   location: { select: { name: true, timezone: true } },
+  vehicle: { select: { name: true } },
   customer: { select: { displayName: true, locationId: true, accountNumber: true } },
   createdBy: { select: { user: { select: { firstName: true, lastName: true, email: true } } } },
   assignments: {
@@ -151,6 +152,8 @@ export class JobsService {
         membershipId: assignment.membershipId,
         name: nameOf(assignment.member.user) ?? 'Unknown',
       })),
+      vehicleId: row.vehicleId,
+      vehicleName: row.vehicle?.name ?? null,
       createdByName: nameOf(row.createdBy?.user),
       createdAt: row.createdAt.toISOString(),
       updatedAt: row.updatedAt.toISOString(),

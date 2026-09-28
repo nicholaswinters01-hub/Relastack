@@ -22,6 +22,8 @@ export const MODULES = {
   AUTOMATION: 'automation',
   CUSTOM_ROLES: 'custom_roles',
   SHARED_CUSTOMERS: 'shared_customers',
+  FLEET: 'fleet',
+  PEST_CONTROL: 'pest_control',
 } as const;
 
 export type ModuleKey = (typeof MODULES)[keyof typeof MODULES];
@@ -44,6 +46,18 @@ export interface ModuleDefinition {
    * comparison marks the rest "coming soon" rather than promising them now.
    */
   ready: boolean;
+  /**
+   * What sort of entry this is.
+   *
+   *   module   — chosen through a plan or bought as an add-on.
+   *   pack     — an industry pack. It plugs into the core modules rather than
+   *              standing apart, and brings the modules it `includes`.
+   *   included — never chosen on its own; it comes with a pack (or later a
+   *              plan) that includes it, so other packs can bring it too.
+   */
+  kind: 'module' | 'pack' | 'included';
+  /** Entitlement to this entry is entitlement to these as well. */
+  includes: ModuleKey[];
 }
 
 export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
@@ -55,6 +69,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [],
     availableFrom: 'Phase 4',
     ready: true,
+    kind: 'module',
+    includes: [],
   },
   {
     key: MODULES.CRM,
@@ -64,6 +80,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [],
     availableFrom: 'Phase 7',
     ready: true,
+    kind: 'module',
+    includes: [],
   },
   {
     key: MODULES.SCHEDULING,
@@ -75,6 +93,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [MODULES.CRM],
     availableFrom: 'Phase 9',
     ready: true,
+    kind: 'module',
+    includes: [],
   },
   {
     key: MODULES.INVENTORY,
@@ -84,6 +104,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [],
     availableFrom: 'Phase 16',
     ready: true,
+    kind: 'module',
+    includes: [],
   },
   {
     key: MODULES.REPORTING,
@@ -93,6 +115,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [],
     availableFrom: 'Phase 10',
     ready: true,
+    kind: 'module',
+    includes: [],
   },
   {
     key: MODULES.AUTOMATION,
@@ -103,6 +127,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [MODULES.CRM],
     availableFrom: 'Phase 12',
     ready: false,
+    kind: 'module',
+    includes: [],
   },
   {
     key: MODULES.CUSTOM_ROLES,
@@ -112,6 +138,8 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [],
     availableFrom: 'Phase 5',
     ready: false,
+    kind: 'module',
+    includes: [],
   },
   {
     key: MODULES.SHARED_CUSTOMERS,
@@ -121,6 +149,33 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [MODULES.CRM],
     availableFrom: 'Phase 7',
     ready: false,
+    kind: 'module',
+    includes: [],
+  },
+  {
+    key: MODULES.FLEET,
+    name: 'Fleet',
+    description:
+      'Vehicles and equipment, readings, service reminders, and the stock each van carries.',
+    isCore: false,
+    dependencies: [],
+    availableFrom: 'Phase 16',
+    ready: true,
+    kind: 'included',
+    includes: [],
+  },
+  {
+    key: MODULES.PEST_CONTROL,
+    name: 'Pest Control',
+    description:
+      'Pest control on top of the core: application records on every job, with vans and product stock included.',
+    isCore: false,
+    // Application records are written on jobs, from stock, off a van.
+    dependencies: [MODULES.SCHEDULING, MODULES.INVENTORY, MODULES.FLEET],
+    availableFrom: 'Phase 17',
+    ready: false,
+    kind: 'pack',
+    includes: [MODULES.INVENTORY, MODULES.FLEET],
   },
 ];
 
@@ -166,6 +221,23 @@ export function resolveDependencies(key: ModuleKey): ModuleKey[] {
   return resolved.filter((entry) => entry !== key);
 }
 
+/**
+ * Everything a set of entitlements reaches, following `includes`.
+ *
+ * The one place a pack turns into the modules it brings, so business logic
+ * keeps asking only "is this organization entitled to fleet?"
+ */
+export function withIncludedModules(keys: Iterable<string>): Set<string> {
+  const reached = new Set<string>();
+  const visit = (key: string): void => {
+    if (reached.has(key)) return;
+    reached.add(key);
+    for (const included of MODULE_BY_KEY.get(key)?.includes ?? []) visit(included);
+  };
+  for (const key of keys) visit(key);
+  return reached;
+}
+
 /** Modules that would break if this one were turned off. */
 export function findDependents(key: ModuleKey): ModuleKey[] {
   return MODULE_REGISTRY.filter((module) => module.dependencies.includes(key)).map(
@@ -182,6 +254,9 @@ export const moduleStateSchema = z.object({
   isCore: z.boolean(),
   dependencies: z.array(z.string()),
   availableFrom: z.string(),
+  kind: z.enum(['module', 'pack', 'included']),
+  /** Keys this one brings with it (a pack), for the settings screen to explain. */
+  includes: z.array(z.string()),
   /** Switched on by the customer. */
   enabled: z.boolean(),
   /**

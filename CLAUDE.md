@@ -111,6 +111,28 @@ like job conflicts. Authority follows the place's branch: managing needs
 `employees_can_take` setting plus `inventory.read` there. That setting is read
 only by the inventory service.
 
+**Industry packs** plug into the core rather than standing apart. Registry
+entries have a `kind`:
+
+- `module` is chosen through a plan or bought as an add-on.
+- `pack` is an industry pack, such as Pest Control.
+- `included` is never chosen alone, like Fleet.
+
+A pack `includes` modules. `withIncludedModules` expands them where entitlement
+is resolved, so business logic still asks only "is this organization entitled
+to fleet?" The trial includes the pack. Paying businesses get it from staff,
+through an audited `POST /staff/businesses/:id/packs`, until choosing a pack is
+built. **Fleet** (stage 2):
+
+- **Authority** follows an asset's home branch, like stock.
+- **The usual driver** may see their vehicle, log its readings and take stock
+  from it, whatever their role. That authority comes from the row.
+- **Stock places:** a vehicle or trailer is one, created with it, and it moves
+  branch when the vehicle does.
+- **Readings** are append-only. A reading lower than the last warns
+  (`READING_LOWER`), and so does a vehicle double-booked on overlapping jobs
+  (`VEHICLE_CONFLICT`). Both can be overridden.
+
 The **help desk** (Phase 19c, design in docs/design/help-desk.md) lets anyone
 in a business ask for help from `/help`, including a read-only business (rule
 13). RLS keeps each business to its own requests; within one, the service shows
@@ -329,6 +351,11 @@ Recorded because each one cost real time and none is obvious.
   session restart, every suite failed with `ConfigValidationError`.
   `test/load-env.ts` now loads `.env` as a vitest setup file, which runs before
   any test file is imported.
+- **A migration cannot use an enum value it adds.** `ALTER TYPE ... ADD VALUE`
+  runs inside the migration's transaction, and Postgres refuses the new value
+  until that commits. The Fleet migration writes its constraints in terms of
+  the old value (`("kind" = 'BRANCH') = ("fleet_asset_id" IS NULL)`) for this
+  reason.
 - **Backticks inside `node -e "..."` run as shell commands.** Bash expands them
   before Node sees the script. Several edits to prose came out garbled this
   way, and one silently executed a pnpm command. Use the Edit/Write tools for
@@ -369,7 +396,8 @@ next phase without it.
 | 13    | Public website API                                           |          |
 | 14    | Website module                                               |          |
 | 15    | Customer portal                                              |          |
-| 16    | Inventory (stage 1 of docs/design/inventory-fleet-pest.md)   | Review   |
+| 16    | Inventory (stage 1 of docs/design/inventory-fleet-pest.md)   | Complete |
+| 16b   | Fleet and the pack plumbing (stage 2 of the same design)     | Review   |
 | 17    | Custom module framework                                      |          |
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
 | 19a   | Staff console: businesses, support actions, audit trail      | Complete |

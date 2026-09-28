@@ -198,7 +198,7 @@ export default async function PlansPage() {
                 </Row>
 
                 <SectionRow title="Modules" span={plans.length} />
-                {MODULE_REGISTRY.map((module) => (
+                {MODULE_REGISTRY.filter((module) => module.kind === 'module').map((module) => (
                   <Row
                     key={module.key}
                     label={module.name}

@@ -13,6 +13,7 @@ import {
   type StaffBusinessSummary,
   type StaffOverview,
   type SubscriptionStatus,
+  MODULE_BY_KEY,
 } from '@platform/shared';
 import { SERVER_ENV } from '../config.provider';
 import {
@@ -505,6 +506,62 @@ export class StaffService {
         to: plan.key,
         addOnsRemoved: removed.count,
       });
+    });
+  }
+
+  /**
+   * Switch an industry pack on or off for a business.
+   *
+   * By hand, like payments, until choosing a pack is built. Only packs: a
+   * module the plan does not include is a plan change, and one that comes
+   * with a pack is never granted on its own. Switching a pack off keeps
+   * everything the business recorded with it.
+   */
+  async setPack(
+    staff: StaffIdentity,
+    organizationId: string,
+    moduleKey: string,
+    included: boolean,
+    priceCents: number,
+    reason: string,
+  ): Promise<void> {
+    const pack = MODULE_BY_KEY.get(moduleKey);
+    if (!pack || pack.kind !== 'pack')
+      throw new BadRequestException('That is not an industry pack');
+
+    await this.prisma.withStaff(staff.userId, async (tx) => {
+      const subscription = await this.subscriptionOf(tx, organizationId);
+      const existing = await tx.subscriptionAddOn.findFirst({
+        where: { subscriptionId: subscription.id, moduleKey },
+        select: { moduleKey: true },
+      });
+
+      if (included) {
+        const inPlan = await tx.planModule.findFirst({
+          where: { planKey: subscription.planKey, moduleKey },
+          select: { moduleKey: true },
+        });
+        if (inPlan) throw new BadRequestException(`Their plan already includes ${pack.name}`);
+        if (existing) throw new BadRequestException(`The business already has ${pack.name}`);
+
+        await tx.subscriptionAddOn.create({
+          data: { subscriptionId: subscription.id, moduleKey, priceCents, organizationId },
+        });
+      } else {
+        if (!existing) throw new BadRequestException(`The business does not have ${pack.name}`);
+        await tx.subscriptionAddOn.deleteMany({
+          where: { subscriptionId: subscription.id, moduleKey },
+        });
+      }
+
+      await recordStaffEvent(
+        tx,
+        staff,
+        organizationId,
+        included ? 'pack.added' : 'pack.removed',
+        reason,
+        included ? { moduleKey, priceCents } : { moduleKey },
+      );
     });
   }
 

@@ -69,7 +69,7 @@ export const updateItemRequestSchema = createItemRequestSchema.partial().extend(
 });
 export type UpdateItemRequest = z.infer<typeof updateItemRequestSchema>;
 
-export const stockPlaceKindSchema = z.enum(['BRANCH']);
+export const stockPlaceKindSchema = z.enum(['BRANCH', 'VEHICLE']);
 export type StockPlaceKind = z.infer<typeof stockPlaceKindSchema>;
 
 export const stockPlaceSchema = z.object({
@@ -77,7 +77,9 @@ export const stockPlaceSchema = z.object({
   kind: stockPlaceKindSchema,
   name: z.string(),
   locationId: z.string().uuid(),
-  /** The branch has been deactivated. Its stock and history stay visible. */
+  /** For a vehicle: the fleet asset it is. */
+  assetId: z.string().uuid().nullable(),
+  /** The branch has been deactivated, or the vehicle retired. Its stock and history stay visible. */
   inactive: z.boolean(),
   employeesCanTake: z.boolean(),
   /** May receive, count, correct and change this place's setting. */

@@ -60,9 +60,15 @@ export class InventoryController {
   overview(
     @CurrentTenant() tenant: TenantContext,
     @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
     @Query(new ZodValidationPipe(inventoryQuerySchema)) query: InventoryQuery,
   ): Promise<InventoryResponse> {
-    return this.inventory.overview(tenant, permissions, query.includeArchived === 'true');
+    return this.inventory.overview(
+      tenant,
+      permissions,
+      membershipId,
+      query.includeArchived === 'true',
+    );
   }
 
   @Get('items/:id')
@@ -70,9 +76,10 @@ export class InventoryController {
   item(
     @CurrentTenant() tenant: TenantContext,
     @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<ItemDetailResponse> {
-    return this.inventory.item(tenant, permissions, id);
+    return this.inventory.item(tenant, permissions, membershipId, id);
   }
 
   @Post('items')
@@ -102,9 +109,10 @@ export class InventoryController {
     @CurrentTenant() tenant: TenantContext,
     @CurrentPermissions() permissions: PermissionSet,
     @Param('id', ParseUUIDPipe) id: string,
+    @CurrentMembershipId() membershipId: string,
     @Body(new ZodValidationPipe(updatePlaceRequestSchema)) body: UpdatePlaceRequest,
   ): Promise<StockPlace> {
-    return this.inventory.updatePlace(tenant, permissions, id, body);
+    return this.inventory.updatePlace(tenant, permissions, membershipId, id, body);
   }
 
   /** Receive, use, count, move, damaged or correct. See the service for 409s. */

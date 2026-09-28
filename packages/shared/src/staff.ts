@@ -231,6 +231,16 @@ export const staffChangePlanRequestSchema = z.object({
 });
 export type StaffChangePlanRequest = z.infer<typeof staffChangePlanRequestSchema>;
 
+/** Switch an industry pack on or off for a business, by hand while billing is by hand. */
+export const staffPackRequestSchema = z.object({
+  moduleKey: z.string(),
+  included: z.boolean(),
+  /** What the business will be charged for it each month. Billing is by hand. */
+  priceCents: z.number().int().min(0).max(1_000_000).default(0),
+  reason: staffReasonSchema,
+});
+export type StaffPackRequest = z.infer<typeof staffPackRequestSchema>;
+
 export const setBusinessStatusRequestSchema = z.object({
   status: organizationStatusSchema,
   reason: staffReasonSchema,

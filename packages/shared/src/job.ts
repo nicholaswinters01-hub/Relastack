@@ -91,6 +91,9 @@ export const jobSchema = z.object({
   country: z.string().nullable(),
 
   assignees: z.array(jobAssigneeSchema),
+  /** The vehicle the crew takes, when the business uses Fleet. */
+  vehicleId: z.string().uuid().nullable(),
+  vehicleName: z.string().nullable(),
   createdByName: z.string().nullable(),
 
   createdAt: z.string().datetime(),

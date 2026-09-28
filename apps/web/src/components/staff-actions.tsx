@@ -36,7 +36,7 @@ interface StaffActionProps {
   path: string;
   fields?: Field[];
   /** Fixed values sent with every submission, e.g. the status being set. */
-  fixed?: Record<string, string>;
+  fixed?: Record<string, string | boolean>;
   danger?: boolean;
   /** The action returns a link to hand to someone (a re-issued invitation). */
   returnsLink?: boolean;
@@ -69,7 +69,7 @@ export function StaffAction({
     setError(null);
 
     const form = new FormData(event.currentTarget);
-    const body: Record<string, string | number> = {
+    const body: Record<string, string | number | boolean> = {
       ...fixed,
       reason: String(form.get('reason') ?? ''),
     };
