@@ -12,6 +12,7 @@ import {
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { RequirePermission } from '../rbac/rbac.decorators';
 import { CurrentTenant } from '../tenancy/tenant.decorators';
+import { Public } from '../auth/auth.decorators';
 import { AllowsWhenReadOnly } from './billing.decorators';
 import { BillingService } from './billing.service';
 
@@ -88,5 +89,21 @@ export class BillingController {
       summary: await this.billing.getSummary(tenant),
       account: await this.billing.getAccount(tenant),
     };
+  }
+}
+
+/**
+ * The price list, for anyone: the plan comparison page is shown before
+ * signing up, and the marketing site links to it. Plans are public
+ * information; which plan a business is on is not, and is not here.
+ */
+@Public()
+@Controller('plans')
+export class PublicPlansController {
+  constructor(private readonly billing: BillingService) {}
+
+  @Get()
+  async plans(): Promise<PlansResponse> {
+    return { plans: await this.billing.listPlans() };
   }
 }

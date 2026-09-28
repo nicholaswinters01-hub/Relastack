@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
 import { PERMISSIONS } from '@platform/shared';
@@ -43,6 +44,9 @@ export default async function BillingPage() {
           You are billed by business location. Adding people never costs more, and a failed payment
           never locks you out of your own data.
         </p>
+        <Link href="/plans" className="mt-2 inline-block text-sm underline underline-offset-4">
+          Compare plans side by side
+        </Link>
 
         <BillingManager
           subscription={billing.subscription}

@@ -15,7 +15,9 @@ import {
   type Subscription,
   type SubscriptionStatus,
   EVENT_TYPES,
+  planComparisonExtraSchema,
 } from '@platform/shared';
+import { z } from 'zod';
 import { SERVER_ENV } from '../config.provider';
 import { EventsService } from '../notifications/events.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -228,6 +230,7 @@ export class BillingService {
       trialDays: plan.trialDays,
       annualBillingMonths: plan.annualBillingMonths,
       modules: plan.modules.map((entry) => entry.moduleKey),
+      comparisonExtras: z.array(planComparisonExtraSchema).catch([]).parse(plan.comparisonExtras),
     }));
   }
 

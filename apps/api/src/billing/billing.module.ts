@@ -1,5 +1,5 @@
 import { Global, Module } from '@nestjs/common';
-import { BillingController } from './billing.controller';
+import { BillingController, PublicPlansController } from './billing.controller';
 import { BillingService } from './billing.service';
 
 /**
@@ -8,7 +8,7 @@ import { BillingService } from './billing.service';
  */
 @Global()
 @Module({
-  controllers: [BillingController],
+  controllers: [BillingController, PublicPlansController],
   providers: [BillingService],
   exports: [BillingService],
 })

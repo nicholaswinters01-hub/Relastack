@@ -39,6 +39,11 @@ export interface ModuleDefinition {
   dependencies: ModuleKey[];
   /** Which phase delivers the functionality. Documentation, not behaviour. */
   availableFrom: string;
+  /**
+   * Usable in the app today: screens exist, not just the server side. The plan
+   * comparison marks the rest "coming soon" rather than promising them now.
+   */
+  ready: boolean;
 }
 
 export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
@@ -49,6 +54,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: true,
     dependencies: [],
     availableFrom: 'Phase 4',
+    ready: true,
   },
   {
     key: MODULES.CRM,
@@ -57,6 +63,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: false,
     dependencies: [],
     availableFrom: 'Phase 7',
+    ready: true,
   },
   {
     key: MODULES.SCHEDULING,
@@ -67,6 +74,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     // nothing to attach to.
     dependencies: [MODULES.CRM],
     availableFrom: 'Phase 9',
+    ready: true,
   },
   {
     key: MODULES.INVENTORY,
@@ -75,6 +83,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: false,
     dependencies: [],
     availableFrom: 'Phase 16',
+    ready: false,
   },
   {
     key: MODULES.REPORTING,
@@ -83,6 +92,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: false,
     dependencies: [],
     availableFrom: 'Phase 10',
+    ready: true,
   },
   {
     key: MODULES.AUTOMATION,
@@ -92,6 +102,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     // Every useful trigger in the first version fires on customer data.
     dependencies: [MODULES.CRM],
     availableFrom: 'Phase 12',
+    ready: false,
   },
   {
     key: MODULES.CUSTOM_ROLES,
@@ -100,6 +111,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: false,
     dependencies: [],
     availableFrom: 'Phase 5',
+    ready: false,
   },
   {
     key: MODULES.SHARED_CUSTOMERS,
@@ -108,6 +120,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: false,
     dependencies: [MODULES.CRM],
     availableFrom: 'Phase 7',
+    ready: false,
   },
 ];
 

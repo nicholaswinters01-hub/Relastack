@@ -136,6 +136,15 @@ export function monthlyCharge(
   };
 }
 
+/** One non-module row of the plan comparison. */
+export const planComparisonExtraSchema = z.object({
+  label: z.string(),
+  /** Included (true), not included (false), or a short phrase like "1 included". */
+  value: z.union([z.boolean(), z.string()]),
+  comingSoon: z.boolean(),
+});
+export type PlanComparisonExtra = z.infer<typeof planComparisonExtraSchema>;
+
 export const planSchema = z.object({
   key: z.string(),
   name: z.string(),
@@ -150,6 +159,8 @@ export const planSchema = z.object({
   annualBillingMonths: z.number().int().min(1).max(12),
   /** Module keys included at no extra charge. */
   modules: z.array(z.string()),
+  /** Comparison rows that are not modules: industry packs, portal, support. */
+  comparisonExtras: z.array(planComparisonExtraSchema),
 });
 
 export type Plan = z.infer<typeof planSchema>;

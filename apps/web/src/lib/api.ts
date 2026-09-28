@@ -296,7 +296,7 @@ export async function getCustomFields(
 /** The public price list. */
 export async function getPlans(): Promise<PlansResponse['plans']> {
   try {
-    const response = await serverFetch('/api/v1/billing/plans');
+    const response = await serverFetch('/api/v1/plans');
     if (!response.ok) return [];
 
     const parsed = plansResponseSchema.safeParse(await response.json());

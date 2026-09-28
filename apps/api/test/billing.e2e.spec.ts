@@ -143,6 +143,37 @@ describe('Billing and subscriptions (e2e)', () => {
       expect(keys).not.toContain('trial');
     });
 
+    it('shows the price list to someone who is not signed in, and nothing else', async () => {
+      const response = await request('GET', '/api/v1/plans');
+
+      expect(response.statusCode, response.body).toBe(200);
+      const body = json(response);
+      // Plans only: no subscription, no account, nothing about any business.
+      expect(Object.keys(body)).toEqual(['plans']);
+      const keys = body.plans.map((p: { key: string }) => p.key);
+      expect(keys).toEqual(expect.arrayContaining(['core', 'pro', 'business_v2']));
+      expect(keys).not.toContain('trial');
+
+      // The comparison page's extra rows arrive parsed, with what each plan offers.
+      const pro = body.plans.find((p: { key: string }) => p.key === 'pro');
+      expect(pro.comparisonExtras).toEqual(
+        expect.arrayContaining([
+          { label: 'Customer portal', value: true, comingSoon: true },
+          { label: 'Support', value: 'Faster replies', comingSoon: false },
+        ]),
+      );
+      const core = body.plans.find((p: { key: string }) => p.key === 'core');
+      expect(core.comparisonExtras).toEqual(
+        expect.arrayContaining([{ label: 'Customer portal', value: false, comingSoon: true }]),
+      );
+    });
+
+    it('still keeps the signed-in billing routes behind sign-in', async () => {
+      // Opening the price list must not have opened the controller beside it.
+      expect((await request('GET', '/api/v1/billing/plans')).statusCode).toBe(401);
+      expect((await request('GET', '/api/v1/billing/subscription')).statusCode).toBe(401);
+    });
+
     it('never prices by user count', async () => {
       const response = await request('GET', '/api/v1/billing/plans', token);
 

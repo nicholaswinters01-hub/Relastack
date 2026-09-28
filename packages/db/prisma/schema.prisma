@@ -621,6 +621,12 @@ model Plan {
   /// Months charged for a year paid up front: 10 means two months free.
   annualBillingMonths Int @default(12) @map("annual_billing_months")
 
+  /// Rows for the plan comparison that are not modules: industry packs, the
+  /// customer portal, support level. [{ label, value, comingSoon }], where value
+  /// is true, false or a short phrase. Modules come from plan_modules, never
+  /// from here, so the comparison cannot disagree with what a plan unlocks.
+  comparisonExtras Json @default("[]") @map("comparison_extras")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
