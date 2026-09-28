@@ -1,6 +1,6 @@
 # Inventory, Fleet and the Pest Control pack: design
 
-Status: **approved 2026-09-28** (answers at the end). **Stage 1 complete** (built and approved 2026-09-28). **Stage 2 built** 2026-09-28, awaiting review. Pulls Phase 16 (Inventory)
+Status: **approved 2026-09-28** (answers at the end). **Stage 1 complete** (built and approved 2026-09-28). **Stage 2 complete** (built and approved 2026-09-28). **Stage 3 built** 2026-09-28, awaiting review. Pulls Phase 16 (Inventory)
 forward, with part of Phase 17 (packs extending modules), at the product
 owner's request on 2026-09-28.
 
@@ -254,3 +254,37 @@ not a guess.
 - **A vehicle on a job** is set from the job page by anyone who can book jobs
   at that branch. A clash names the times, not the other job, which may be at a
   branch the reader cannot see.
+
+## Stage 3 as built (2026-09-28)
+
+The product owner confirmed the record's contents: product with EPA
+registration number, amount, target pests, areas, method, applicator and
+license, and date and time. Added to that: **weather** (wind and temperature),
+**mix rate**, and a **customer signature**. The crew on the job records it.
+
+- **Pack fields** are a catalogue in `@platform/shared` (`PACK_FIELDS`). The
+  core validates each enabled pack's part and never reads inside it. Items get
+  an EPA number and active ingredient, people an applicator license and
+  expiry, and a treatment line the pest fields.
+- **Materials used on a job** are core. Stock is taken from the job's vehicle,
+  else its branch, and a line is voided with a reason, never edited. With the
+  pack on, every line must carry the pest fields. With it off, lines are plain
+  materials, and existing records are hidden but kept.
+- **Records are evidence.** A line copies the license and EPA number as they
+  were. A job with records or a signature cannot be deleted. A series visit
+  with records survives rule changes.
+- **Customer sign-off** is drawn on the phone, append-only, and the latest is
+  shown.
+- **Pages:**
+  - Treatments and Sign-off sections on the job page
+  - a printable application record (`/jobs/:id/record`)
+  - a treatment history on the customer's page
+  - `/pest-records` with a date range and a CSV download, dated in each
+    branch's time zone
+  - license numbers on the Employees page
+  - EPA fields on items
+
+Not yet: stations at properties, pest customer fields, a starter product list,
+and choosing a pack from a plan. The date-range filter counts UTC days, so a
+late-evening visit can fall on the next day's filter. The CSV itself shows
+local dates.

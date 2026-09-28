@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
-import { PERMISSIONS } from '@platform/shared';
+import { MODULES, PERMISSIONS, pestItemFieldsSchema } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
 import { InventoryItemEditor } from '@/components/inventory-item-editor';
 import { StockChangeForm } from '@/components/stock-change-form';
-import { getCurrentOrganization, getInventoryItem } from '@/lib/api';
+import { getCurrentOrganization, getInventoryItem, getModules } from '@/lib/api';
 import { REASON_LABEL, formatQuantity } from '@/lib/inventory-format';
 import { can } from '@/lib/permissions';
 
@@ -24,8 +24,12 @@ export default async function InventoryItemPage({ params }: { params: Promise<{ 
   if (!organization) redirect('/login');
 
   const { id } = await params;
-  const detail = await getInventoryItem(id);
+  const [detail, modules] = await Promise.all([getInventoryItem(id), getModules()]);
   if (!detail) notFound();
+  const pestOn = modules.some((m) => m.key === MODULES.PEST_CONTROL && m.enabled);
+  const pest = pestOn
+    ? pestItemFieldsSchema.catch({}).parse(detail.item.packFields[MODULES.PEST_CONTROL] ?? {})
+    : null;
 
   const { item, places, movements } = detail;
   const quantities = new Map(item.places.map((entry) => [entry.placeId, entry]));
@@ -55,6 +59,8 @@ export default async function InventoryItemPage({ params }: { params: Promise<{ 
             <p className="mt-1 text-sm text-[var(--color-muted)]">
               {[
                 item.sku && `SKU ${item.sku}`,
+                pest?.epaRegistrationNumber && `EPA ${pest.epaRegistrationNumber}`,
+                pest?.activeIngredient,
                 item.category,
                 `counted in ${item.unit}`,
                 item.lowStockLevel !== null &&
@@ -66,7 +72,7 @@ export default async function InventoryItemPage({ params }: { params: Promise<{ 
             </p>
           </div>
           {can(organization.permissions, PERMISSIONS.INVENTORY_CONFIGURE) && (
-            <InventoryItemEditor item={item} />
+            <InventoryItemEditor item={item} pestOn={pestOn} />
           )}
         </div>
 

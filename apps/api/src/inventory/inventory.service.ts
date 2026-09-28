@@ -18,10 +18,18 @@ import {
   type StockPlace,
   type UpdateItemRequest,
   type UpdatePlaceRequest,
+  MODULES,
+  type JobMaterial,
+  type JobMaterialsResponse,
+  type PestTreatmentFields,
+  type RecordJobMaterialRequest,
 } from '@platform/shared';
 import { randomUUID } from 'node:crypto';
 import type { PermissionSet } from '../rbac/permission-set';
 import { PrismaService } from '../prisma/prisma.service';
+import { loadJobAccess, type JobAccess } from '../common/job-access';
+import { checkPackFields } from '../packs/pack-fields';
+import { enrichPestTreatment } from '../packs/pest-control/pest-enrich';
 
 const ITEM_NOT_FOUND = 'Item not found';
 const PLACE_NOT_FOUND = 'That place does not exist';
@@ -57,7 +65,13 @@ type ItemRow = {
   costCents: number | null;
   lowStockLevel: Decimal | null;
   archivedAt: Date | null;
+  packFields: Prisma.JsonValue;
 };
+
+const asObject = (value: unknown): Record<string, unknown> =>
+  value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 
 const placeSelect = {
   id: true,
@@ -160,7 +174,12 @@ export class InventoryService {
   // Items
   // -------------------------------------------------------------------------
 
-  async createItem(context: TenantContext, input: CreateItemRequest): Promise<InventoryItem> {
+  async createItem(
+    context: TenantContext,
+    enabledModules: ReadonlySet<string>,
+    input: CreateItemRequest,
+  ): Promise<InventoryItem> {
+    const packFields = checkPackFields('item', input.packFields, {}, enabledModules, 'merge');
     const item = await this.prisma.withTenant(context, async (tx) => {
       await this.assertUnique(tx, input.name, input.sku ?? null, null);
 
@@ -176,6 +195,7 @@ export class InventoryService {
             input.lowStockLevel === undefined || input.lowStockLevel === null
               ? null
               : decimal(input.lowStockLevel),
+          packFields: packFields as Prisma.InputJsonValue,
         },
       });
     });
@@ -185,6 +205,7 @@ export class InventoryService {
 
   async updateItem(
     context: TenantContext,
+    enabledModules: ReadonlySet<string>,
     itemId: string,
     input: UpdateItemRequest,
   ): Promise<void> {
@@ -221,6 +242,18 @@ export class InventoryService {
             : {}),
           ...(input.archived !== undefined
             ? { archivedAt: input.archived ? (current.archivedAt ?? new Date()) : null }
+            : {}),
+          // Merged over what the item already has, inside this transaction.
+          ...(input.packFields !== undefined
+            ? {
+                packFields: checkPackFields(
+                  'item',
+                  input.packFields,
+                  current.packFields,
+                  enabledModules,
+                  'merge',
+                ) as Prisma.InputJsonValue,
+              }
             : {}),
         },
       });
@@ -391,6 +424,220 @@ export class InventoryService {
 
       return { onHand: [{ placeId: place.id, onHand: after.toNumber() }] };
     });
+  }
+
+  // -------------------------------------------------------------------------
+  // Materials used on a job
+  // -------------------------------------------------------------------------
+
+  async jobMaterials(
+    context: TenantContext,
+    permissions: PermissionSet,
+    membershipId: string,
+    jobId: string,
+  ): Promise<JobMaterialsResponse> {
+    return this.prisma.withTenant(context, async (tx) => {
+      const access = await loadJobAccess(tx, permissions, membershipId, jobId);
+      const defaultPlace = await this.defaultPlaceFor(tx, access);
+      const rows = await tx.stockMovement.findMany({
+        where: { jobId, reason: 'USED' },
+        include: {
+          item: { select: { name: true, unit: true } },
+          place: { select: placeSelect },
+          voidedBy: { select: { note: true, recordedByName: true, createdAt: true } },
+        },
+        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      });
+
+      return {
+        materials: rows.map((row): JobMaterial => ({
+          id: row.id,
+          itemId: row.itemId,
+          itemName: row.item.name,
+          unit: row.item.unit,
+          placeId: row.placeId,
+          placeName: placeName(row.place),
+          quantity: row.quantity.negated().toNumber(),
+          note: row.note,
+          recordedByName: row.recordedByName,
+          createdAt: row.createdAt.toISOString(),
+          packFields: asObject(row.packFields),
+          voided: row.voidedBy
+            ? {
+                reason: row.voidedBy.note ?? '',
+                byName: row.voidedBy.recordedByName,
+                at: row.voidedBy.createdAt.toISOString(),
+              }
+            : null,
+        })),
+        defaultPlaceId: defaultPlace?.id ?? null,
+        canRecord: access.canRecordWork,
+      };
+    });
+  }
+
+  /**
+   * Record stock used on a job: a "used" row linked to the job, taken from the
+   * job's vehicle, else its branch, unless another place is chosen.
+   *
+   * Every enabled pack that adds fields to a treatment line must be given
+   * them; for Pest Control that makes the line an application record. The
+   * crew on the job may record it whatever their role: authority from the
+   * row, like completing the job. Recording on a series visit marks it as
+   * touched, so a later rule change never removes a visit with records on it.
+   */
+  async recordJobMaterial(
+    context: TenantContext,
+    permissions: PermissionSet,
+    membershipId: string,
+    enabledModules: ReadonlySet<string>,
+    jobId: string,
+    input: RecordJobMaterialRequest,
+  ): Promise<JobMaterialsResponse> {
+    await this.prisma.withTenant(context, async (tx) => {
+      const access = await loadJobAccess(tx, permissions, membershipId, jobId);
+      if (!access.canRecordWork) {
+        throw new ForbiddenException('Only the crew on this job, or a manager, can record that');
+      }
+
+      const item = await tx.inventoryItem.findUnique({ where: { id: input.itemId } });
+      if (!item) throw new NotFoundException(ITEM_NOT_FOUND);
+      if (item.archivedAt) throw new BadRequestException('That item is archived');
+
+      const defaultPlace = await this.defaultPlaceFor(tx, access);
+      let place: PlaceRow;
+      if (input.placeId && input.placeId !== defaultPlace?.id) {
+        place = await this.loadPlace(tx, permissions, membershipId, input.placeId);
+        this.assertAuthority(permissions, membershipId, place, true);
+      } else if (defaultPlace) {
+        place = defaultPlace;
+      } else {
+        throw new BadRequestException(
+          'This job has no branch or vehicle to take stock from. Choose where it came from.',
+        );
+      }
+
+      const checked = checkPackFields('jobUse', input.packFields, {}, enabledModules, 'require');
+      const packFields: Record<string, unknown> = { ...checked };
+      if (MODULES.PEST_CONTROL in checked) {
+        packFields[MODULES.PEST_CONTROL] = await enrichPestTreatment(
+          tx,
+          checked[MODULES.PEST_CONTROL] as PestTreatmentFields,
+          item,
+          membershipId,
+        );
+      }
+
+      await this.lock(tx, item.id, [place.id]);
+      const onHand = await this.onHandAt(tx, item.id, place.id);
+      const delta = decimal(input.quantity).negated();
+      const after = onHand.plus(delta);
+      if (after.isNegative() && !input.acknowledgeNegative) {
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'STOCK_BELOW_ZERO',
+          message: `${placeName(place)} has ${onHand.toNumber()} ${item.unit} of ${item.name}. This would leave ${after.toNumber()}.`,
+          onHand: onHand.toNumber(),
+          after: after.toNumber(),
+        });
+      }
+
+      await tx.stockMovement.create({
+        data: {
+          organizationId: context.organizationId,
+          itemId: item.id,
+          placeId: place.id,
+          quantity: delta,
+          reason: 'USED',
+          jobId,
+          note: input.note?.trim() || null,
+          packFields: packFields as Prisma.InputJsonValue,
+          recordedById: membershipId,
+          recordedByName: await this.nameOf(tx, membershipId),
+        },
+      });
+
+      if (access.job.seriesId && !access.job.detachedFromSeries) {
+        await tx.job.update({ where: { id: jobId }, data: { detachedFromSeries: true } });
+      }
+    });
+
+    return this.jobMaterials(context, permissions, membershipId, jobId);
+  }
+
+  /**
+   * Void a line entered by mistake. The line stays, and a correcting row puts
+   * the stock back and says why: records are never edited or deleted.
+   */
+  async voidJobMaterial(
+    context: TenantContext,
+    permissions: PermissionSet,
+    membershipId: string,
+    movementId: string,
+    reason: string,
+  ): Promise<void> {
+    await this.prisma.withTenant(context, async (tx) => {
+      const line = await tx.stockMovement.findFirst({
+        where: { id: movementId, reason: 'USED', jobId: { not: null } },
+        include: { voidedBy: { select: { id: true } } },
+      });
+      if (!line?.jobId) throw new NotFoundException('That line does not exist');
+
+      const access = await loadJobAccess(tx, permissions, membershipId, line.jobId);
+      if (!access.canRecordWork) {
+        throw new ForbiddenException('Only the crew on this job, or a manager, can void that');
+      }
+
+      await this.lock(tx, line.itemId, [line.placeId]);
+      const again = await tx.stockMovement.findFirst({
+        where: { voidsMovementId: movementId },
+        select: { id: true },
+      });
+      if (line.voidedBy || again) throw new ConflictException('That line is already voided');
+
+      await tx.stockMovement.create({
+        data: {
+          organizationId: context.organizationId,
+          itemId: line.itemId,
+          placeId: line.placeId,
+          quantity: line.quantity.negated(),
+          reason: 'CORRECTED',
+          jobId: line.jobId,
+          voidsMovementId: movementId,
+          note: reason,
+          recordedById: membershipId,
+          recordedByName: await this.nameOf(tx, membershipId),
+        },
+      });
+    });
+  }
+
+  /** The job's vehicle, else its branch. */
+  private async defaultPlaceFor(
+    tx: TransactionClient,
+    access: JobAccess,
+  ): Promise<PlaceRow | null> {
+    if (access.job.vehicleId) {
+      const van = await tx.stockPlace.findFirst({
+        where: { fleetAssetId: access.job.vehicleId },
+        select: placeSelect,
+      });
+      if (van) return van;
+    }
+    if (access.job.locationId) {
+      return tx.stockPlace.findFirst({
+        where: { locationId: access.job.locationId, kind: 'BRANCH' },
+        select: placeSelect,
+      });
+    }
+    return null;
+  }
+
+  /** Serialise changes to one item at these places. */
+  private async lock(tx: TransactionClient, itemId: string, placeIds: string[]): Promise<void> {
+    for (const id of [...placeIds].sort()) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`stock:${itemId}:${id}`}, 0))`;
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -574,6 +821,7 @@ export class InventoryService {
       onHand: onHand.toNumber(),
       places,
       low: item.archivedAt === null && places.some((place) => place.low),
+      packFields: asObject(item.packFields),
     };
   }
 }

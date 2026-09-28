@@ -221,3 +221,29 @@ export type JobsResponse = z.infer<typeof jobsResponseSchema>;
 
 export const jobResponseSchema = z.object({ job: jobSchema });
 export type JobResponse = z.infer<typeof jobResponseSchema>;
+
+// --- Customer sign-off -------------------------------------------------------
+
+/** A signature drawn on the tech's phone, as a PNG data URL. */
+export const SIGNATURE_MAX_LENGTH = 200_000;
+
+export const jobSignoffSchema = z.object({
+  id: z.string().uuid(),
+  signerName: z.string(),
+  image: z.string(),
+  signedAt: z.string().datetime(),
+  recordedByName: z.string(),
+});
+export type JobSignoff = z.infer<typeof jobSignoffSchema>;
+
+export const jobSignoffResponseSchema = z.object({ signoff: jobSignoffSchema.nullable() });
+export type JobSignoffResponse = z.infer<typeof jobSignoffResponseSchema>;
+
+export const createSignoffRequestSchema = z.object({
+  signerName: z.string().trim().min(1, 'Who is signing?').max(120),
+  image: z
+    .string()
+    .startsWith('data:image/png;base64,', 'The signature must be a PNG image')
+    .max(SIGNATURE_MAX_LENGTH, 'That signature is too large'),
+});
+export type CreateSignoffRequest = z.infer<typeof createSignoffRequestSchema>;

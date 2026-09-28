@@ -1,12 +1,14 @@
 import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
-import { PERMISSIONS } from '@platform/shared';
+import { MODULES, PERMISSIONS } from '@platform/shared';
+import { ApplicatorLicenses } from '@/components/applicator-licenses';
 import { TeamManager } from '@/components/team-manager';
 import {
   getCurrentOrganization,
   getGroups,
   getInvitations,
   getLocations,
+  getModules,
   getOrganizationMembers,
 } from '@/lib/api';
 import { can, canAnywhere } from '@/lib/permissions';
@@ -25,12 +27,14 @@ export default async function EmployeesPage() {
   // Organization-wide, like the API: groups belong to the whole business.
   const canManage = can(organization.permissions, PERMISSIONS.MEMBER_MANAGE);
 
-  const [members, groups, invitations, locations] = await Promise.all([
+  const [members, groups, invitations, locations, modules] = await Promise.all([
     getOrganizationMembers(),
     getGroups(),
     canInvite ? getInvitations() : Promise.resolve([]),
     getLocations(),
+    getModules(),
   ]);
+  const pestOn = modules.some((m) => m.key === MODULES.PEST_CONTROL && m.enabled);
 
   return (
     <>
@@ -50,6 +54,8 @@ export default async function EmployeesPage() {
           locations={locations}
           canInvite={canInvite}
         />
+
+        {pestOn && canManage && <ApplicatorLicenses members={members} />}
       </main>
     </>
   );

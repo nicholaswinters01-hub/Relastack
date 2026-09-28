@@ -133,6 +133,32 @@ built. **Fleet** (stage 2):
   (`READING_LOWER`), and so does a vehicle double-booked on overlapping jobs
   (`VEHICLE_CONFLICT`). Both can be overridden.
 
+**Pack fields** are the connection point by which packs add to core records.
+Items, memberships and stock movements carry `pack_fields` JSONB keyed by
+pack. `checkPackFields` (`apps/api/src/packs/pack-fields.ts`) validates each
+pack's part against `PACK_FIELDS` in `@platform/shared`, and only for enabled
+packs:
+
+- A key for a pack the business doesn't have is refused.
+- Items and people are merged inside the transaction.
+- A treatment line requires every enabled pack's fields.
+
+**Application records** (stage 3) are "used" stock movements linked to a job:
+
+- **Who records:** the crew on the job, whatever their role, or anyone who can
+  book jobs there (`common/job-access.ts`).
+- **Snapshots:** each record copies the product's EPA number and the
+  applicator's license as they are that day.
+- **Voiding:** a mistake is voided by a correcting row (`voids_movement_id`);
+  the original stays.
+- **Jobs are kept:** a job with materials or a customer sign-off cannot be
+  deleted (409 `JOB_HAS_RECORDS`), and `stock_movements.job_id` is `NO ACTION`.
+  Recording on a series visit sets `detachedFromSeries`, so a rule change never
+  removes it.
+- **Sign-offs** (`job_signoffs`) are append-only PNG data URLs.
+- **Export:** the CSV defuses cells starting with `= + - @` and dates each row
+  in its branch's time zone.
+
 The **help desk** (Phase 19c, design in docs/design/help-desk.md) lets anyone
 in a business ask for help from `/help`, including a read-only business (rule
 13). RLS keeps each business to its own requests; within one, the service shows
@@ -397,7 +423,8 @@ next phase without it.
 | 14    | Website module                                               |          |
 | 15    | Customer portal                                              |          |
 | 16    | Inventory (stage 1 of docs/design/inventory-fleet-pest.md)   | Complete |
-| 16b   | Fleet and the pack plumbing (stage 2 of the same design)     | Review   |
+| 16b   | Fleet and the pack plumbing (stage 2 of the same design)     | Complete |
+| 16c   | Pest Control pack: application records (stage 3)             | Review   |
 | 17    | Custom module framework                                      |          |
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
 | 19a   | Staff console: businesses, support actions, audit trail      | Complete |

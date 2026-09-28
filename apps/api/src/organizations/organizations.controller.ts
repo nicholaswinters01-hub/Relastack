@@ -1,8 +1,10 @@
-import { Body, Controller, Get, Param, Patch } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Put } from '@nestjs/common';
 import type { TenantContext } from '@platform/db';
 import {
   PERMISSIONS,
+  setMemberPackFieldsRequestSchema,
   updateOrganizationRequestSchema,
+  type SetMemberPackFieldsRequest,
   type OrganizationMembersResponse,
   type OrganizationResponse,
   type SetupProgress,
@@ -15,6 +17,7 @@ import {
   CurrentPermissions,
   RequirePermission,
 } from '../rbac/rbac.decorators';
+import { EnabledModules } from '../modules/module.decorators';
 import { CurrentTenant } from '../tenancy/tenant.decorators';
 import { OrganizationsService } from './organizations.service';
 
@@ -71,6 +74,25 @@ export class OrganizationsController {
   @RequirePermission(PERMISSIONS.MEMBER_READ)
   async members(@CurrentTenant() tenant: TenantContext): Promise<OrganizationMembersResponse> {
     return { members: await this.organizations.listMembers(tenant) };
+  }
+
+  /** What enabled packs record about a person, such as an applicator's license. */
+  @Put('current/members/:membershipId/pack-fields')
+  @RequirePermission(PERMISSIONS.MEMBER_MANAGE)
+  async setMemberPackFields(
+    @CurrentTenant() tenant: TenantContext,
+    @EnabledModules() enabledModules: Set<string> | undefined,
+    @Param('membershipId', ParseUUIDPipe) membershipId: string,
+    @Body(new ZodValidationPipe(setMemberPackFieldsRequestSchema)) body: SetMemberPackFieldsRequest,
+  ): Promise<{ packFields: Record<string, unknown> }> {
+    return {
+      packFields: await this.organizations.setMemberPackFields(
+        tenant,
+        enabledModules ?? new Set(),
+        membershipId,
+        body.packFields,
+      ),
+    };
   }
 
   /**

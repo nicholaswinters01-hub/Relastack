@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { packFieldsSchema } from './pack-fields';
 
 /**
  * Inventory: items, the places stock sits, and every change to it.
@@ -60,6 +61,8 @@ export const createItemRequestSchema = z.object({
     .refine((value) => value >= 0, 'The low-stock level cannot be below zero')
     .nullable()
     .optional(),
+  /** Fields an enabled pack adds to items, keyed by pack. */
+  packFields: packFieldsSchema.optional(),
 });
 export type CreateItemRequest = z.infer<typeof createItemRequestSchema>;
 
@@ -110,6 +113,7 @@ export const inventoryItemSchema = z.object({
   /** Only places that have ever held this item. */
   places: z.array(placeQuantitySchema),
   low: z.boolean(),
+  packFields: packFieldsSchema,
 });
 export type InventoryItem = z.infer<typeof inventoryItemSchema>;
 
@@ -222,3 +226,51 @@ export const updatePlaceRequestSchema = z.object({
   employeesCanTake: z.boolean(),
 });
 export type UpdatePlaceRequest = z.infer<typeof updatePlaceRequestSchema>;
+
+// --- Materials used on a job -------------------------------------------------
+
+export const jobMaterialSchema = z.object({
+  id: z.string().uuid(),
+  itemId: z.string().uuid(),
+  itemName: z.string(),
+  unit: z.string(),
+  placeId: z.string().uuid(),
+  placeName: z.string(),
+  /** How much was used, as a positive number. */
+  quantity: z.number(),
+  note: z.string().nullable(),
+  recordedByName: z.string(),
+  createdAt: z.string().datetime(),
+  /** What packs recorded with it, such as a pest application record. */
+  packFields: packFieldsSchema,
+  /** Set when the line was voided. The line and the void both stay. */
+  voided: z
+    .object({ reason: z.string(), byName: z.string(), at: z.string().datetime() })
+    .nullable(),
+});
+export type JobMaterial = z.infer<typeof jobMaterialSchema>;
+
+export const jobMaterialsResponseSchema = z.object({
+  materials: z.array(jobMaterialSchema),
+  /** Where stock comes from unless another place is chosen: the job's vehicle, else its branch. */
+  defaultPlaceId: z.string().uuid().nullable(),
+  /** On the crew, or may book jobs at its branch. */
+  canRecord: z.boolean(),
+});
+export type JobMaterialsResponse = z.infer<typeof jobMaterialsResponseSchema>;
+
+export const recordJobMaterialRequestSchema = z.object({
+  itemId: z.string().uuid(),
+  quantity: positiveQuantitySchema,
+  /** Leave out to use the job's vehicle, or its branch. */
+  placeId: z.string().uuid().optional(),
+  note: z.string().trim().max(500).optional(),
+  packFields: packFieldsSchema.optional(),
+  acknowledgeNegative: z.boolean().default(false),
+});
+export type RecordJobMaterialRequest = z.infer<typeof recordJobMaterialRequestSchema>;
+
+export const voidJobMaterialRequestSchema = z.object({
+  reason: z.string().trim().min(1, 'Say why this line is wrong').max(500),
+});
+export type VoidJobMaterialRequest = z.infer<typeof voidJobMaterialRequestSchema>;

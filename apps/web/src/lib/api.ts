@@ -20,6 +20,9 @@ import {
   jobResponseSchema,
   groupsResponseSchema,
   inventoryResponseSchema,
+  jobMaterialsResponseSchema,
+  jobSignoffResponseSchema,
+  pestRecordsResponseSchema,
   fleetResponseSchema,
   assetDetailResponseSchema,
   itemDetailResponseSchema,
@@ -44,6 +47,9 @@ import {
   type Job,
   type MemberGroup,
   type InventoryResponse,
+  type JobMaterialsResponse,
+  type JobSignoff,
+  type PestRecord,
   type FleetResponse,
   type AssetDetailResponse,
   type ItemDetailResponse,
@@ -513,6 +519,52 @@ export async function getFleetAsset(id: string): Promise<AssetDetailResponse | n
     if (!response.ok) return null;
     const parsed = assetDetailResponseSchema.safeParse(await response.json());
     return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Stock used on a job, with any application records, or null. */
+export async function getJobMaterials(jobId: string): Promise<JobMaterialsResponse | null> {
+  try {
+    const response = await serverFetch(
+      `/api/v1/inventory/jobs/${encodeURIComponent(jobId)}/materials`,
+    );
+    if (!response.ok) return null;
+    const parsed = jobMaterialsResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The customer's latest signature on a job, or null. */
+export async function getJobSignoff(jobId: string): Promise<JobSignoff | null> {
+  try {
+    const response = await serverFetch(`/api/v1/jobs/${encodeURIComponent(jobId)}/signoff`);
+    if (!response.ok) return null;
+    const parsed = jobSignoffResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.signoff : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Pest application records, narrowed by the query; empty on any failure. */
+export async function getPestRecords(query: {
+  from?: string;
+  to?: string;
+  customerId?: string;
+  jobId?: string;
+}): Promise<PestRecord[] | null> {
+  try {
+    const params = new URLSearchParams(
+      Object.entries(query).filter((entry): entry is [string, string] => Boolean(entry[1])),
+    );
+    const response = await serverFetch(`/api/v1/packs/pest-control/records?${params}`);
+    if (!response.ok) return null;
+    const parsed = pestRecordsResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.records : null;
   } catch {
     return null;
   }

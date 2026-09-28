@@ -55,7 +55,14 @@ export const organizationMemberSchema = z.object({
   /** Employee groups this person is in. Labels only; they grant nothing. */
   groupIds: z.array(z.string().uuid()),
   joinedAt: z.string().datetime(),
+  /** Fields an enabled pack adds to people, such as an applicator's license. */
+  packFields: z.record(z.string(), z.unknown()),
 });
+
+export const setMemberPackFieldsRequestSchema = z.object({
+  packFields: z.record(z.string(), z.unknown()),
+});
+export type SetMemberPackFieldsRequest = z.infer<typeof setMemberPackFieldsRequestSchema>;
 
 export type OrganizationMember = z.infer<typeof organizationMemberSchema>;
 

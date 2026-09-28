@@ -1,10 +1,18 @@
 import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
 import { notFound, redirect } from 'next/navigation';
-import { PERMISSIONS } from '@platform/shared';
+import { MODULES, PERMISSIONS } from '@platform/shared';
 import { CustomerDetailView } from '@/components/customer-detail';
-import { getCurrentOrganization, getCustomFields, getCustomer, getTags } from '@/lib/api';
-import { can, canAt } from '@/lib/permissions';
+import { PestRecordsTable } from '@/components/pest-records-table';
+import {
+  getCurrentOrganization,
+  getCustomFields,
+  getCustomer,
+  getModules,
+  getPestRecords,
+  getTags,
+} from '@/lib/api';
+import { can, canAnywhere, canAt } from '@/lib/permissions';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +32,12 @@ export default async function CustomerPage({ params }: Props) {
   // deliberately does not distinguish them, and neither does this page.
   if (!customer) notFound();
 
-  const [tags, fields] = await Promise.all([getTags(), getCustomFields()]);
+  const [tags, fields, modules] = await Promise.all([getTags(), getCustomFields(), getModules()]);
+  // A customer's treatment history, with the Pest Control pack.
+  const pestOn =
+    modules.some((m) => m.key === MODULES.PEST_CONTROL && m.enabled) &&
+    canAnywhere(organization.permissions, PERMISSIONS.JOB_READ);
+  const treatments = pestOn ? await getPestRecords({ customerId: customer.id }) : null;
 
   // Writing is scoped to where the customer sits, so the check has to name
   // that location rather than asking a plain yes/no.
@@ -55,6 +68,15 @@ export default async function CustomerPage({ params }: Props) {
           canDelete={canDelete}
           membershipId={organization.membershipId}
         />
+
+        {treatments && (
+          <section className="mt-10">
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
+              Treatment history
+            </h2>
+            <PestRecordsTable records={treatments} showCustomer={false} />
+          </section>
+        )}
       </main>
     </>
   );

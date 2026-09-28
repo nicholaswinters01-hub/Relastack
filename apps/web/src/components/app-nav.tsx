@@ -65,6 +65,12 @@ const WORK: Entry[] = [
     permission: PERMISSIONS.FLEET_READ,
     module: MODULES.FLEET,
   },
+  {
+    href: '/pest-records',
+    label: 'Records',
+    permission: PERMISSIONS.JOB_READ,
+    module: MODULES.PEST_CONTROL,
+  },
   // Core, so no module gate — tasks are on every plan.
   { href: '/tasks', label: 'Tasks', permission: PERMISSIONS.TASK_READ },
 ];

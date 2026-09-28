@@ -2,6 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type {
   Organization as OrganizationRow,
+  Prisma,
   TenantContext,
   TransactionClient,
 } from '@platform/db';
@@ -15,6 +16,7 @@ import {
   type UpdateOrganizationRequest,
 } from '@platform/shared';
 import { BillingService } from '../billing/billing.service';
+import { checkPackFields } from '../packs/pack-fields';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
@@ -236,7 +238,46 @@ export class OrganizationsService {
       })),
       groupIds: membership.groupMemberships.map((link) => link.groupId),
       joinedAt: membership.createdAt.toISOString(),
+      packFields:
+        membership.packFields !== null &&
+        typeof membership.packFields === 'object' &&
+        !Array.isArray(membership.packFields)
+          ? (membership.packFields as Record<string, unknown>)
+          : {},
     }));
+  }
+
+  /**
+   * Set what an enabled pack records about a person, such as an applicator's
+   * license. Merged over what they already have inside the transaction, so
+   * sending the expiry never wipes the number.
+   */
+  async setMemberPackFields(
+    context: TenantContext,
+    enabledModules: ReadonlySet<string>,
+    membershipId: string,
+    packFields: Record<string, unknown>,
+  ): Promise<Record<string, unknown>> {
+    return this.prisma.withTenant(context, async (tx) => {
+      const membership = await tx.organizationMembership.findUnique({
+        where: { id: membershipId },
+        select: { packFields: true },
+      });
+      if (!membership) throw new NotFoundException('That person is not in this business');
+
+      const merged = checkPackFields(
+        'member',
+        packFields,
+        membership.packFields,
+        enabledModules,
+        'merge',
+      );
+      await tx.organizationMembership.update({
+        where: { id: membershipId },
+        data: { packFields: merged as Prisma.InputJsonValue },
+      });
+      return merged;
+    });
   }
 
   /**

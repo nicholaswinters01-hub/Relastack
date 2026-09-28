@@ -173,7 +173,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     // Application records are written on jobs, from stock, off a van.
     dependencies: [MODULES.SCHEDULING, MODULES.INVENTORY, MODULES.FLEET],
     availableFrom: 'Phase 17',
-    ready: false,
+    ready: true,
     kind: 'pack',
     includes: [MODULES.INVENTORY, MODULES.FLEET],
   },

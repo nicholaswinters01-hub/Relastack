@@ -23,6 +23,9 @@ import {
   type JobResponse,
   type JobsResponse,
   type UpdateJobRequest,
+  createSignoffRequestSchema,
+  type CreateSignoffRequest,
+  type JobSignoffResponse,
 } from '@platform/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { RequireModule } from '../modules/module.decorators';
@@ -122,5 +125,30 @@ export class JobsController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<void> {
     await this.jobs.remove(tenant, permissions, membershipId, id);
+  }
+
+  @Get(':id/signoff')
+  @RequirePermissionAnywhere(PERMISSIONS.JOB_READ)
+  async signoff(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<JobSignoffResponse> {
+    return { signoff: await this.jobs.signoff(tenant, permissions, membershipId, id) };
+  }
+
+  /** The crew on the job, or whoever may book it there. */
+  @Post(':id/signoff')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissionAnywhere(PERMISSIONS.JOB_READ)
+  async createSignoff(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(createSignoffRequestSchema)) body: CreateSignoffRequest,
+  ): Promise<JobSignoffResponse> {
+    return { signoff: await this.jobs.createSignoff(tenant, permissions, membershipId, id, body) };
   }
 }

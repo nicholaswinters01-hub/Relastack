@@ -32,3 +32,5 @@ export * from './search';
 export * from './group';
 export * from './inventory';
 export * from './fleet';
+export * from './pack-fields';
+export * from './pest-records';

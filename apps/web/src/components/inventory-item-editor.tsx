@@ -2,7 +2,12 @@
 
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { INVENTORY_UNITS, type InventoryItem } from '@platform/shared';
+import {
+  INVENTORY_UNITS,
+  MODULES,
+  pestItemFieldsSchema,
+  type InventoryItem,
+} from '@platform/shared';
 import { apiWrite } from '@/lib/live-sync';
 
 const FIELD =
@@ -27,7 +32,14 @@ async function patch(id: string, body: unknown): Promise<string | null> {
  * Edit an item's details, or archive it. For owners and admins: the item list
  * is the whole company's. Archiving keeps the history and frees the name.
  */
-export function InventoryItemEditor({ item }: { item: InventoryItem }) {
+export function InventoryItemEditor({
+  item,
+  pestOn = false,
+}: {
+  item: InventoryItem;
+  pestOn?: boolean;
+}) {
+  const pest = pestItemFieldsSchema.catch({}).parse(item.packFields[MODULES.PEST_CONTROL] ?? {});
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState(item.name);
@@ -38,6 +50,8 @@ export function InventoryItemEditor({ item }: { item: InventoryItem }) {
   const [cost, setCost] = useState(
     item.costCents === null ? '' : (item.costCents / 100).toFixed(2),
   );
+  const [epa, setEpa] = useState(pest.epaRegistrationNumber ?? '');
+  const [ingredient, setIngredient] = useState(pest.activeIngredient ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -59,6 +73,16 @@ export function InventoryItemEditor({ item }: { item: InventoryItem }) {
       category,
       lowStockLevel,
       costCents: costDollars === null ? null : Math.round(costDollars * 100),
+      ...(pestOn
+        ? {
+            packFields: {
+              [MODULES.PEST_CONTROL]: {
+                epaRegistrationNumber: epa,
+                activeIngredient: ingredient,
+              },
+            },
+          }
+        : {}),
     });
     setBusy(false);
     if (failure) setError(failure);
@@ -161,6 +185,29 @@ export function InventoryItemEditor({ item }: { item: InventoryItem }) {
               className={FIELD}
             />
           </label>
+          {pestOn && (
+            <>
+              <label className="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
+                EPA registration number
+                <input
+                  value={epa}
+                  onChange={(e) => setEpa(e.target.value)}
+                  className={FIELD}
+                  maxLength={30}
+                  placeholder="e.g. 7969-210"
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
+                Active ingredient
+                <input
+                  value={ingredient}
+                  onChange={(e) => setIngredient(e.target.value)}
+                  className={FIELD}
+                  maxLength={120}
+                />
+              </label>
+            </>
+          )}
           {error && <p className="text-sm text-[var(--color-bad)] sm:col-span-3">{error}</p>}
           <div className="sm:col-span-3">
             <button

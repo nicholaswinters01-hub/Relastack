@@ -65,6 +65,7 @@ export default async function InventoryPage({
               places={data.places}
               canConfigure={can(organization.permissions, PERMISSIONS.INVENTORY_CONFIGURE)}
               showingArchived={showingArchived}
+              pestOn={modules.some((m) => m.key === MODULES.PEST_CONTROL && m.enabled)}
               initialPlaceId={data.places.some((entry) => entry.id === place) ? place : undefined}
             />
           </>

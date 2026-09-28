@@ -29,9 +29,14 @@ import {
   type StockPlace,
   type UpdateItemRequest,
   type UpdatePlaceRequest,
+  recordJobMaterialRequestSchema,
+  voidJobMaterialRequestSchema,
+  type JobMaterialsResponse,
+  type RecordJobMaterialRequest,
+  type VoidJobMaterialRequest,
 } from '@platform/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
-import { RequireModule } from '../modules/module.decorators';
+import { EnabledModules, RequireModule } from '../modules/module.decorators';
 import {
   CurrentMembershipId,
   CurrentPermissions,
@@ -87,9 +92,10 @@ export class InventoryController {
   @RequirePermission(PERMISSIONS.INVENTORY_CONFIGURE)
   createItem(
     @CurrentTenant() tenant: TenantContext,
+    @EnabledModules() enabledModules: Set<string> | undefined,
     @Body(new ZodValidationPipe(createItemRequestSchema)) body: CreateItemRequest,
   ): Promise<InventoryItem> {
-    return this.inventory.createItem(tenant, body);
+    return this.inventory.createItem(tenant, enabledModules ?? new Set(), body);
   }
 
   @Patch('items/:id')
@@ -97,10 +103,11 @@ export class InventoryController {
   @RequirePermission(PERMISSIONS.INVENTORY_CONFIGURE)
   updateItem(
     @CurrentTenant() tenant: TenantContext,
+    @EnabledModules() enabledModules: Set<string> | undefined,
     @Param('id', ParseUUIDPipe) id: string,
     @Body(new ZodValidationPipe(updateItemRequestSchema)) body: UpdateItemRequest,
   ): Promise<void> {
-    return this.inventory.updateItem(tenant, id, body);
+    return this.inventory.updateItem(tenant, enabledModules ?? new Set(), id, body);
   }
 
   @Patch('places/:id')
@@ -126,5 +133,53 @@ export class InventoryController {
     @Body(new ZodValidationPipe(stockChangeRequestSchema)) body: StockChangeRequest,
   ): Promise<StockChangeResponse> {
     return this.inventory.change(tenant, permissions, membershipId, body);
+  }
+
+  // --- Materials used on a job ----------------------------------------------
+
+  /** The crew or anyone who can see the job. Authority is checked by the service. */
+  @Get('jobs/:jobId/materials')
+  @RequirePermissionAnywhere(PERMISSIONS.INVENTORY_READ)
+  jobMaterials(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+  ): Promise<JobMaterialsResponse> {
+    return this.inventory.jobMaterials(tenant, permissions, membershipId, jobId);
+  }
+
+  @Post('jobs/:jobId/materials')
+  @HttpCode(HttpStatus.CREATED)
+  @RequirePermissionAnywhere(PERMISSIONS.INVENTORY_READ)
+  recordJobMaterial(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
+    @EnabledModules() enabledModules: Set<string> | undefined,
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+    @Body(new ZodValidationPipe(recordJobMaterialRequestSchema)) body: RecordJobMaterialRequest,
+  ): Promise<JobMaterialsResponse> {
+    return this.inventory.recordJobMaterial(
+      tenant,
+      permissions,
+      membershipId,
+      enabledModules ?? new Set(),
+      jobId,
+      body,
+    );
+  }
+
+  @Post('materials/:id/void')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @RequirePermissionAnywhere(PERMISSIONS.INVENTORY_READ)
+  voidJobMaterial(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body(new ZodValidationPipe(voidJobMaterialRequestSchema)) body: VoidJobMaterialRequest,
+  ): Promise<void> {
+    return this.inventory.voidJobMaterial(tenant, permissions, membershipId, id, body.reason);
   }
 }

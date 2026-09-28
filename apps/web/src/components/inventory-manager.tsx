@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
-import { INVENTORY_UNITS, type InventoryItem, type StockPlace } from '@platform/shared';
+import { INVENTORY_UNITS, MODULES, type InventoryItem, type StockPlace } from '@platform/shared';
 import { formatQuantity } from '@/lib/inventory-format';
 import { apiWrite } from '@/lib/live-sync';
 import { StockChangeForm } from './stock-change-form';
@@ -32,7 +32,7 @@ const numberOrNull = (text: string) => {
   return Number.isFinite(value) ? value : NaN;
 };
 
-function NewItemForm({ onDone }: { onDone: () => void }) {
+function NewItemForm({ onDone, pestOn }: { onDone: () => void; pestOn: boolean }) {
   const router = useRouter();
   const [name, setName] = useState('');
   const [unit, setUnit] = useState('each');
@@ -40,6 +40,8 @@ function NewItemForm({ onDone }: { onDone: () => void }) {
   const [category, setCategory] = useState('');
   const [low, setLow] = useState('');
   const [cost, setCost] = useState('');
+  const [epa, setEpa] = useState('');
+  const [ingredient, setIngredient] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -61,6 +63,16 @@ function NewItemForm({ onDone }: { onDone: () => void }) {
       category,
       lowStockLevel,
       costCents: costDollars === null ? null : Math.round(costDollars * 100),
+      ...(pestOn
+        ? {
+            packFields: {
+              [MODULES.PEST_CONTROL]: {
+                epaRegistrationNumber: epa,
+                activeIngredient: ingredient,
+              },
+            },
+          }
+        : {}),
     });
     setBusy(false);
     if (failure) {
@@ -142,6 +154,29 @@ function NewItemForm({ onDone }: { onDone: () => void }) {
             className={FIELD}
           />
         </label>
+        {pestOn && (
+          <>
+            <label className="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
+              EPA registration number
+              <input
+                value={epa}
+                onChange={(e) => setEpa(e.target.value)}
+                className={FIELD}
+                maxLength={30}
+                placeholder="e.g. 7969-210"
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-xs text-[var(--color-muted)]">
+              Active ingredient
+              <input
+                value={ingredient}
+                onChange={(e) => setIngredient(e.target.value)}
+                className={FIELD}
+                maxLength={120}
+              />
+            </label>
+          </>
+        )}
       </div>
       {error && <p className="text-sm text-[var(--color-bad)]">{error}</p>}
       <div className="flex gap-2">
@@ -227,6 +262,7 @@ export function InventoryManager({
   canConfigure,
   showingArchived,
   initialPlaceId,
+  pestOn = false,
 }: {
   items: InventoryItem[];
   places: StockPlace[];
@@ -234,6 +270,8 @@ export function InventoryManager({
   showingArchived: boolean;
   /** From a link such as "Stock on Van 3". */
   initialPlaceId?: string;
+  /** With the Pest Control pack, items carry an EPA number and active ingredient. */
+  pestOn?: boolean;
 }) {
   const [placeId, setPlaceId] = useState<string>(initialPlaceId ?? 'all');
   const [query, setQuery] = useState('');
@@ -310,7 +348,7 @@ export function InventoryManager({
         )}
       </div>
 
-      {adding && <NewItemForm onDone={() => setAdding(false)} />}
+      {adding && <NewItemForm onDone={() => setAdding(false)} pestOn={pestOn} />}
 
       <p className="mt-3 text-xs text-[var(--color-muted)]">On hand at {scopeLabel}.</p>
 

@@ -18,8 +18,11 @@ import {
   type PermissionKey,
   type UpdateJobRequest,
   EVENT_TYPES,
+  type CreateSignoffRequest,
+  type JobSignoff,
 } from '@platform/shared';
 import { EventsService } from '../notifications/events.service';
+import { loadJobAccess } from '../common/job-access';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 
@@ -571,13 +574,105 @@ export class JobsService {
       throw new ForbiddenException('You do not have permission to delete jobs');
     }
 
-    const deleted = await this.prisma.withTenant(context, (tx) =>
-      tx.job.deleteMany({ where: this.scopedTo(permissions, membershipId, { id }) }),
-    );
+    const deleted = await this.prisma.withTenant(context, async (tx) => {
+      // Materials used on it may be a pest application record, and a signed
+      // visit is the customer's word: both are kept, so the job is too.
+      const [materials, signoffs] = await Promise.all([
+        tx.stockMovement.count({ where: { jobId: id } }),
+        tx.jobSignoff.count({ where: { jobId: id } }),
+      ]);
+      if (materials > 0 || signoffs > 0) {
+        const visible = await tx.job.count({
+          where: this.scopedTo(permissions, membershipId, { id }),
+        });
+        if (visible === 0) throw new NotFoundException(NOT_FOUND);
+        throw new ConflictException({
+          statusCode: 409,
+          code: 'JOB_HAS_RECORDS',
+          message:
+            'This job has materials or a customer signature recorded on it, which must be kept. Cancel it instead.',
+        });
+      }
+
+      return tx.job.deleteMany({ where: this.scopedTo(permissions, membershipId, { id }) });
+    });
 
     if (deleted.count === 0) throw new NotFoundException(NOT_FOUND);
 
     this.logger.warn(`Job ${id} permanently deleted from ${context.organizationId}`);
+  }
+
+  // -------------------------------------------------------------------------
+  // Customer sign-off
+  // -------------------------------------------------------------------------
+
+  async signoff(
+    context: TenantContext,
+    permissions: PermissionSet,
+    membershipId: string,
+    jobId: string,
+  ): Promise<JobSignoff | null> {
+    return this.prisma.withTenant(context, async (tx) => {
+      await loadJobAccess(tx, permissions, membershipId, jobId);
+      const row = await tx.jobSignoff.findFirst({
+        where: { jobId },
+        orderBy: [{ signedAt: 'desc' }, { id: 'desc' }],
+      });
+      return row ? JobsService.toSignoff(row) : null;
+    });
+  }
+
+  /**
+   * The customer signs on the tech's phone. Never edited: signing again adds
+   * another, and the latest is the one shown.
+   */
+  async createSignoff(
+    context: TenantContext,
+    permissions: PermissionSet,
+    membershipId: string,
+    jobId: string,
+    input: CreateSignoffRequest,
+  ): Promise<JobSignoff> {
+    return this.prisma.withTenant(context, async (tx) => {
+      const access = await loadJobAccess(tx, permissions, membershipId, jobId);
+      if (!access.canRecordWork) {
+        throw new ForbiddenException(
+          'Only the crew on this job, or a manager, can take a signature',
+        );
+      }
+
+      const recorder = await tx.organizationMembership.findUnique({
+        where: { id: membershipId },
+        select: { user: { select: { firstName: true, lastName: true, email: true } } },
+      });
+      const row = await tx.jobSignoff.create({
+        data: {
+          organizationId: context.organizationId,
+          jobId,
+          signerName: input.signerName,
+          image: input.image,
+          recordedById: membershipId,
+          recordedByName: nameOf(recorder?.user) ?? 'Someone',
+        },
+      });
+      return JobsService.toSignoff(row);
+    });
+  }
+
+  private static toSignoff(row: {
+    id: string;
+    signerName: string;
+    image: string;
+    signedAt: Date;
+    recordedByName: string;
+  }): JobSignoff {
+    return {
+      id: row.id,
+      signerName: row.signerName,
+      image: row.image,
+      signedAt: row.signedAt.toISOString(),
+      recordedByName: row.recordedByName,
+    };
   }
 
   // -------------------------------------------------------------------------
