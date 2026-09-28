@@ -19,6 +19,7 @@ export * from './module';
 export * from './subscription';
 export * from './billing';
 export * from './customer';
+export * from './customer-import';
 export * from './task';
 export * from './job';
 export * from './recurrence';

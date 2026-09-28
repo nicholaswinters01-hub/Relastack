@@ -35,11 +35,16 @@ import {
   type ShareCustomerRequest,
   type UpdateContactRequest,
   type UpdateCustomerRequest,
+  customerImportRequestSchema,
+  type CustomerImportPreview,
+  type CustomerImportRequest,
+  type CustomerImportResult,
 } from '@platform/shared';
 import { ZodValidationPipe } from '../common/zod-validation.pipe';
 import { RequireModule } from '../modules/module.decorators';
 import {
   CurrentMembershipId,
+  RequirePermission,
   CurrentPermissions,
   RequirePermissionAnywhere,
 } from '../rbac/rbac.decorators';
@@ -79,6 +84,31 @@ export class CustomersController {
     @Query(new ZodValidationPipe(customerQuerySchema)) query: CustomerQuery,
   ): Promise<CustomersResponse> {
     return this.customers.list(tenant, permissions, query);
+  }
+
+  /** Checks a spreadsheet of customers row by row. Saves nothing. Owners and admins. */
+  @Post('import/preview')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PERMISSIONS.CUSTOMER_WRITE)
+  previewImport(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentPermissions() permissions: PermissionSet,
+    @Body(new ZodValidationPipe(customerImportRequestSchema)) body: CustomerImportRequest,
+  ): Promise<CustomerImportPreview> {
+    return this.customers.previewImport(tenant, permissions, body);
+  }
+
+  /** Imports the rows that pass; duplicates and rows with problems are skipped. */
+  @Post('import')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermission(PERMISSIONS.CUSTOMER_WRITE)
+  importCustomers(
+    @CurrentTenant() tenant: TenantContext,
+    @CurrentPermissions() permissions: PermissionSet,
+    @CurrentMembershipId() membershipId: string,
+    @Body(new ZodValidationPipe(customerImportRequestSchema)) body: CustomerImportRequest,
+  ): Promise<CustomerImportResult> {
+    return this.customers.importCustomers(tenant, permissions, membershipId, body);
   }
 
   @Post()

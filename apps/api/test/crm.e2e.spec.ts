@@ -918,6 +918,109 @@ describe('CRM (e2e)', () => {
 
   // =========================================================================
 
+  describe('importing from a spreadsheet', () => {
+    const body = (rows: Array<Record<string, unknown>>) => ({
+      locationId: downtownId,
+      stage: 'ACTIVE',
+      rows,
+    });
+
+    it('previews without saving, then imports the good rows with their tag and notes', async () => {
+      await request('POST', '/api/v1/customers', admin.token, {
+        firstName: 'Already Here',
+        email: 'already@import.test',
+        locationId: downtownId,
+      });
+      const rows = [
+        {
+          firstName: 'Imported',
+          lastName: 'Iris',
+          email: 'iris@import.test',
+          note: 'Gate code 4411',
+        },
+        { companyName: 'Imported Acme LLC', phone: '(813) 555-7000', accountNumber: '90210' },
+        { firstName: 'Dup', email: 'ALREADY@import.test' },
+        { email: 'noname@import.test' },
+      ];
+      const before = await privileged.customer.count({ where: { organizationId } });
+
+      const preview = await request(
+        'POST',
+        '/api/v1/customers/import/preview',
+        admin.token,
+        body(rows),
+      );
+      expect(preview.statusCode, preview.body).toBe(200);
+      expect(json(preview).counts).toEqual({ ready: 2, duplicate: 1, invalid: 1 });
+      expect(await privileged.customer.count({ where: { organizationId } })).toBe(before);
+
+      const imported = await request('POST', '/api/v1/customers/import', admin.token, body(rows));
+      expect(imported.statusCode, imported.body).toBe(200);
+      const result = json(imported);
+      expect(result).toMatchObject({ created: 2, skippedDuplicates: 1, skippedInvalid: 1 });
+      expect(result.tag.name).toMatch(/^Imported /);
+
+      const iris = await privileged.customer.findFirstOrThrow({
+        where: { organizationId, email: 'iris@import.test' },
+        include: { notes: true, tags: true },
+      });
+      expect(iris.notes.map((n) => n.body)).toEqual(['Gate code 4411']);
+      expect(iris.tags.map((t) => t.tagId)).toEqual([result.tag.id]);
+      expect(iris.accountNumber).toEqual(expect.any(Number));
+
+      const acme = await privileged.customer.findFirstOrThrow({
+        where: { organizationId, companyName: 'Imported Acme LLC' },
+      });
+      expect(acme.type).toBe('COMPANY');
+      expect(acme.accountNumber).toBe(90210);
+    });
+
+    it('is refused to anyone who does not run the whole business', async () => {
+      const response = await request(
+        'POST',
+        '/api/v1/customers/import',
+        manager.token,
+        body([{ firstName: 'Sneaky' }]),
+      );
+      expect(response.statusCode).toBe(403);
+    });
+
+    it("never treats another business's customers as duplicates, or imports into its location", async () => {
+      // The rival has a customer with this email; for us it is new.
+      const rival = await request('POST', '/api/v1/customers', otherToken, {
+        firstName: 'Rival Row',
+        email: 'shared-address@import.test',
+      });
+      expect(rival.statusCode, rival.body).toBe(201);
+
+      const preview = await request(
+        'POST',
+        '/api/v1/customers/import/preview',
+        admin.token,
+        body([{ firstName: 'Ours', email: 'shared-address@import.test' }]),
+      );
+      expect(json(preview).counts.ready).toBe(1);
+
+      const rivalLocation = await privileged.location.findFirst({
+        where: { organizationId: { not: organizationId } },
+        select: { id: true },
+      });
+      if (rivalLocation) {
+        const intoTheirs = await request('POST', '/api/v1/customers/import', admin.token, {
+          locationId: rivalLocation.id,
+          stage: 'ACTIVE',
+          rows: [{ firstName: 'Misplaced' }],
+        });
+        // The same answer as a location that does not exist: nothing about theirs leaks.
+        expect(intoTheirs.statusCode).toBe(400);
+        expect(json(intoTheirs).message).toBe('That location does not exist');
+        expect(await privileged.customer.count({ where: { firstName: 'Misplaced' } })).toBe(0);
+      }
+    });
+  });
+
+  // =========================================================================
+
   describe('deleting for good', () => {
     it('refuses a customer with work attached, and says to archive instead', async () => {
       const created = await request('POST', '/api/v1/customers', admin.token, {

@@ -6,6 +6,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma, type TenantContext, type TransactionClient } from '@platform/db';
 import {
   PERMISSIONS,
@@ -18,12 +19,16 @@ import {
   type CustomFieldValues,
   type PermissionKey,
   type UpdateCustomerRequest,
+  type CustomerImportPreview,
+  type CustomerImportRequest,
+  type CustomerImportResult,
 } from '@platform/shared';
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 import { ContactsService } from './contacts.service';
 import { CustomFieldsService } from './custom-fields.service';
 import { NotesService } from './notes.service';
+import { analyzeImport } from './customer-import';
 
 /**
  * Cross-tenant and out-of-scope access are both reported as "not found".
@@ -680,6 +685,172 @@ export class CustomersService {
    * either "does not exist" or "belongs to someone else" — and the caller is
    * told the same thing either way.
    */
+  // -------------------------------------------------------------------------
+  // Importing from a spreadsheet
+  // -------------------------------------------------------------------------
+
+  /**
+   * Check every row of an import without saving anything.
+   *
+   * Owners and admins only: bulk-adding a customer list is a decision for the
+   * whole business. Keeping old account numbers is owner-only, as it is one at
+   * a time.
+   */
+  async previewImport(
+    context: TenantContext,
+    permissions: PermissionSet,
+    request: CustomerImportRequest,
+  ): Promise<CustomerImportPreview> {
+    const { analysis } = await this.analyzeImportRequest(context, permissions, request);
+    return {
+      rows: analysis.results,
+      counts: {
+        ready: analysis.ready.length,
+        duplicate: analysis.results.filter((r) => r.status === 'duplicate').length,
+        invalid: analysis.results.filter((r) => r.status === 'invalid').length,
+      },
+    };
+  }
+
+  /**
+   * Import the rows that pass, skipping duplicates and rows with problems.
+   *
+   * Checked again here rather than trusting the preview the browser holds.
+   * Every imported customer gets the import's tag, so a bad import is easy to
+   * find and archive. Saved in batches: each batch is all-or-nothing, and a
+   * big list does not hold one transaction open for long.
+   */
+  async importCustomers(
+    context: TenantContext,
+    permissions: PermissionSet,
+    membershipId: string,
+    request: CustomerImportRequest,
+  ): Promise<CustomerImportResult> {
+    const { analysis } = await this.analyzeImportRequest(context, permissions, request);
+    const skippedDuplicates = analysis.results.filter((r) => r.status === 'duplicate').length;
+    const skippedInvalid = analysis.results.filter((r) => r.status === 'invalid').length;
+
+    if (analysis.ready.length === 0) {
+      return { created: 0, skippedDuplicates, skippedInvalid, tag: null };
+    }
+
+    const now = new Date();
+    const tag = await this.prisma.withTenant(context, async (tx) => {
+      const day = now.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
+      // Checked, not caught: an error inside a transaction aborts it.
+      for (let attempt = 1; ; attempt += 1) {
+        const name = attempt === 1 ? `Imported ${day}` : `Imported ${day} (${attempt})`;
+        const taken = await tx.tag.findFirst({ where: { name }, select: { id: true } });
+        if (!taken) {
+          return tx.tag.create({
+            data: { organizationId: context.organizationId, name },
+            select: { id: true, name: true },
+          });
+        }
+      }
+    });
+
+    const BATCH = 200;
+    for (let start = 0; start < analysis.ready.length; start += BATCH) {
+      const batch = analysis.ready.slice(start, start + BATCH).map((row) => ({
+        ...row,
+        // Chosen here, so notes and tags can name the customer without relying
+        // on the order the database returns rows in.
+        id: randomUUID(),
+      }));
+
+      await this.prisma.withTenant(context, async (tx) => {
+        await tx.customer.createMany({
+          data: batch.map(({ id, data, accountNumber, customFields }) => ({
+            id,
+            organizationId: context.organizationId,
+            stage: data.stage,
+            type: data.type,
+            displayName: CustomersService.displayNameFor(data),
+            companyName: data.companyName ?? null,
+            firstName: data.firstName ?? null,
+            lastName: data.lastName ?? null,
+            email: data.email ?? null,
+            phone: data.phone ?? null,
+            addressLine1: data.addressLine1 ?? null,
+            addressLine2: data.addressLine2 ?? null,
+            city: data.city ?? null,
+            region: data.region ?? null,
+            postalCode: data.postalCode ?? null,
+            country: data.country ?? null,
+            source: data.source ?? null,
+            locationId: request.locationId,
+            customFields: customFields as Prisma.InputJsonValue,
+            convertedAt: data.stage === 'ACTIVE' ? now : null,
+            // Left out entirely when not chosen, so the database numbers it.
+            ...(accountNumber !== null ? { accountNumber } : {}),
+          })),
+        });
+
+        await tx.customerTag.createMany({
+          data: batch.map(({ id }) => ({
+            customerId: id,
+            tagId: tag.id,
+            organizationId: context.organizationId,
+          })),
+        });
+
+        const notes = batch.filter((row) => row.note !== null);
+        if (notes.length > 0) {
+          await tx.customerNote.createMany({
+            data: notes.map(({ id, note }) => ({
+              organizationId: context.organizationId,
+              customerId: id,
+              authorMembershipId: membershipId,
+              body: note!,
+            })),
+          });
+        }
+      });
+    }
+
+    this.logger.log(
+      `Imported ${analysis.ready.length} customer(s) into ${context.organizationId}; skipped ${skippedDuplicates} duplicate(s), ${skippedInvalid} invalid`,
+    );
+
+    return { created: analysis.ready.length, skippedDuplicates, skippedInvalid, tag };
+  }
+
+  private async analyzeImportRequest(
+    context: TenantContext,
+    permissions: PermissionSet,
+    request: CustomerImportRequest,
+  ) {
+    this.assertPermissionOrganizationWide(
+      permissions,
+      PERMISSIONS.CUSTOMER_WRITE,
+      'import customers',
+    );
+
+    const definitions = await this.customFields.list(context);
+    const existing = await this.prisma.withTenant(context, async (tx) => {
+      await this.assertLocationInScope(tx, request.locationId);
+      // Every customer, archived too: re-importing a former customer is still a duplicate.
+      return tx.customer.findMany({
+        select: { id: true, displayName: true, accountNumber: true, email: true, phone: true },
+      });
+    });
+
+    const analysis = analyzeImport(request.rows, {
+      stage: request.stage,
+      locationId: request.locationId,
+      canChooseNumbers: permissions.has(PERMISSIONS.CUSTOMER_DELETE),
+      existing,
+      definitions,
+    });
+
+    return { analysis };
+  }
+
   private async assertLocationInScope(
     tx: TransactionClient,
     locationId: string | null,
