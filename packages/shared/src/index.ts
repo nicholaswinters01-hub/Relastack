@@ -30,3 +30,4 @@ export * from './staff';
 export * from './support';
 export * from './search';
 export * from './group';
+export * from './inventory';

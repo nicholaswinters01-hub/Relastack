@@ -83,7 +83,7 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     isCore: false,
     dependencies: [],
     availableFrom: 'Phase 16',
-    ready: false,
+    ready: true,
   },
   {
     key: MODULES.REPORTING,

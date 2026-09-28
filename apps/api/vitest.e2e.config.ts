@@ -13,6 +13,8 @@ export default defineConfig({
     hookTimeout: 30_000,
     // A shared database makes parallel suites non-deterministic.
     fileParallelism: false,
+    // Configuration is read while the app is imported; see test/load-env.ts.
+    setupFiles: ['./test/load-env.ts'],
   },
   plugins: [swc.vite({ module: { type: 'es6' } })],
 });

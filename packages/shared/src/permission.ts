@@ -31,6 +31,10 @@ export const PERMISSIONS = {
   JOB_READ: 'job.read',
   JOB_WRITE: 'job.write',
   JOB_DELETE: 'job.delete',
+  INVENTORY_READ: 'inventory.read',
+  INVENTORY_WRITE: 'inventory.write',
+  /** The item list is the whole company's, so defining items is separate from moving stock. */
+  INVENTORY_CONFIGURE: 'inventory.configure',
 } as const;
 
 export type PermissionKey = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];

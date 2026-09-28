@@ -53,6 +53,12 @@ const WORK: Entry[] = [
     permission: PERMISSIONS.JOB_READ,
     module: MODULES.SCHEDULING,
   },
+  {
+    href: '/inventory',
+    label: 'Inventory',
+    permission: PERMISSIONS.INVENTORY_READ,
+    module: MODULES.INVENTORY,
+  },
   // Core, so no module gate — tasks are on every plan.
   { href: '/tasks', label: 'Tasks', permission: PERMISSIONS.TASK_READ },
 ];

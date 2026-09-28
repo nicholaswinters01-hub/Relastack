@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { MODULES } from '@platform/shared';
+import { MODULES, PERMISSIONS } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
 import { DashboardView } from '@/components/dashboard-view';
 import { GettingStarted } from '@/components/getting-started';
@@ -8,9 +8,11 @@ import {
   getCurrentOrganization,
   getCurrentUser,
   getDashboard,
+  getInventory,
   getModules,
   getSetupProgress,
 } from '@/lib/api';
+import { canAnywhere } from '@/lib/permissions';
 
 // The dashboard, replacing the Phase 0 status page this route used to hold.
 
@@ -76,7 +78,15 @@ export default async function HomePage() {
     );
   }
 
-  const dashboard = await getDashboard();
+  // From the inventory list itself, so the count passes through exactly the
+  // branch filter the list does: a manager hears about their branches only.
+  const inventoryOn =
+    enabled(MODULES.INVENTORY) && canAnywhere(organization.permissions, PERMISSIONS.INVENTORY_READ);
+  const [dashboard, inventory] = await Promise.all([
+    getDashboard(),
+    inventoryOn ? getInventory() : Promise.resolve(null),
+  ]);
+  const lowStock = inventory?.items.filter((item) => item.low).length ?? 0;
 
   return (
     <>
@@ -88,6 +98,18 @@ export default async function HomePage() {
         </p>
 
         {checklist}
+
+        {lowStock > 0 && (
+          <p className="mt-6 rounded-xl border border-[var(--color-bad)] bg-[var(--color-surface)] px-4 py-3 text-sm">
+            {lowStock} item{lowStock === 1 ? '' : 's'} running low
+            {inventory && inventory.places.length === 1
+              ? ` at ${inventory.places[0]!.name}`
+              : ''}.{' '}
+            <Link href="/inventory" className="underline underline-offset-4">
+              See inventory
+            </Link>
+          </p>
+        )}
 
         {dashboard ? (
           <DashboardView dashboard={dashboard} />

@@ -19,6 +19,8 @@ import {
   jobsResponseSchema,
   jobResponseSchema,
   groupsResponseSchema,
+  inventoryResponseSchema,
+  itemDetailResponseSchema,
   setupProgressSchema,
   tasksResponseSchema,
   taskResponseSchema,
@@ -39,6 +41,8 @@ import {
   type NotificationsResponse,
   type Job,
   type MemberGroup,
+  type InventoryResponse,
+  type ItemDetailResponse,
   type SetupProgress,
   type JobsResponse,
   type Task,
@@ -452,6 +456,32 @@ export async function getSetupProgress(): Promise<SetupProgress | null> {
     const response = await serverFetch('/api/v1/organizations/current/setup');
     if (!response.ok) return null;
     const parsed = setupProgressSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Items and stock at the places the reader can see, or null on any failure. */
+export async function getInventory(includeArchived = false): Promise<InventoryResponse | null> {
+  try {
+    const response = await serverFetch(
+      `/api/v1/inventory${includeArchived ? '?includeArchived=true' : ''}`,
+    );
+    if (!response.ok) return null;
+    const parsed = inventoryResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** One item with its places and history, or null when missing or not visible. */
+export async function getInventoryItem(id: string): Promise<ItemDetailResponse | null> {
+  try {
+    const response = await serverFetch(`/api/v1/inventory/items/${encodeURIComponent(id)}`);
+    if (!response.ok) return null;
+    const parsed = itemDetailResponseSchema.safeParse(await response.json());
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

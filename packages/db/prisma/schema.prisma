@@ -183,6 +183,9 @@ model Organization {
   billingCredits         BillingCredit[]
   memberGroups           MemberGroup[]
   supportRequests        SupportRequest[]
+  inventoryItems         InventoryItem[]
+  stockPlaces            StockPlace[]
+  stockMovements         StockMovement[]
 
   @@map("organizations")
 }
@@ -219,6 +222,7 @@ model OrganizationMembership {
   notifications           Notification[]
   notificationPreferences NotificationPreference[]
   groupMemberships        MemberGroupMember[]
+  recordedStockMovements  StockMovement[]
 
   @@unique([userId, organizationId])
   @@index([organizationId])
@@ -280,6 +284,7 @@ model Location {
   tasks           Task[]
   jobs            Job[]
   jobSeries       JobSeries[]
+  stockPlaces     StockPlace[]
 
   @@unique([organizationId, slug])
   @@index([organizationId])
@@ -1701,4 +1706,112 @@ model MemberGroupMember {
   @@index([organizationId])
   @@index([membershipId])
   @@map("member_group_members")
+}
+
+// ---------------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------------
+
+/// Where stock can sit. Branches today; Fleet adds vehicles.
+enum StockPlaceKind {
+  BRANCH
+
+  @@map("stock_place_kind")
+}
+
+/// Why a quantity changed. The sign each reason allows is a CHECK constraint.
+enum StockMovementReason {
+  RECEIVED
+  USED
+  COUNTED
+  DAMAGED
+  MOVED_OUT
+  MOVED_IN
+  CORRECTED
+
+  @@map("stock_movement_reason")
+}
+
+/// Something a business keeps in stock. Archived, never deleted, so its
+/// history always has something to belong to.
+model InventoryItem {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+
+  name          String
+  sku           String?
+  unit          String
+  category      String?
+  costCents     Int?     @map("cost_cents")
+  /// Company-wide for now; per-place levels can come later.
+  lowStockLevel Decimal? @map("low_stock_level") @db.Decimal(12, 3)
+
+  archivedAt DateTime? @map("archived_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  movements    StockMovement[]
+
+  @@index([organizationId])
+  @@map("inventory_items")
+}
+
+/// A place stock sits. Every place belongs to a branch, so the permission a
+/// person holds at that branch is the permission they hold over its stock.
+model StockPlace {
+  id             String         @id @default(uuid()) @db.Uuid
+  organizationId String         @map("organization_id") @db.Uuid
+  kind           StockPlaceKind @default(BRANCH)
+  locationId     String         @map("location_id") @db.Uuid
+
+  /// Whether employees here may record using and moving stock themselves.
+  /// Some shops have a manager oversee every item taken; others do not.
+  employeesCanTake Boolean @default(false) @map("employees_can_take")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location        @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  movements    StockMovement[]
+
+  @@index([organizationId])
+  @@index([locationId])
+  @@map("stock_places")
+}
+
+/// One change to the stock of one item at one place. Never updated or
+/// deleted: on hand is the sum, and a mistake is fixed by another row, so the
+/// history always explains the number.
+model StockMovement {
+  id             String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  itemId         String @map("item_id") @db.Uuid
+  placeId        String @map("place_id") @db.Uuid
+
+  quantity        Decimal             @db.Decimal(12, 3)
+  reason          StockMovementReason
+  /// For a count: what was counted. `quantity` is the difference.
+  countedQuantity Decimal?            @map("counted_quantity") @db.Decimal(12, 3)
+  /// Ties the two halves of a move together.
+  transferId      String?             @map("transfer_id") @db.Uuid
+  note            String?
+
+  recordedById   String? @map("recorded_by_id") @db.Uuid
+  /// Kept as written, so the history still says who after they have left.
+  recordedByName String  @map("recorded_by_name")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  item         InventoryItem           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  place        StockPlace              @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  recordedBy   OrganizationMembership? @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([itemId, placeId])
+  @@index([placeId])
+  @@index([transferId])
+  @@map("stock_movements")
 }

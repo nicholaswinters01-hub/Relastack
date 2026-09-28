@@ -99,6 +99,18 @@ visibility or scope code may read them, and an e2e test proves joining one
 leaves permissions unchanged. Managed with organization-wide `member.manage`.
 The people page is `/employees` (`/team` redirects).
 
+**Inventory** (Phase 16 pulled forward; design in
+docs/design/inventory-fleet-pest.md) keeps stock at **stock places**. Every
+branch is one, made by a trigger when the location is created; Fleet will add
+vehicles. On hand is always the **sum of `stock_movements`**, an append-only
+ledger: the application role has no UPDATE or DELETE, and a mistake is fixed by
+a correcting row. The sign each reason allows is a CHECK constraint. Taking
+stock below zero **warns (409 `STOCK_BELOW_ZERO`) and can be recorded anyway**,
+like job conflicts. Authority follows the place's branch: managing needs
+`hasAt(inventory.write)`. Using and moving needs that, or the branch's own
+`employees_can_take` setting plus `inventory.read` there. That setting is read
+only by the inventory service.
+
 The **help desk** (Phase 19c, design in docs/design/help-desk.md) lets anyone
 in a business ask for help from `/help`, including a read-only business (rule
 13). RLS keeps each business to its own requests; within one, the service shows
@@ -311,6 +323,12 @@ Recorded because each one cost real time and none is obvious.
   component.** It arrives as a client reference, not the object: the help
   pages rendered "·" where "Question · Replied" belonged. Keep shared constants
   in a plain module (`lib/support-labels.ts`).
+- **The e2e suites passed only because the shell already had the variables
+  set.** Each suite calls `loadDotenv` at its top, but imports are hoisted
+  above it, and the app reads its configuration while being imported. After a
+  session restart, every suite failed with `ConfigValidationError`.
+  `test/load-env.ts` now loads `.env` as a vitest setup file, which runs before
+  any test file is imported.
 - **Backticks inside `node -e "..."` run as shell commands.** Bash expands them
   before Node sees the script. Several edits to prose came out garbled this
   way, and one silently executed a pnpm command. Use the Edit/Write tools for
@@ -351,7 +369,7 @@ next phase without it.
 | 13    | Public website API                                           |          |
 | 14    | Website module                                               |          |
 | 15    | Customer portal                                              |          |
-| 16    | Inventory                                                    |          |
+| 16    | Inventory (stage 1 of docs/design/inventory-fleet-pest.md)   | Review   |
 | 17    | Custom module framework                                      |          |
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
 | 19a   | Staff console: businesses, support actions, audit trail      | Complete |
