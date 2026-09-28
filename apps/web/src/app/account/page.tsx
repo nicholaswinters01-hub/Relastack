@@ -42,7 +42,10 @@ export default async function AccountPage() {
         </p>
 
         {organization && (
-          <section className="mt-10 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+          <section
+            id="business"
+            className="mt-10 scroll-mt-20 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6"
+          >
             <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
               Organization
             </h2>
@@ -86,7 +89,10 @@ export default async function AccountPage() {
           </section>
         )}
 
-        <section className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+        <section
+          id="profile"
+          className="mt-6 scroll-mt-20 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6"
+        >
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
             Account
           </h2>
@@ -112,7 +118,9 @@ export default async function AccountPage() {
           <NotificationPreferences preferences={preferences} />
         )}
 
-        <SignOutButtons />
+        <div id="sessions" className="scroll-mt-20">
+          <SignOutButtons />
+        </div>
 
         <p className="mt-8 text-sm text-[var(--color-muted)]">
           Your organization&apos;s data is isolated at the database level, not just in this

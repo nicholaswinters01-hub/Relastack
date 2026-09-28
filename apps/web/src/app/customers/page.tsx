@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
+import { SettingsLink } from '@/components/settings-link';
 import { redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS, type CustomerStage } from '@platform/shared';
 import { CustomersManager } from '@/components/customers-manager';
@@ -27,7 +28,10 @@ export default async function CustomersPage({ searchParams }: Props) {
       <>
         <AppNav current="customers" />
         <main className="mx-auto max-w-3xl px-6 py-16">
-          <h1 className="text-3xl font-semibold tracking-tight">Customers</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight">Customers</h1>
+            <SettingsLink section="customers" />
+          </div>
           <p className="mt-3 text-[var(--color-muted)]">
             {crm?.entitled
               ? 'The CRM module is not switched on for your organization yet.'
@@ -62,7 +66,10 @@ export default async function CustomersPage({ searchParams }: Props) {
       <AppNav current="customers" />
       <main className="mx-auto max-w-screen-2xl px-6 py-16">
         <div className="mt-2 flex flex-wrap items-baseline justify-between gap-3">
-          <h1 className="text-3xl font-semibold tracking-tight">Customers</h1>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="text-3xl font-semibold tracking-tight">Customers</h1>
+            <SettingsLink section="customers" />
+          </div>
           {/* Owners and admins: bulk import is a whole-business decision. */}
           {can(organization.permissions, PERMISSIONS.CUSTOMER_WRITE) && (
             <Link href="/customers/import" className="text-sm underline underline-offset-4">

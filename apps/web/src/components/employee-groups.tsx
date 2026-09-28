@@ -258,7 +258,10 @@ export function GroupsManager({ groups }: { groups: MemberGroup[] }) {
   }
 
   return (
-    <section className="rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+    <section
+      id="groups"
+      className="scroll-mt-20 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6"
+    >
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
         Groups
       </h2>

@@ -92,6 +92,11 @@ bare `fetch` leaves the user's other windows stale. **Quick search**
 service behind its list page, with that page's permission, visibility filter
 and module switch, so it can never show more than the lists.
 
+**Settings** live in one catalog, `apps/web/src/lib/settings-catalog.ts`. The
+hub (`/settings`), quick search and each page's settings button all read it,
+so a new setting is added there once and turns up everywhere. It only decides
+what is offered: the page and API behind each entry enforce the rules.
+
 **Employee groups** (docs/design/employees-and-groups.md) are labels a
 business gives its people ("Field crew", "Office"); each business names its
 own, and none are created for it. They **grant nothing**: no permission,
@@ -424,7 +429,7 @@ next phase without it.
 | 15    | Customer portal                                              |          |
 | 16    | Inventory (stage 1 of docs/design/inventory-fleet-pest.md)   | Complete |
 | 16b   | Fleet and the pack plumbing (stage 2 of the same design)     | Complete |
-| 16c   | Pest Control pack: application records (stage 3)             | Review   |
+| 16c   | Pest Control pack: application records (stage 3)             | Complete |
 | 17    | Custom module framework                                      |          |
 | 18    | Payment provider integration, invoice sync to QuickBooks     |          |
 | 19a   | Staff console: businesses, support actions, audit trail      | Complete |

@@ -7,6 +7,8 @@ import { searchResponseSchema, type SearchResult } from '@platform/shared';
 export interface PaletteAction {
   label: string;
   href: string;
+  /** More words it should be found by, such as a setting's description. */
+  keywords?: string;
 }
 
 interface Item {
@@ -128,9 +130,13 @@ export function CommandPalette({ actions }: { actions: PaletteAction[] }) {
   const items = useMemo<Item[]>(() => {
     const term = query.trim().toLowerCase();
     const matchingActions = actions
-      .filter((action) => term === '' || action.label.toLowerCase().includes(term))
+      .filter(
+        (action) =>
+          term === '' || `${action.label} ${action.keywords ?? ''}`.toLowerCase().includes(term),
+      )
       .map((action) => ({
-        key: `action:${action.href}`,
+        // Label and address: two settings may live on the same page.
+        key: `action:${action.label}:${action.href}`,
         label: action.label,
         detail: null,
         group: 'Go to',

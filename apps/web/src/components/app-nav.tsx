@@ -3,6 +3,7 @@ import { MODULES, PERMISSIONS, type ModuleState, type PermissionKey } from '@pla
 import { NotificationBell } from '@/components/notification-bell';
 import { getCurrentOrganization, getCurrentUser, getModules, getNotifications } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
+import { visibleSettings } from '@/lib/settings-catalog';
 import { getStaffIdentity } from '@/lib/staff-api';
 import { AccountMenu, type MenuLink } from './account-menu';
 import { CommandPalette, type PaletteAction } from './command-palette';
@@ -78,6 +79,7 @@ const WORK: Entry[] = [
 /** The account and the business, under the person's name. */
 const ACCOUNT: Entry[] = [
   { href: '/account', label: 'Your account' },
+  { href: '/settings', label: 'Settings' },
   { href: '/locations', label: 'Locations', permission: PERMISSIONS.LOCATION_READ },
   { href: '/employees', label: 'Employees', permission: PERMISSIONS.MEMBER_READ },
   { href: '/modules', label: 'Modules', permission: PERMISSIONS.ORGANIZATION_READ },
@@ -124,6 +126,12 @@ export async function AppNav({ current }: { current: string }) {
       : []),
     { label: 'Ask for help', href: '/help' },
     ...account.map((entry) => ({ label: entry.label, href: entry.href })),
+    // Every setting, so typing "license" or "password" finds it.
+    ...visibleSettings(organization.permissions, enabled).map((entry) => ({
+      label: `Settings: ${entry.title}`,
+      href: entry.href,
+      keywords: `${entry.description} ${entry.keywords ?? ''}`,
+    })),
   ];
 
   const name =

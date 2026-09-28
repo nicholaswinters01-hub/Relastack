@@ -63,7 +63,10 @@ export function NotificationPreferences({
   }
 
   return (
-    <section className="mt-6 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6">
+    <section
+      id="notifications"
+      className="mt-6 scroll-mt-20 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6"
+    >
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
         Notifications
       </h2>

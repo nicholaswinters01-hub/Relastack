@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
+import { SettingsLink } from '@/components/settings-link';
 import { PestRecordsTable } from '@/components/pest-records-table';
 import { getCurrentOrganization, getModules, getPestRecords } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
@@ -43,7 +44,10 @@ export default async function PestRecordsPage({
     <>
       <AppNav current="records" />
       <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Application records</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight">Application records</h1>
+          <SettingsLink section="pest-control" />
+        </div>
 
         {!pestOn ? (
           <p className="mt-3 text-[var(--color-muted)]">

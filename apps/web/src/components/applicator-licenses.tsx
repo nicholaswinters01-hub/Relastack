@@ -100,7 +100,7 @@ function LicenseRow({ member }: { member: OrganizationMember }) {
  */
 export function ApplicatorLicenses({ members }: { members: OrganizationMember[] }) {
   return (
-    <section className="mt-10">
+    <section id="licenses" className="mt-10 scroll-mt-20">
       <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
         Applicator licenses
       </h2>

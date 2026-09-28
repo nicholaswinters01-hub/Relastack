@@ -215,7 +215,7 @@ function PlaceSettings({ places }: { places: StockPlace[] }) {
   }
 
   return (
-    <section className="mt-10">
+    <section id="take-stock" className="mt-10 scroll-mt-20">
       <h2 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-muted)]">
         Who can take stock
       </h2>

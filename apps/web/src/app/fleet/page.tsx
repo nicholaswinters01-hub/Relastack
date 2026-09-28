@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
+import { SettingsLink } from '@/components/settings-link';
 import { FleetManager } from '@/components/fleet-manager';
 import {
   getCurrentOrganization,
@@ -54,7 +55,10 @@ export default async function FleetPage({
     <>
       <AppNav current="fleet" />
       <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Fleet</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight">Fleet</h1>
+          <SettingsLink section="fleet" />
+        </div>
 
         {!fleet?.enabled ? (
           <p className="mt-3 text-[var(--color-muted)]">

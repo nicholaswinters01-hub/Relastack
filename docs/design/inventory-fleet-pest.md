@@ -1,6 +1,6 @@
 # Inventory, Fleet and the Pest Control pack: design
 
-Status: **approved 2026-09-28** (answers at the end). **Stage 1 complete** (built and approved 2026-09-28). **Stage 2 complete** (built and approved 2026-09-28). **Stage 3 built** 2026-09-28, awaiting review. Pulls Phase 16 (Inventory)
+Status: **approved 2026-09-28** (answers at the end). **Stage 1 complete** (built and approved 2026-09-28). **Stage 2 complete** (built and approved 2026-09-28). **Stage 3 complete** (built and approved 2026-09-28). Pulls Phase 16 (Inventory)
 forward, with part of Phase 17 (packs extending modules), at the product
 owner's request on 2026-09-28.
 

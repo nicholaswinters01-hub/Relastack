@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
+import { SettingsLink } from '@/components/settings-link';
 import { InventoryManager } from '@/components/inventory-manager';
 import { getCurrentOrganization, getInventory, getModules } from '@/lib/api';
 import { can, canAnywhere } from '@/lib/permissions';
@@ -27,7 +28,10 @@ export default async function InventoryPage({
     <>
       <AppNav current="inventory" />
       <main className="mx-auto max-w-5xl px-4 py-12 sm:px-6">
-        <h1 className="text-3xl font-semibold tracking-tight">Inventory</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-3xl font-semibold tracking-tight">Inventory</h1>
+          <SettingsLink section="inventory" />
+        </div>
 
         {!inventory?.enabled ? (
           <p className="mt-3 text-[var(--color-muted)]">
