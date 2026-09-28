@@ -35,3 +35,4 @@ export * from './fleet';
 export * from './pack-fields';
 export * from './pest-records';
 export * from './board';
+export * from './integrations';

@@ -20,6 +20,36 @@ const commaSeparatedList = z
   )
   .pipe(z.array(z.string().url()));
 
+/**
+ * Keys that encrypt the grants businesses give RelaStack to act in other
+ * services: "1:<base64>,2:<base64>". Each is 32 random bytes. The highest
+ * version encrypts; every listed version decrypts, so a key can be rotated by
+ * adding the next one, re-encrypting, then dropping the old.
+ */
+const integrationKeys = z.string().transform((value, context) => {
+  const keys = new Map<number, Buffer>();
+  for (const entry of value
+    .split(',')
+    .map((part) => part.trim())
+    .filter(Boolean)) {
+    const match = /^(\d+):([A-Za-z0-9+/=_-]+)$/.exec(entry);
+    const key = match ? Buffer.from(match[2]!, 'base64') : null;
+    if (!match || !key || key.length !== 32) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'Each key must be "<version>:<32 bytes, base64>"',
+      });
+      return z.NEVER;
+    }
+    keys.set(Number(match[1]), key);
+  }
+  if (keys.size === 0) {
+    context.addIssue({ code: z.ZodIssueCode.custom, message: 'Give at least one key' });
+    return z.NEVER;
+  }
+  return keys;
+});
+
 const booleanFromString = z
   .enum(['true', 'false'])
   .transform((value) => value === 'true')
@@ -208,6 +238,20 @@ export const serverEnvSchema = z
      * be walked through locally.
      */
     BILLING_SIMULATION: booleanFromString.optional(),
+
+    // --- Connected apps (Phase 11a) ---------------------------------------
+    /**
+     * Encrypts every OAuth grant a business gives RelaStack. Never stored in
+     * the database, which is the point: a copy of the database alone reveals
+     * no one's DocuSign. Without it, no business can connect anything.
+     */
+    INTEGRATION_TOKEN_KEYS: integrationKeys.optional(),
+
+    /** DocuSign app ("integration key") credentials. Unset: DocuSign is not offered. */
+    DOCUSIGN_CLIENT_ID: z.string().min(1).optional(),
+    DOCUSIGN_CLIENT_SECRET: z.string().min(1).optional(),
+    /** DocuSign's test ("demo") environment until the app passes its go-live review. */
+    DOCUSIGN_ENVIRONMENT: z.enum(['demo', 'production']).default('demo'),
   })
   .refine((env) => env.NODE_ENV !== 'production' || env.INTERNAL_API_SECRET !== undefined, {
     message: 'INTERNAL_API_SECRET must be set when NODE_ENV=production',
@@ -231,6 +275,19 @@ export const serverEnvSchema = z
       'BILLING_SIMULATION cannot be true when NODE_ENV=production: it lets a business mark itself as paid',
     path: ['BILLING_SIMULATION'],
   })
+  // A provider with nowhere safe to keep what it grants must not be offered.
+  .refine(
+    (env) =>
+      (env.DOCUSIGN_CLIENT_ID === undefined && env.DOCUSIGN_CLIENT_SECRET === undefined) ||
+      (env.DOCUSIGN_CLIENT_ID !== undefined &&
+        env.DOCUSIGN_CLIENT_SECRET !== undefined &&
+        env.INTEGRATION_TOKEN_KEYS !== undefined),
+    {
+      message:
+        'DOCUSIGN_CLIENT_ID and DOCUSIGN_CLIENT_SECRET go together, and need INTEGRATION_TOKEN_KEYS',
+      path: ['DOCUSIGN_CLIENT_ID'],
+    },
+  )
   .refine((env) => env.NODE_ENV !== 'production' || env.COOKIE_SECURE, {
     message: 'COOKIE_SECURE must be true when NODE_ENV=production',
     path: ['COOKIE_SECURE'],

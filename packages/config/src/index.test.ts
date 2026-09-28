@@ -268,4 +268,43 @@ describe('loadServerEnv — deployment settings', () => {
       /BILLING_SIMULATION cannot be true/,
     );
   });
+
+  describe('connected apps', () => {
+    const key = (byte: number) => Buffer.alloc(32, byte).toString('base64');
+
+    it('parses versioned keys', () => {
+      const env = loadServerEnv({
+        ...validEnv,
+        INTEGRATION_TOKEN_KEYS: `1:${key(1)}, 2:${key(2)}`,
+      });
+      expect([...env.INTEGRATION_TOKEN_KEYS!.keys()]).toEqual([1, 2]);
+      expect(env.INTEGRATION_TOKEN_KEYS!.get(2)).toEqual(Buffer.alloc(32, 2));
+    });
+
+    it('refuses a key that is not 32 bytes, or has no version', () => {
+      const short = Buffer.alloc(16, 1).toString('base64');
+      expect(() => loadServerEnv({ ...validEnv, INTEGRATION_TOKEN_KEYS: `1:${short}` })).toThrow(
+        ConfigValidationError,
+      );
+      expect(() => loadServerEnv({ ...validEnv, INTEGRATION_TOKEN_KEYS: key(1) })).toThrow(
+        ConfigValidationError,
+      );
+    });
+
+    it('refuses DocuSign credentials without a key to protect what it grants', () => {
+      expect(() =>
+        loadServerEnv({ ...validEnv, DOCUSIGN_CLIENT_ID: 'id', DOCUSIGN_CLIENT_SECRET: 'secret' }),
+      ).toThrow(/need INTEGRATION_TOKEN_KEYS/);
+    });
+
+    it('refuses half a set of DocuSign credentials', () => {
+      expect(() =>
+        loadServerEnv({
+          ...validEnv,
+          INTEGRATION_TOKEN_KEYS: `1:${key(1)}`,
+          DOCUSIGN_CLIENT_ID: 'id',
+        }),
+      ).toThrow(ConfigValidationError);
+    });
+  });
 });

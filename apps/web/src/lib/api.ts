@@ -20,6 +20,7 @@ import {
   jobResponseSchema,
   groupsResponseSchema,
   inventoryResponseSchema,
+  integrationsResponseSchema,
   boardResponseSchema,
   jobHelpResponseSchema,
   jobMaterialsResponseSchema,
@@ -49,6 +50,7 @@ import {
   type Job,
   type MemberGroup,
   type InventoryResponse,
+  type IntegrationsResponse,
   type BoardResponse,
   type JobHelpResponse,
   type JobMaterialsResponse,
@@ -598,6 +600,18 @@ export async function getJobHelp(jobId: string): Promise<JobHelpResponse | null>
     const response = await serverFetch(`/api/v1/jobs/${encodeURIComponent(jobId)}/help`);
     if (!response.ok) return null;
     const parsed = jobHelpResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The business's connected apps (never their credentials), or null. */
+export async function getIntegrations(): Promise<IntegrationsResponse | null> {
+  try {
+    const response = await serverFetch('/api/v1/integrations');
+    if (!response.ok) return null;
+    const parsed = integrationsResponseSchema.safeParse(await response.json());
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

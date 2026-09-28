@@ -123,6 +123,16 @@ export const SETTINGS: SettingEntry[] = [
     scope: 'organization',
   },
   {
+    id: 'connected-apps',
+    section: 'business',
+    title: 'Connected apps',
+    description: 'Accounts you already use, like DocuSign, connected to RelaStack.',
+    href: '/settings/connected-apps',
+    keywords: 'integrations docusign dropbox sign e-signature oauth connect',
+    permission: PERMISSIONS.ORGANIZATION_WRITE,
+    scope: 'organization',
+  },
+  {
     id: 'plans',
     section: 'business',
     title: 'Compare plans',

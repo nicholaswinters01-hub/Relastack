@@ -192,6 +192,9 @@ model Organization {
   fleetServiceRecords    FleetServiceRecord[]
   jobSignoffs            JobSignoff[]
   jobHelpRequests        JobHelpRequest[]
+  integrationConnections IntegrationConnection[]
+  integrationStates      IntegrationOAuthState[]
+  integrationEvents      IntegrationEvent[]
 
   @@map("organizations")
 }
@@ -234,6 +237,8 @@ model OrganizationMembership {
   recordedFleetServices   FleetServiceRecord[]
   recordedSignoffs        JobSignoff[]
   helpRequests            JobHelpRequest[]
+  integrationConnections  IntegrationConnection[]
+  integrationEvents       IntegrationEvent[]
 
   /// Fields an enabled pack adds to a person, keyed by pack: an applicator's license.
   packFields Json @default("{}") @map("pack_fields")
@@ -2069,4 +2074,88 @@ model JobHelpRequest {
   @@index([organizationId])
   @@index([jobId])
   @@map("job_help_requests")
+}
+
+// ---------------------------------------------------------------------------
+// Connected apps (Phase 11a)
+// ---------------------------------------------------------------------------
+
+enum IntegrationStatus {
+  CONNECTED
+  NEEDS_RECONNECT
+
+  @@map("integration_status")
+}
+
+/// A business's grant to let RelaStack act in another service. Tokens are
+/// sealed by the API with a key that is never in the database; nothing here
+/// is usable without it. Disconnecting deletes the row.
+model IntegrationConnection {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  provider       String
+  status         IntegrationStatus @default(CONNECTED)
+
+  /// Which account at the provider, for the screen and for the API calls.
+  accountId    String  @map("account_id")
+  accountName  String? @map("account_name")
+  accountEmail String? @map("account_email")
+  baseUri      String? @map("base_uri")
+
+  accessTokenSealed  String   @map("access_token_sealed")
+  refreshTokenSealed String   @map("refresh_token_sealed")
+  accessExpiresAt    DateTime @map("access_expires_at")
+
+  connectedById   String?   @map("connected_by_id") @db.Uuid
+  connectedByName String    @map("connected_by_name")
+  connectedAt     DateTime  @default(now()) @map("connected_at")
+  lastUsedAt      DateTime? @map("last_used_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connectedBy  OrganizationMembership? @relation(fields: [connectedById], references: [id], onDelete: SetNull)
+  events       IntegrationEvent[]
+
+  @@unique([organizationId, provider])
+  @@index([organizationId])
+  @@map("integration_connections")
+}
+
+/// One "Connect" in progress: the OAuth state, single use and short-lived,
+/// bound to the business and the person who clicked. Only its hash is kept.
+model IntegrationOAuthState {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  provider           String
+  stateHash          String   @unique @map("state_hash")
+  codeVerifierSealed String   @map("code_verifier_sealed")
+  userId             String   @map("user_id") @db.Uuid
+  expiresAt          DateTime @map("expires_at")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("integration_oauth_states")
+}
+
+/// Every connection, refresh, use, failure and disconnection. Append-only,
+/// and never the token.
+model IntegrationEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  connectionId   String?  @map("connection_id") @db.Uuid
+  provider       String
+  action         String
+  detail         String?
+  actorId        String?  @map("actor_id") @db.Uuid
+  actorName      String   @map("actor_name")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  connection   IntegrationConnection?  @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  actor        OrganizationMembership? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, createdAt])
+  @@map("integration_events")
 }

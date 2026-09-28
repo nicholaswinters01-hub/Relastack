@@ -105,6 +105,27 @@ jobs at a branch, and covers those branches.
 - **Answering:** only a manager of that branch may acknowledge, which notifies
   the caller. The caller or a manager closes it.
 
+**Connected apps** (Phase 11a's connection layer; design in
+docs/design/contracts-and-integrations.md) hold a business's OAuth grants to
+act in other services. DocuSign comes first, then Dropbox Sign; QuickBooks and
+mail will use the same layer.
+
+- **Sealing:** grants are sealed by `TokenVault` (AES-256-GCM). The key is in
+  `INTEGRATION_TOKEN_KEYS`, versioned, and never in the database. Each value
+  is bound to its business, provider and purpose as authenticated data, so a
+  copied row fails to open. A CHECK refuses anything unsealed.
+- **The connect link:** OAuth state is kept only as a hash, is single use,
+  lasts 10 minutes, and is bound to the business and the person who started
+  it. PKCE is always used.
+- **Refreshing:** a grant is renewed when used, under a lock. There is no
+  background job, which keeps the worker hatch at three tables. A refused
+  grant sets `NEEDS_RECONNECT` (409).
+- **Audit:** every connect, refresh, use, failure and disconnect goes to
+  `integration_events`, which is append-only.
+- **Who may:** owners and admins only. Tokens never leave `IntegrationsService`.
+- **Adapters** implement `IntegrationAdapter`, and tests replace their `http`
+  with recorded responses. Nothing calls a live provider in CI.
+
 **Settings** live in one catalog, `apps/web/src/lib/settings-catalog.ts`. The
 hub (`/settings`), quick search and each page's settings button all read it,
 so a new setting is added there once and turns up everywhere. It only decides
@@ -439,7 +460,7 @@ next phase without it.
 | 9b    | Recurring jobs                                               | Complete |
 | 10    | Reporting and dashboards                                     | Complete |
 | 11    | Notifications and the event system                           | Complete |
-| 11a   | Integrations layer: OAuth vault, QuickBooks, mail providers  | Held     |
+| 11a   | Integrations layer: OAuth vault (built), QuickBooks, mail    | Review   |
 | 12    | Automation engine (trigger → condition → action)             |          |
 | 13    | Public website API                                           |          |
 | 14    | Website module                                               |          |
