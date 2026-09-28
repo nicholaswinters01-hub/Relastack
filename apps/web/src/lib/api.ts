@@ -20,6 +20,8 @@ import {
   jobResponseSchema,
   groupsResponseSchema,
   inventoryResponseSchema,
+  boardResponseSchema,
+  jobHelpResponseSchema,
   jobMaterialsResponseSchema,
   jobSignoffResponseSchema,
   pestRecordsResponseSchema,
@@ -47,6 +49,8 @@ import {
   type Job,
   type MemberGroup,
   type InventoryResponse,
+  type BoardResponse,
+  type JobHelpResponse,
   type JobMaterialsResponse,
   type JobSignoff,
   type PestRecord,
@@ -565,6 +569,36 @@ export async function getPestRecords(query: {
     if (!response.ok) return null;
     const parsed = pestRecordsResponseSchema.safeParse(await response.json());
     return parsed.success ? parsed.data.records : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A branch's day for its manager, or null (not a manager, or any failure). */
+export async function getBoard(query: {
+  locationId?: string;
+  day?: string;
+}): Promise<BoardResponse | null> {
+  try {
+    const params = new URLSearchParams(
+      Object.entries(query).filter((entry): entry is [string, string] => Boolean(entry[1])),
+    );
+    const response = await serverFetch(`/api/v1/board?${params}`);
+    if (!response.ok) return null;
+    const parsed = boardResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** A job's call for a manager, if any, and whether the reader may make one. */
+export async function getJobHelp(jobId: string): Promise<JobHelpResponse | null> {
+  try {
+    const response = await serverFetch(`/api/v1/jobs/${encodeURIComponent(jobId)}/help`);
+    if (!response.ok) return null;
+    const parsed = jobHelpResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
   } catch {
     return null;
   }

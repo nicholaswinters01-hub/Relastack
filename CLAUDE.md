@@ -92,6 +92,19 @@ bare `fetch` leaves the user's other windows stale. **Quick search**
 service behind its list page, with that page's permission, visibility filter
 and module switch, so it can never show more than the lists.
 
+**The manager's board** (`/board`, `GET /board`) is for anyone who can book
+jobs at a branch, and covers those branches.
+
+- **Where people are** comes from the job they marked "On site", never from
+  their phone.
+- **"Need a manager"** (`job_help_requests`, one open per job) may be called
+  only by the crew on the job.
+- **Who hears it:** the event `job.help_requested` goes to the managers of the
+  job's branch, meaning people with `job.write` there through a role scoped to
+  that branch. When there are none, it goes to the owners and admins.
+- **Answering:** only a manager of that branch may acknowledge, which notifies
+  the caller. The caller or a manager closes it.
+
 **Settings** live in one catalog, `apps/web/src/lib/settings-catalog.ts`. The
 hub (`/settings`), quick search and each page's settings button all read it,
 so a new setting is added there once and turns up everywhere. It only decides
@@ -382,6 +395,10 @@ Recorded because each one cost real time and none is obvious.
   session restart, every suite failed with `ConfigValidationError`.
   `test/load-env.ts` now loads `.env` as a vitest setup file, which runs before
   any test file is imported.
+- **A test that books "now" fails in the evening.** The board shows a branch's
+  local day, and a job an hour from 11pm is tomorrow's. It passed all afternoon,
+  then failed in the full run. Tests of anything "today" book a fixed day and
+  ask for that day explicitly.
 - **A migration cannot use an enum value it adds.** `ALTER TYPE ... ADD VALUE`
   runs inside the migration's transaction, and Postgres refuses the new value
   until that commits. The Fleet migration writes its constraints in terms of

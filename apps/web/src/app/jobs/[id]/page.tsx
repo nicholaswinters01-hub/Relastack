@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
 import { JobDetail } from '@/components/job-detail';
+import { HelpCall } from '@/components/help-call';
 import { JobMaterials } from '@/components/job-materials';
 import { JobSignoff } from '@/components/job-signoff';
 import { JobVehicle } from '@/components/job-vehicle';
@@ -11,6 +12,7 @@ import {
   getCurrentUser,
   getFleet,
   getInventory,
+  getJobHelp,
   getJobMaterials,
   getJobSignoff,
   getGroups,
@@ -55,11 +57,12 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
   const inventoryOn =
     enabled(MODULES.INVENTORY) && canAnywhere(organization.permissions, PERMISSIONS.INVENTORY_READ);
   const pestOn = enabled(MODULES.PEST_CONTROL);
-  const [materials, inventory, signoff, user] = await Promise.all([
+  const [materials, inventory, signoff, user, help] = await Promise.all([
     inventoryOn ? getJobMaterials(job.id) : Promise.resolve(null),
     inventoryOn ? getInventory() : Promise.resolve(null),
     pestOn ? getJobSignoff(job.id) : Promise.resolve(null),
     getCurrentUser(),
+    getJobHelp(job.id),
   ]);
   const me = organization.membershipId;
   const myName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || user?.email || 'Me';
@@ -84,6 +87,7 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
           Schedule
         </Link>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight">{job.title}</h1>
+        {help && <HelpCall jobId={job.id} request={help.request} canRequest={help.canRequest} />}
         <JobDetail
           job={job}
           members={members}

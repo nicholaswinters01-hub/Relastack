@@ -298,6 +298,59 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
             ]
           : [];
 
+      case EVENT_TYPES.HELP_REQUESTED: {
+        // The managers of the job's branch: whoever may book jobs there by a
+        // role scoped to it. A branch with none, or a job with no branch,
+        // goes to the owners and admins, so a call is never lost. Read in the
+        // event's own tenant context, like the billing notices above.
+        const recipients = await this.prisma.withTenant(
+          systemContext(organizationId),
+          async (tx) => {
+            const managers = data.locationId
+              ? await tx.membershipRole.findMany({
+                  where: {
+                    scope: 'LOCATION',
+                    locations: { some: { locationId: data.locationId } },
+                    role: { permissions: { some: { permissionKey: 'job.write' } } },
+                  },
+                  select: { membershipId: true },
+                })
+              : [];
+            const branch = managers
+              .map((row) => row.membershipId)
+              .filter((id) => id !== data.requesterMembershipId);
+            if (branch.length > 0) return branch;
+
+            const owners = await tx.membershipRole.findMany({
+              where: { scope: 'ORGANIZATION', role: { key: 'org_admin' } },
+              select: { membershipId: true },
+            });
+            return owners
+              .map((row) => row.membershipId)
+              .filter((id) => id !== data.requesterMembershipId);
+          },
+        );
+
+        return [...new Set(recipients)].map((membershipId) => ({
+          membershipId,
+          title: `${data.requesterName ?? 'Someone'} needs a manager`,
+          body: `${data.title ?? 'A job'}${data.note ? ` — "${data.note}"` : ''}`,
+          linkPath: data.jobId ? `/jobs/${data.jobId}` : '/board',
+        }));
+      }
+
+      case EVENT_TYPES.HELP_ACKNOWLEDGED:
+        return data.membershipId
+          ? [
+              {
+                membershipId: data.membershipId,
+                title: `${data.managerName ?? 'A manager'} is on it`,
+                body: `Your call on ${data.title ?? 'a job'} has been seen.`,
+                linkPath: data.jobId ? `/jobs/${data.jobId}` : '/schedule',
+              },
+            ]
+          : [];
+
       // Invitations are emailed directly by their own service, because the
       // recipient has no membership to address a notification to yet.
       case EVENT_TYPES.INVITATION_SENT:

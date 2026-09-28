@@ -191,6 +191,7 @@ model Organization {
   fleetReminders         FleetReminder[]
   fleetServiceRecords    FleetServiceRecord[]
   jobSignoffs            JobSignoff[]
+  jobHelpRequests        JobHelpRequest[]
 
   @@map("organizations")
 }
@@ -232,6 +233,7 @@ model OrganizationMembership {
   recordedFleetReadings   FleetReading[]
   recordedFleetServices   FleetServiceRecord[]
   recordedSignoffs        JobSignoff[]
+  helpRequests            JobHelpRequest[]
 
   /// Fields an enabled pack adds to a person, keyed by pack: an applicator's license.
   packFields Json @default("{}") @map("pack_fields")
@@ -1213,8 +1215,9 @@ model Job {
   vehicleId String?     @map("vehicle_id") @db.Uuid
   vehicle   FleetAsset? @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
 
-  materials StockMovement[]
-  signoffs  JobSignoff[]
+  materials    StockMovement[]
+  signoffs     JobSignoff[]
+  helpRequests JobHelpRequest[]
 
   @@index([vehicleId])
   @@index([organizationId, startsAt])
@@ -2025,4 +2028,45 @@ model JobSignoff {
   @@index([organizationId])
   @@index([jobId])
   @@map("job_signoffs")
+}
+
+// ---------------------------------------------------------------------------
+// "Need a manager"
+// ---------------------------------------------------------------------------
+
+enum HelpRequestStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+
+  @@map("help_request_status")
+}
+
+/// A tech on a job asking their branch manager for help. One open at a time
+/// per job; acknowledged, then resolved.
+model JobHelpRequest {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  jobId          String            @map("job_id") @db.Uuid
+  status         HelpRequestStatus @default(OPEN)
+  note           String?
+
+  requestedById   String? @map("requested_by_id") @db.Uuid
+  requestedByName String  @map("requested_by_name")
+
+  acknowledgedByName String?   @map("acknowledged_by_name")
+  acknowledgedAt     DateTime? @map("acknowledged_at")
+  resolvedByName     String?   @map("resolved_by_name")
+  resolvedAt         DateTime? @map("resolved_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  job          Job                     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  requestedBy  OrganizationMembership? @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([jobId])
+  @@map("job_help_requests")
 }

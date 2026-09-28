@@ -24,6 +24,8 @@ export const EVENT_TYPES = {
   SUBSCRIPTION_READ_ONLY: 'subscription.read_only',
   INVITATION_SENT: 'invitation.sent',
   SUPPORT_REPLIED: 'support.replied',
+  HELP_REQUESTED: 'job.help_requested',
+  HELP_ACKNOWLEDGED: 'job.help_acknowledged',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -59,6 +61,16 @@ export const NOTIFIABLE: Array<{ type: EventType; label: string; description: st
     type: EVENT_TYPES.SUPPORT_REPLIED,
     label: 'We reply to your help request',
     description: 'The RelaStack team answers something you asked through Help.',
+  },
+  {
+    type: EVENT_TYPES.HELP_REQUESTED,
+    label: 'Someone in the field needs a manager',
+    description: 'Managers. A tech on a job at your branch asks for you.',
+  },
+  {
+    type: EVENT_TYPES.HELP_ACKNOWLEDGED,
+    label: 'A manager answers your call',
+    description: 'A manager has seen your "Need a manager" and is on it.',
   },
 ];
 

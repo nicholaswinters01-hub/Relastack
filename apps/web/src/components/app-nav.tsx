@@ -55,6 +55,13 @@ const WORK: Entry[] = [
     module: MODULES.SCHEDULING,
   },
   {
+    href: '/board',
+    label: 'Board',
+    // For whoever runs a branch; the API narrows it to their branches.
+    permission: PERMISSIONS.JOB_WRITE,
+    module: MODULES.SCHEDULING,
+  },
+  {
     href: '/inventory',
     label: 'Inventory',
     permission: PERMISSIONS.INVENTORY_READ,
