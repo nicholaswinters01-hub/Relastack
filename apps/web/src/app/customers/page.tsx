@@ -70,12 +70,40 @@ export default async function CustomersPage({ searchParams }: Props) {
             <h1 className="text-3xl font-semibold tracking-tight">Customers</h1>
             <SettingsLink section="customers" />
           </div>
-          {/* Owners and admins: bulk import is a whole-business decision. */}
-          {can(organization.permissions, PERMISSIONS.CUSTOMER_WRITE) && (
-            <Link href="/customers/import" className="text-sm underline underline-offset-4">
-              Import from a spreadsheet
-            </Link>
-          )}
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            {/* Owners and admins: bulk import is a whole-business decision. */}
+            {can(organization.permissions, PERMISSIONS.CUSTOMER_WRITE) && (
+              <Link href="/customers/import" className="underline underline-offset-4">
+                Import from a spreadsheet
+              </Link>
+            )}
+            {/* Plain links: the browser downloads the file the API names. */}
+            {canAnywhere(organization.permissions, PERMISSIONS.CUSTOMER_EXPORT) && (
+              <span className="text-[var(--color-muted)]">
+                Export:{' '}
+                <a
+                  href="/api/v1/customers/export/customers"
+                  className="text-[var(--color-ink)] underline underline-offset-4"
+                >
+                  customers
+                </a>
+                {' · '}
+                <a
+                  href="/api/v1/customers/export/contacts"
+                  className="text-[var(--color-ink)] underline underline-offset-4"
+                >
+                  contacts
+                </a>
+                {' · '}
+                <a
+                  href="/api/v1/customers/export/notes"
+                  className="text-[var(--color-ink)] underline underline-offset-4"
+                >
+                  notes
+                </a>
+              </span>
+            )}
+          </div>
         </div>
         <p className="mt-3 text-[var(--color-muted)]">
           Leads and customers are the same record at different stages, so converting one keeps every

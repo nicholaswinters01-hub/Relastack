@@ -7,6 +7,7 @@ import {
   type PestRecord,
   type PestRecordsQuery,
 } from '@platform/shared';
+import { csvCell } from '../../common/csv';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { PermissionSet } from '../../rbac/permission-set';
 
@@ -185,7 +186,7 @@ export class PestRecordsService {
           record.placeName,
           record.voided ? 'Voided' : '',
         ]
-          .map(cell)
+          .map(csvCell)
           .join(','),
       );
     }
@@ -226,13 +227,4 @@ function addressOf(job: {
     .filter(Boolean)
     .join(', ');
   return [street, place].filter(Boolean).join(', ') || null;
-}
-
-/**
- * One CSV cell. Quoted when it must be, and a leading = + - @ is defused so a
- * spreadsheet never runs something a customer name smuggled in as a formula.
- */
-function cell(value: string): string {
-  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[",\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }

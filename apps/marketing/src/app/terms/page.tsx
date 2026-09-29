@@ -45,8 +45,9 @@ export default function TermsPage() {
         <Section title="Your records are yours">
           Everything your business puts into {BRAND.productName} stays yours. You let us store and
           process it only to run the service for you — never to sell, advertise with, or use for
-          anyone else. You can delete it, and we will give you a copy of it whenever you ask. How we
-          handle it is set out in the{' '}
+          anyone else. You can delete it, download your customers, contacts and notes at any time,
+          and we will give you a copy of anything else whenever you ask. How we handle it is set out
+          in the{' '}
           <Link href="/privacy" className="underline underline-offset-4">
             privacy notice
           </Link>
@@ -79,15 +80,14 @@ export default function TermsPage() {
         <Section title="Paying">
           Plans and prices are the ones shown when you choose them. A trial ends on the date shown
           in the app. If a payment is missed, the account becomes read-only after a grace period:
-          you can still see everything, we will give you a copy on request, and paying restores it.
-          We do not lock you out of your own records, and we do not delete them for non-payment
-          without telling you first.
+          you can still see and download everything, and paying restores it. We do not lock you out
+          of your own records, and we do not delete them for non-payment without telling you first.
         </Section>
 
         <Section title="Leaving">
-          You can stop at any time: ask us for a copy of your records, then ask us to close the
-          account. We may end these terms with 30 days&apos; notice, and will give you a copy of
-          your records before we do.
+          You can stop at any time: download your records, or ask us for a copy, then ask us to
+          close the account. We may end these terms with 30 days&apos; notice, and will give you a
+          copy of your records before we do.
         </Section>
 
         <Section title="What we promise, and what we cannot">

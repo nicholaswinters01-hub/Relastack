@@ -1,3 +1,5 @@
+import { CustomerExportController } from './customer-export.controller';
+import { CustomerExportService } from './customer-export.service';
 import { Module } from '@nestjs/common';
 import { ContactsService } from './contacts.service';
 import { CustomFieldsController } from './custom-fields.controller';
@@ -16,8 +18,20 @@ import { TagsService } from './tags.service';
  * module after it follows.
  */
 @Module({
-  controllers: [CustomersController, TagsController, CustomFieldsController],
-  providers: [CustomersService, ContactsService, NotesService, TagsService, CustomFieldsService],
+  controllers: [
+    CustomerExportController,
+    CustomersController,
+    TagsController,
+    CustomFieldsController,
+  ],
+  providers: [
+    CustomerExportService,
+    CustomersService,
+    ContactsService,
+    NotesService,
+    TagsService,
+    CustomFieldsService,
+  ],
   exports: [CustomersService],
 })
 export class CrmModule {}

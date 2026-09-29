@@ -26,6 +26,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { PermissionSet } from '../rbac/permission-set';
 import { ContactsService } from './contacts.service';
+import { customerVisibility } from './customer-visibility';
 import { CustomFieldsService } from './custom-fields.service';
 import { NotesService } from './notes.service';
 import { analyzeImport } from './customer-import';
@@ -84,18 +85,7 @@ export class CustomersService {
    * this returns.
    */
   private visibilityFilter(permissions: PermissionSet): Prisma.CustomerWhereInput {
-    const allowed = permissions.locationsFor(PERMISSIONS.CUSTOMER_READ);
-
-    // null means the permission is held organization-wide, so no filter at
-    // all — deliberately not "the ids of the locations that exist right now",
-    // which would be a snapshot excluding anything created afterwards.
-    if (allowed === null) return {};
-
-    const ids = [...allowed];
-
-    return {
-      OR: [{ locationId: { in: ids } }, { sharedLocations: { some: { locationId: { in: ids } } } }],
-    };
+    return customerVisibility(permissions, PERMISSIONS.CUSTOMER_READ);
   }
 
   /**

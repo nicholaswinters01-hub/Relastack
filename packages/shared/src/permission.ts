@@ -26,6 +26,11 @@ export const PERMISSIONS = {
   CUSTOMER_WRITE: 'customer.write',
   CUSTOMER_DELETE: 'customer.delete',
   /**
+   * Downloading the whole book at once. Separate from reading: anyone can see
+   * customers one at a time, but a file of all of them walks out the door.
+   */
+  CUSTOMER_EXPORT: 'customer.export',
+  /**
    * Defining a custom field or renaming a tag changes the shape of the data
    * for everyone in the company, so it is separated from day-to-day writing.
    */
