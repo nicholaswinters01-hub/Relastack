@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
 import { SettingsLink } from '@/components/settings-link';
 import { redirect } from 'next/navigation';
@@ -43,7 +44,14 @@ export default async function EmployeesPage() {
       <main className="mx-auto max-w-3xl px-6 py-16">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="mt-2 text-3xl font-semibold tracking-tight">Employees</h1>
-          <SettingsLink section="people" />
+          <div className="flex items-center gap-4">
+            {canAnywhere(organization.permissions, PERMISSIONS.MEMBER_REVIEW) && (
+              <Link href="/board/performance" className="text-sm underline underline-offset-4">
+                Performance
+              </Link>
+            )}
+            <SettingsLink section="people" />
+          </div>
         </div>
         <p className="mt-3 text-[var(--color-muted)]">
           Employees join by invitation. Signing up directly always creates a new business, so there

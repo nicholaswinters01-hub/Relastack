@@ -23,6 +23,10 @@ import {
   contractsResponseSchema,
   integrationsResponseSchema,
   boardResponseSchema,
+  performanceResponseSchema,
+  myPerformanceResponseSchema,
+  type PerformanceResponse,
+  type MyPerformanceResponse,
   jobHelpResponseSchema,
   jobMaterialsResponseSchema,
   jobSignoffResponseSchema,
@@ -590,6 +594,37 @@ export async function getBoard(query: {
     const response = await serverFetch(`/api/v1/board?${params}`);
     if (!response.ok) return null;
     const parsed = boardResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** How people are doing, at the branches the reader reviews. */
+export async function getPerformance(query: {
+  from?: string;
+  to?: string;
+  locationId?: string;
+}): Promise<PerformanceResponse | null> {
+  try {
+    const params = new URLSearchParams(
+      Object.entries(query).filter((entry): entry is [string, string] => Boolean(entry[1])),
+    );
+    const response = await serverFetch(`/api/v1/performance?${params}`);
+    if (!response.ok) return null;
+    const parsed = performanceResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The reader's own numbers, this month. */
+export async function getMyPerformance(): Promise<MyPerformanceResponse | null> {
+  try {
+    const response = await serverFetch('/api/v1/performance/me');
+    if (!response.ok) return null;
+    const parsed = myPerformanceResponseSchema.safeParse(await response.json());
     return parsed.success ? parsed.data : null;
   } catch {
     return null;

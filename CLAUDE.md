@@ -105,6 +105,22 @@ jobs at a branch, and covers those branches.
 - **Answering:** only a manager of that branch may acknowledge, which notifies
   the caller. The caller or a manager closes it.
 
+**Performance** (`/board/performance`, `GET /performance`) shows how people are
+doing over a period, from records the app already keeps. Each measure in
+`PERFORMANCE_MEASURES` belongs to a module and appears only when the business
+has it.
+
+- **Who sees it:** `member.review` (admins organization-wide, location
+  managers at their branches). A manager sees their branches' people and only
+  the work done there, counted where it happened: a job at its branch, a task
+  at its location, a lead or contract at its customer's branch.
+- **Your own:** everyone sees their own numbers (`GET /performance/me`, on the
+  account page), and nobody else's.
+- **Counts carry context:** contracts signed of sent, jobs that ran over, leads
+  still open. A withdrawn contract counts neither way.
+- **Standouts only:** the best in each measure is named; nobody is ever listed
+  as worst. Calling for a manager is deliberately not a measure.
+
 **Connected apps** (Phase 11a's connection layer; design in
 docs/design/contracts-and-integrations.md) hold a business's OAuth grants to
 act in other services. DocuSign comes first, then Dropbox Sign; QuickBooks and

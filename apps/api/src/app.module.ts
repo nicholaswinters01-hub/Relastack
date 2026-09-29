@@ -33,6 +33,7 @@ import { FleetModule } from './fleet/fleet.module';
 import { PestControlModule } from './packs/pest-control/pest-control.module';
 import { IntegrationsModule } from './integrations/integrations.module';
 import { ContractsModule } from './contracts/contracts.module';
+import { PerformanceModule } from './performance/performance.module';
 
 /**
  * Application root.
@@ -88,6 +89,7 @@ import { ContractsModule } from './contracts/contracts.module';
     PestControlModule,
     IntegrationsModule,
     ContractsModule,
+    PerformanceModule,
   ],
   providers: [
     // ORDER MATTERS. Guards run in registration order, so rate limiting is

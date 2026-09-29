@@ -14,6 +14,11 @@ export const PERMISSIONS = {
   MEMBER_READ: 'member.read',
   MEMBER_INVITE: 'member.invite',
   MEMBER_MANAGE: 'member.manage',
+  /**
+   * How people are doing, for the branches it is held at. Separate from
+   * seeing who works here: performance is more sensitive than a staff list.
+   */
+  MEMBER_REVIEW: 'member.review',
   LOCATION_READ: 'location.read',
   LOCATION_WRITE: 'location.write',
   LOCATION_ASSIGN: 'location.assign',

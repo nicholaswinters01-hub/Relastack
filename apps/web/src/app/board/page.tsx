@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS, type BoardJob, type BoardPerson } from '@platform/shared';
 import { AppNav } from '@/components/app-nav';
 import { BoardBranchPicker } from '@/components/board-branch-picker';
+import { BoardTabs } from '@/components/board-tabs';
 import { HelpActions } from '@/components/help-call';
 import { getBoard, getCurrentOrganization, getModules } from '@/lib/api';
 import { canAnywhere } from '@/lib/permissions';
@@ -67,6 +68,11 @@ export default async function BoardPage({
     <>
       <AppNav current="board" />
       <main className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
+        <BoardTabs
+          current="today"
+          showToday={schedulingOn && canRun}
+          showPerformance={canAnywhere(organization.permissions, PERMISSIONS.MEMBER_REVIEW)}
+        />
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">Today</h1>

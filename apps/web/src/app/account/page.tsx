@@ -1,13 +1,19 @@
 import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
 import { redirect } from 'next/navigation';
-import { getCurrentOrganization, getCurrentUser, getNotificationPreferences } from '@/lib/api';
+import {
+  getCurrentOrganization,
+  getCurrentUser,
+  getMyPerformance,
+  getNotificationPreferences,
+} from '@/lib/api';
 import { can, roleLabel } from '@/lib/permissions';
 import { PERMISSIONS } from '@platform/shared';
 import { NotificationPreferences } from '@/components/notification-preferences';
 import { OrganizationNameForm } from '@/components/organization-name-form';
 import { ProfileNameForm } from '@/components/profile-name-form';
 import { SignOutButtons } from '@/components/sign-out-buttons';
+import { dayLabel, detailLine, measureOf } from '@/lib/performance-labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,10 +26,11 @@ export const dynamic = 'force-dynamic';
  * without a session returns 401 regardless of what this page does.
  */
 export default async function AccountPage() {
-  const [user, organization, preferences] = await Promise.all([
+  const [user, organization, preferences, mine] = await Promise.all([
     getCurrentUser(),
     getCurrentOrganization(),
     getNotificationPreferences(),
+    getMyPerformance(),
   ]);
 
   if (!user) redirect('/login');
@@ -113,6 +120,36 @@ export default async function AccountPage() {
             <Row label="Member since" value={new Date(user.createdAt).toLocaleDateString()} />
           </dl>
         </section>
+
+        {organization && mine && mine.measures.length > 0 && (
+          <section
+            id="my-numbers"
+            className="mt-6 scroll-mt-20 rounded-xl border border-[var(--color-line)] bg-[var(--color-surface)] p-6"
+          >
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--color-muted)]">
+              My numbers
+            </h2>
+            <p className="mt-1 text-xs text-[var(--color-muted)]">
+              {dayLabel(mine.from)} – {dayLabel(mine.to)}. Only you and your managers see these.
+            </p>
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              {mine.measures.map((key) => {
+                const measure = measureOf(key);
+                const stat = mine.stats[key];
+                const detail = stat ? detailLine(key, stat) : null;
+                return (
+                  <div key={key}>
+                    <dt className="text-xs text-[var(--color-muted)]">
+                      {measure.label} {measure.count}
+                    </dt>
+                    <dd className="text-2xl font-semibold tabular-nums">{stat?.count ?? 0}</dd>
+                    {detail && <dd className="text-xs text-[var(--color-muted)]">{detail}</dd>}
+                  </div>
+                );
+              })}
+            </dl>
+          </section>
+        )}
 
         {organization && preferences.length > 0 && (
           <NotificationPreferences preferences={preferences} />
