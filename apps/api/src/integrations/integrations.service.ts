@@ -498,12 +498,39 @@ export class IntegrationsService {
    * the business in the path, and a secret that proves the report came from
    * someone the provider was given the address by.
    */
-  webhookUrl(context: TenantContext, connection: ConnectionRow): string | null {
-    if (!connection.hookTokenSealed) return null;
-    const token = this.vault.open(
-      connection.hookTokenSealed,
-      this.binding(context, connection.provider, 'hook'),
-    );
+  async webhookUrl(context: TenantContext, connection: ConnectionRow): Promise<string> {
+    let token: string;
+    if (connection.hookTokenSealed) {
+      token = this.vault.open(
+        connection.hookTokenSealed,
+        this.binding(context, connection.provider, 'hook'),
+      );
+    } else {
+      // Connections made before webhook addresses existed get one on first use.
+      token = random();
+      const saved = await this.prisma.withTenant(context, (tx) =>
+        tx.integrationConnection.updateMany({
+          where: { id: connection.id, hookTokenHash: null },
+          data: {
+            hookTokenSealed: this.vault.seal(
+              token,
+              this.binding(context, connection.provider, 'hook'),
+            ),
+            hookTokenHash: sha256(token),
+          },
+        }),
+      );
+      // Another request got there first: use the address it saved.
+      if (saved.count === 0) {
+        const row = await this.prisma.withTenant(context, (tx) =>
+          tx.integrationConnection.findUniqueOrThrow({ where: { id: connection.id } }),
+        );
+        token = this.vault.open(
+          row.hookTokenSealed!,
+          this.binding(context, connection.provider, 'hook'),
+        );
+      }
+    }
     return `${this.env.APP_URL}/api/v1/webhooks/${connection.provider}/${context.organizationId}/${token}`;
   }
 

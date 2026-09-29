@@ -174,7 +174,7 @@ export class ContractsService {
           signerEmail: input.signerEmail,
           subject,
           fields,
-          webhookUrl: this.integrations.webhookUrl(context, row),
+          webhookUrl: await this.integrations.webhookUrl(context, row),
         });
         return { envelopeId, templateName: detail.name, subject, fields };
       },

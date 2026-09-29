@@ -588,6 +588,17 @@ describe('Contracts (e2e)', () => {
 
   // =========================================================================
 
+  it('gives a connection made before webhook addresses existed one on first use', async () => {
+    await privileged.integrationConnection.updateMany({
+      where: { organizationId: owner.organizationId, provider: 'docusign' },
+      data: { hookTokenSealed: null, hookTokenHash: null },
+    });
+    await send(manager, downtownCustomer);
+    const envelopeId = [...envelopes.keys()].at(-1)!;
+    envelopes.set(envelopeId, 'delivered');
+    expect((await poke(lastWebhook(), envelopeId)).statusCode).toBe(200);
+  });
+
   it('keeps the webhook address across a reconnect, so documents already sent still report', async () => {
     const before = await privileged.integrationConnection.findFirstOrThrow({
       where: { organizationId: owner.organizationId, provider: 'docusign' },
