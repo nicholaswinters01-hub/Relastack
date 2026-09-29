@@ -1,6 +1,6 @@
 # Contracts and e-signature, on the integrations layer: design
 
-Status: **approved 2026-09-28**. **Stage 1 complete** (built, connected to a real DocuSign demo account, and approved 2026-09-28): DocuSign first, then Dropbox Sign; stage 1 (connections) is approved separately from stage 2 (contracts). Takes Phase 11a
+Status: **approved 2026-09-28**. **Stages 1 and 2 complete** (stage 1 connected to a real DocuSign demo account and approved 2026-09-28; stage 2 sent, signed and viewed end to end in production and approved 2026-09-28): DocuSign first, then Dropbox Sign; stage 1 (connections) is approved separately from stage 2 (contracts). Takes Phase 11a
 off hold for its connection layer, as ADR 0004 intended: "one connection layer,
 several adapters".
 
