@@ -21,7 +21,10 @@ import { SERVER_ENV } from '../config.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   ProviderAuthError,
+  ProviderRequestError,
   ProviderUnavailableError,
+  isESignAdapter,
+  type ESignAdapter,
   type IntegrationAdapter,
   type OAuthTokens,
 } from './adapter';
@@ -37,7 +40,7 @@ const EVENT_LIMIT = 20;
 const sha256 = (value: string) => createHash('sha256').update(value).digest('base64url');
 const random = () => randomBytes(32).toString('base64url');
 
-type ConnectionRow = NonNullable<
+export type ConnectionRow = NonNullable<
   Awaited<ReturnType<TransactionClient['integrationConnection']['findFirst']>>
 >;
 
@@ -245,6 +248,16 @@ export class IntegrationsService {
           ...sealed,
         },
       });
+      if (!row.hookTokenHash) {
+        const hook = random();
+        await tx.integrationConnection.update({
+          where: { id: row.id },
+          data: {
+            hookTokenSealed: this.vault.seal(hook, this.binding(context, provider, 'hook')),
+            hookTokenHash: sha256(hook),
+          },
+        });
+      }
       await tx.integrationEvent.create({
         data: {
           organizationId: context.organizationId,
@@ -350,7 +363,7 @@ export class IntegrationsService {
    */
   async withAccessToken<T>(
     context: TenantContext,
-    membershipId: string,
+    membershipId: string | null,
     connectionId: string,
     purpose: string,
     work: (accessToken: string, connection: ConnectionRow) => Promise<T>,
@@ -449,8 +462,64 @@ export class IntegrationsService {
         throw this.needsReconnect(prepared.row.provider);
       }
       if (error instanceof ProviderUnavailableError) throw this.unavailable(prepared.row.provider);
+      if (error instanceof ProviderRequestError) throw new BadRequestException(error.message);
       throw error;
     }
+  }
+
+  // -------------------------------------------------------------------------
+  // For modules that act through a connection
+  // -------------------------------------------------------------------------
+
+  /** The business's connection to a provider, if it has one. */
+  async connectionFor(
+    context: TenantContext,
+    provider: IntegrationProviderKey,
+  ): Promise<{ id: string; status: 'CONNECTED' | 'NEEDS_RECONNECT' } | null> {
+    return this.prisma.withTenant(context, (tx) =>
+      tx.integrationConnection.findUnique({
+        where: { organizationId_provider: { organizationId: context.organizationId, provider } },
+        select: { id: true, status: true },
+      }),
+    );
+  }
+
+  /** The adapter for a provider that can send documents for signature. */
+  esign(provider: IntegrationProviderKey): IntegrationAdapter & ESignAdapter {
+    const adapter = this.adapterFor(provider);
+    if (!isESignAdapter(adapter)) {
+      throw new BadRequestException(`${adapter.name} cannot send documents yet`);
+    }
+    return adapter;
+  }
+
+  /**
+   * The secret address a provider reports progress to for this connection:
+   * the business in the path, and a secret that proves the report came from
+   * someone the provider was given the address by.
+   */
+  webhookUrl(context: TenantContext, connection: ConnectionRow): string | null {
+    if (!connection.hookTokenSealed) return null;
+    const token = this.vault.open(
+      connection.hookTokenSealed,
+      this.binding(context, connection.provider, 'hook'),
+    );
+    return `${this.env.APP_URL}/api/v1/webhooks/${connection.provider}/${context.organizationId}/${token}`;
+  }
+
+  /** Whether a webhook's secret matches this business's connection. */
+  async matchesHook(
+    context: TenantContext,
+    provider: IntegrationProviderKey,
+    token: string,
+  ): Promise<string | null> {
+    const row = await this.prisma.withTenant(context, (tx) =>
+      tx.integrationConnection.findFirst({
+        where: { provider, hookTokenHash: sha256(token) },
+        select: { id: true },
+      }),
+    );
+    return row?.id ?? null;
   }
 
   // -------------------------------------------------------------------------
@@ -516,7 +585,8 @@ export class IntegrationsService {
     return new ServiceUnavailableException(`${name} could not be reached. Try again in a moment.`);
   }
 
-  private async actorName(tx: TransactionClient, membershipId: string): Promise<string> {
+  private async actorName(tx: TransactionClient, membershipId: string | null): Promise<string> {
+    if (membershipId === null) return 'Automatic update';
     const membership = await tx.organizationMembership.findUnique({
       where: { id: membershipId },
       select: { user: { select: { firstName: true, lastName: true, email: true } } },
@@ -530,7 +600,7 @@ export class IntegrationsService {
   private async logIn(
     tx: TransactionClient,
     context: TenantContext,
-    membershipId: string,
+    membershipId: string | null,
     connectionId: string | null,
     provider: string,
     action: string,
@@ -551,7 +621,7 @@ export class IntegrationsService {
 
   private log(
     context: TenantContext,
-    membershipId: string,
+    membershipId: string | null,
     connectionId: string | null,
     provider: string,
     action: string,

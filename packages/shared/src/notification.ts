@@ -26,6 +26,8 @@ export const EVENT_TYPES = {
   SUPPORT_REPLIED: 'support.replied',
   HELP_REQUESTED: 'job.help_requested',
   HELP_ACKNOWLEDGED: 'job.help_acknowledged',
+  CONTRACT_SIGNED: 'contract.signed',
+  CONTRACT_DECLINED: 'contract.declined',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -71,6 +73,16 @@ export const NOTIFIABLE: Array<{ type: EventType; label: string; description: st
     type: EVENT_TYPES.HELP_ACKNOWLEDGED,
     label: 'A manager answers your call',
     description: 'A manager has seen your "Need a manager" and is on it.',
+  },
+  {
+    type: EVENT_TYPES.CONTRACT_SIGNED,
+    label: 'A contract you sent is signed',
+    description: 'The customer has signed an agreement you sent them.',
+  },
+  {
+    type: EVENT_TYPES.CONTRACT_DECLINED,
+    label: 'A contract you sent is declined',
+    description: 'The customer has declined to sign an agreement you sent them.',
   },
 ];
 

@@ -1,6 +1,6 @@
 # Contracts and e-signature, on the integrations layer: design
 
-Status: **approved 2026-09-28**: DocuSign first, then Dropbox Sign; stage 1 (connections) is approved separately from stage 2 (contracts). Takes Phase 11a
+Status: **approved 2026-09-28**. **Stage 1 complete** (built, connected to a real DocuSign demo account, and approved 2026-09-28): DocuSign first, then Dropbox Sign; stage 1 (connections) is approved separately from stage 2 (contracts). Takes Phase 11a
 off hold for its connection layer, as ADR 0004 intended: "one connection layer,
 several adapters".
 
@@ -167,3 +167,27 @@ cannot see their contracts, and gets a 404, never a 403.
 2. **Are stages 1 and 2 one approval, or two?** Recommended: two. The
    connection layer is worth reviewing on its own, because QuickBooks and mail
    will reuse it.
+
+## Stage 2 as built (2026-09-28)
+
+- **Sending:** from the customer's page, choose a DocuSign template. The signer
+  defaults to the customer, and template fields whose labels match the
+  customer record are filled in (name, email, phone, address, account
+  number). Only the template's own fields are sent.
+- **Status:**
+  - Webhooks use DocuSign's per-envelope `eventNotification`, so nothing
+    needs setting up in the business's DocuSign account.
+  - The secret address never needs an HMAC key: its token is the secret, and
+    a report only prompts RelaStack to read the status back.
+  - "Check status" does the same by hand.
+- **Signed copy:** "View signed copy" streams DocuSign's combined PDF, and
+  every view is logged in Connected apps' activity.
+- **Withdraw** voids the envelope at DocuSign, with a reason.
+- **Where it shows:** a Contracts page with status filters, and the Contracts
+  section on each customer.
+- **Not yet:**
+  - Dropbox Sign.
+  - A dashboard count of contracts waiting.
+  - Stage 3: signed agreements starting recurring visits.
+  - DocuSign's go-live review, which needs real envelopes sent in the demo
+    environment first.

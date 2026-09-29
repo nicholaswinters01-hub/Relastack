@@ -24,6 +24,7 @@ export const MODULES = {
   SHARED_CUSTOMERS: 'shared_customers',
   FLEET: 'fleet',
   PEST_CONTROL: 'pest_control',
+  CONTRACTS: 'contracts',
 } as const;
 
 export type ModuleKey = (typeof MODULES)[keyof typeof MODULES];
@@ -149,6 +150,19 @@ export const MODULE_REGISTRY: readonly ModuleDefinition[] = [
     dependencies: [MODULES.CRM],
     availableFrom: 'Phase 7',
     ready: false,
+    kind: 'module',
+    includes: [],
+  },
+  {
+    key: MODULES.CONTRACTS,
+    name: 'Contracts',
+    description:
+      'Send agreements for signature from your own DocuSign, and see when they are signed.',
+    isCore: false,
+    // A contract is sent to a customer.
+    dependencies: [MODULES.CRM],
+    availableFrom: 'Phase 11a',
+    ready: true,
     kind: 'module',
     includes: [],
   },

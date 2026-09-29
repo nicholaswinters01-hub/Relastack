@@ -351,6 +351,23 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
             ]
           : [];
 
+      case EVENT_TYPES.CONTRACT_SIGNED:
+      case EVENT_TYPES.CONTRACT_DECLINED:
+        // To whoever sent it: they are the one waiting on it.
+        return data.membershipId
+          ? [
+              {
+                membershipId: data.membershipId,
+                title:
+                  type === EVENT_TYPES.CONTRACT_SIGNED
+                    ? `${data.customerName ?? 'The customer'} signed`
+                    : `${data.customerName ?? 'The customer'} declined to sign`,
+                body: data.title ?? 'A contract you sent',
+                linkPath: data.customerId ? `/customers/${data.customerId}` : '/contracts',
+              },
+            ]
+          : [];
+
       // Invitations are emailed directly by their own service, because the
       // recipient has no membership to address a notification to yet.
       case EVENT_TYPES.INVITATION_SENT:

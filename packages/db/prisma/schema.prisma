@@ -195,6 +195,7 @@ model Organization {
   integrationConnections IntegrationConnection[]
   integrationStates      IntegrationOAuthState[]
   integrationEvents      IntegrationEvent[]
+  contracts              Contract[]
 
   @@map("organizations")
 }
@@ -239,6 +240,7 @@ model OrganizationMembership {
   helpRequests            JobHelpRequest[]
   integrationConnections  IntegrationConnection[]
   integrationEvents       IntegrationEvent[]
+  sentContracts           Contract[]
 
   /// Fields an enabled pack adds to a person, keyed by pack: an applicator's license.
   packFields Json @default("{}") @map("pack_fields")
@@ -833,6 +835,8 @@ model Customer {
   tags            CustomerTag[]
   sharedLocations CustomerLocation[]
   jobSeries       JobSeries[]
+
+  contracts Contract[]
 
   @@unique([organizationId, accountNumber])
   @@index([organizationId, stage])
@@ -2106,6 +2110,11 @@ model IntegrationConnection {
   refreshTokenSealed String   @map("refresh_token_sealed")
   accessExpiresAt    DateTime @map("access_expires_at")
 
+  /// The secret in this connection's webhook address: sealed so the address
+  /// can be rebuilt for each document sent, hashed so a webhook can be matched.
+  hookTokenSealed String? @map("hook_token_sealed")
+  hookTokenHash   String? @unique @map("hook_token_hash")
+
   connectedById   String?   @map("connected_by_id") @db.Uuid
   connectedByName String    @map("connected_by_name")
   connectedAt     DateTime  @default(now()) @map("connected_at")
@@ -2158,4 +2167,56 @@ model IntegrationEvent {
 
   @@index([organizationId, createdAt])
   @@map("integration_events")
+}
+
+// ---------------------------------------------------------------------------
+// Contracts
+// ---------------------------------------------------------------------------
+
+enum ContractStatus {
+  SENT
+  VIEWED
+  SIGNED
+  DECLINED
+  VOIDED
+
+  @@map("contract_status")
+}
+
+/// A document sent to a customer to sign from the business's own e-signature
+/// account. The document itself stays with the provider; this is the record
+/// of sending it and of what became of it.
+model Contract {
+  id                 String         @id @default(uuid()) @db.Uuid
+  organizationId     String         @map("organization_id") @db.Uuid
+  customerId         String         @map("customer_id") @db.Uuid
+  provider           String
+  providerEnvelopeId String         @map("provider_envelope_id")
+  templateId         String         @map("template_id")
+  templateName       String         @map("template_name")
+  title              String
+  signerName         String         @map("signer_name")
+  signerEmail        String         @map("signer_email")
+  status             ContractStatus @default(SENT)
+  /// The template fields as they were filled in, by label.
+  fields             Json           @default("{}")
+
+  sentById      String?   @map("sent_by_id") @db.Uuid
+  sentByName    String    @map("sent_by_name")
+  sentAt        DateTime  @default(now()) @map("sent_at")
+  viewedAt      DateTime? @map("viewed_at")
+  completedAt   DateTime? @map("completed_at")
+  declinedAt    DateTime? @map("declined_at")
+  voidedAt      DateTime? @map("voided_at")
+  lastCheckedAt DateTime? @map("last_checked_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  organization Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  customer     Customer                @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  sentBy       OrganizationMembership? @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, provider, providerEnvelopeId])
+  @@index([organizationId])
+  @@index([customerId])
+  @@map("contracts")
 }

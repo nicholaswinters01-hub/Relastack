@@ -2,9 +2,11 @@ import Link from 'next/link';
 import { AppNav } from '@/components/app-nav';
 import { notFound, redirect } from 'next/navigation';
 import { MODULES, PERMISSIONS } from '@platform/shared';
+import { CustomerContracts } from '@/components/customer-contracts';
 import { CustomerDetailView } from '@/components/customer-detail';
 import { PestRecordsTable } from '@/components/pest-records-table';
 import {
+  getContracts,
   getCurrentOrganization,
   getCustomFields,
   getCustomer,
@@ -37,7 +39,26 @@ export default async function CustomerPage({ params }: Props) {
   const pestOn =
     modules.some((m) => m.key === MODULES.PEST_CONTROL && m.enabled) &&
     canAnywhere(organization.permissions, PERMISSIONS.JOB_READ);
-  const treatments = pestOn ? await getPestRecords({ customerId: customer.id }) : null;
+  const contractsOn = modules.some((m) => m.key === MODULES.CONTRACTS && m.enabled);
+  const [treatments, contracts] = await Promise.all([
+    pestOn ? getPestRecords({ customerId: customer.id }) : Promise.resolve(null),
+    contractsOn ? getContracts({ customerId: customer.id }) : Promise.resolve(null),
+  ]);
+  // What the customer record can fill in a template.
+  const prefill = {
+    name: customer.displayName,
+    email: customer.email ?? '',
+    phone: customer.phone ?? '',
+    address: [
+      [customer.addressLine1, customer.addressLine2].filter(Boolean).join(' '),
+      [customer.city, [customer.region, customer.postalCode].filter(Boolean).join(' ')]
+        .filter(Boolean)
+        .join(', '),
+    ]
+      .filter(Boolean)
+      .join(', '),
+    accountNumber: `#${customer.accountNumber}`,
+  };
 
   // Writing is scoped to where the customer sits, so the check has to name
   // that location rather than asking a plain yes/no.
@@ -68,6 +89,16 @@ export default async function CustomerPage({ params }: Props) {
           canDelete={canDelete}
           membershipId={organization.membershipId}
         />
+
+        {contracts && (
+          <CustomerContracts
+            customerId={customer.id}
+            contracts={contracts}
+            canSend={canWrite}
+            canConnect={can(organization.permissions, PERMISSIONS.ORGANIZATION_WRITE)}
+            prefill={prefill}
+          />
+        )}
 
         {treatments && (
           <section className="mt-10">

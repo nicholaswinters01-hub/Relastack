@@ -126,6 +126,25 @@ mail will use the same layer.
 - **Adapters** implement `IntegrationAdapter`, and tests replace their `http`
   with recorded responses. Nothing calls a live provider in CI.
 
+**Contracts** (stage 2 of the same design; a module on Pro, Business and the
+trial) send a business's own DocuSign templates to a customer.
+
+- **What we keep:** a row per contract. The document stays at DocuSign, and
+  the signed copy is streamed through on demand, never stored.
+- **Who may:** visibility follows the customer list's own filter. Sending and
+  withdrawing need `customer.write` where the customer sits. A customer with
+  contracts cannot be deleted.
+- **Sending:** only the template's own text fields are sent, to a signer role
+  the template names.
+- **Webhooks:** DocuSign reports to
+  `/webhooks/docusign/:organizationId/:token`. The token is a per-connection
+  secret, sealed and hashed, and kept across reconnects. A report is only a
+  prompt: status is read back from DocuSign.
+- **Status** only moves forward, and a conditional update means signed or
+  declined tells the sender exactly once.
+- **Host check:** the account's API host is checked against `*.docusign.net`
+  and `*.docusign.com` on every call.
+
 **Settings** live in one catalog, `apps/web/src/lib/settings-catalog.ts`. The
 hub (`/settings`), quick search and each page's settings button all read it,
 so a new setting is added there once and turns up everywhere. It only decides
@@ -460,7 +479,7 @@ next phase without it.
 | 9b    | Recurring jobs                                               | Complete |
 | 10    | Reporting and dashboards                                     | Complete |
 | 11    | Notifications and the event system                           | Complete |
-| 11a   | Integrations layer: OAuth vault (built), QuickBooks, mail    | Review   |
+| 11a   | Integrations: connections + DocuSign done; QuickBooks, mail  | Partial  |
 | 12    | Automation engine (trigger → condition → action)             |          |
 | 13    | Public website API                                           |          |
 | 14    | Website module                                               |          |

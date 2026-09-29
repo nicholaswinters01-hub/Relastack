@@ -556,15 +556,19 @@ export class CustomersService {
       // Every job, series and task cascades from the customer, so deleting one
       // with work attached would wipe that history from the schedule and the
       // reports. Refused, naming what is there; archiving keeps it all.
-      const [jobs, series, tasks] = await Promise.all([
+      // Contracts too: the signed document lives at the provider, and this is
+      // the only record of having sent it.
+      const [jobs, series, tasks, contracts] = await Promise.all([
         tx.job.count({ where: { customerId: id } }),
         tx.jobSeries.count({ where: { customerId: id } }),
         tx.task.count({ where: { customerId: id } }),
+        tx.contract.count({ where: { customerId: id } }),
       ]);
       const attached = [
         jobs > 0 ? `${jobs} job${jobs === 1 ? '' : 's'}` : null,
         series > 0 ? `${series} recurring series` : null,
         tasks > 0 ? `${tasks} task${tasks === 1 ? '' : 's'}` : null,
+        contracts > 0 ? `${contracts} contract${contracts === 1 ? '' : 's'}` : null,
       ].filter((part): part is string => part !== null);
 
       if (attached.length > 0) {

@@ -62,6 +62,12 @@ const WORK: Entry[] = [
     module: MODULES.SCHEDULING,
   },
   {
+    href: '/contracts',
+    label: 'Contracts',
+    permission: PERMISSIONS.CUSTOMER_READ,
+    module: MODULES.CONTRACTS,
+  },
+  {
     href: '/inventory',
     label: 'Inventory',
     permission: PERMISSIONS.INVENTORY_READ,

@@ -20,6 +20,7 @@ import {
   jobResponseSchema,
   groupsResponseSchema,
   inventoryResponseSchema,
+  contractsResponseSchema,
   integrationsResponseSchema,
   boardResponseSchema,
   jobHelpResponseSchema,
@@ -50,6 +51,7 @@ import {
   type Job,
   type MemberGroup,
   type InventoryResponse,
+  type Contract,
   type IntegrationsResponse,
   type BoardResponse,
   type JobHelpResponse,
@@ -613,6 +615,24 @@ export async function getIntegrations(): Promise<IntegrationsResponse | null> {
     if (!response.ok) return null;
     const parsed = integrationsResponseSchema.safeParse(await response.json());
     return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Contracts the reader may see, narrowed by customer or status; null on failure. */
+export async function getContracts(query: {
+  customerId?: string;
+  status?: string;
+}): Promise<Contract[] | null> {
+  try {
+    const params = new URLSearchParams(
+      Object.entries(query).filter((entry): entry is [string, string] => Boolean(entry[1])),
+    );
+    const response = await serverFetch(`/api/v1/contracts?${params}`);
+    if (!response.ok) return null;
+    const parsed = contractsResponseSchema.safeParse(await response.json());
+    return parsed.success ? parsed.data.contracts : null;
   } catch {
     return null;
   }
