@@ -4,6 +4,7 @@ import { EmailService } from './email.service';
 import { EventsService } from './events.service';
 import { NotificationsController } from './notifications.controller';
 import { NotificationsService } from './notifications.service';
+import { OpsAlertsService } from './ops-alerts.service';
 import { SweepsService } from './sweeps.service';
 import { SchedulingModule } from '../scheduling/scheduling.module';
 
@@ -18,7 +19,21 @@ import { SchedulingModule } from '../scheduling/scheduling.module';
 @Module({
   imports: [SchedulingModule],
   controllers: [NotificationsController],
-  providers: [EventsService, NotificationsService, EmailService, DispatcherService, SweepsService],
-  exports: [EventsService, NotificationsService, EmailService, DispatcherService, SweepsService],
+  providers: [
+    EventsService,
+    NotificationsService,
+    EmailService,
+    DispatcherService,
+    SweepsService,
+    OpsAlertsService,
+  ],
+  exports: [
+    EventsService,
+    NotificationsService,
+    EmailService,
+    DispatcherService,
+    SweepsService,
+    OpsAlertsService,
+  ],
 })
 export class NotificationsModule {}

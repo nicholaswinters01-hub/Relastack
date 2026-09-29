@@ -51,6 +51,12 @@ people learn to ignore, and that cannot be undone. Preferences decide
 _delivery_, never whether the event is recorded — Phase 12's automation reads
 the same stream and must not be muted by somebody's inbox settings.
 
+**Unexpected errors alert** (docs/operations.md). `AlertingExceptionFilter`
+answers a crash with a reference and nothing else; `OpsAlertsService` emails
+the support address where and what failed — never an error's message, which
+can carry customer data — at most once per 15 minutes. Background failures
+report there too. Refusals and 502/503 are the system answering, not alerts.
+
 Background work runs as a **single instance** and needs
 `FOR UPDATE SKIP LOCKED` before that changes. The dispatcher and the hourly
 sweeps are idempotent, so a second copy would duplicate effort rather than

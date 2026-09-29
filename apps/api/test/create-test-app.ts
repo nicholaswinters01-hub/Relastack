@@ -5,6 +5,7 @@ import { AppModule } from '../src/app.module';
 import { loadServerEnv } from '@platform/config';
 import { fastifyCookiePlugin } from '../src/common/fastify-cookie';
 import { registerInternalGate } from '../src/common/internal-gate';
+import { registerRequestReference, requestReference } from '../src/common/request-reference';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 export interface TestApp {
@@ -42,10 +43,13 @@ export function createPrivilegedTestClient(): PrismaClient {
 export async function createTestApp(): Promise<TestApp> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
 
-  const app = moduleRef.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
+  const app = moduleRef.createNestApplication<NestFastifyApplication>(
+    new FastifyAdapter({ genReqId: requestReference }),
+  );
 
   await app.getHttpAdapter().getInstance().register(fastifyCookiePlugin);
   registerInternalGate(app.getHttpAdapter().getInstance(), loadServerEnv().INTERNAL_API_SECRET);
+  registerRequestReference(app.getHttpAdapter().getInstance());
   app.setGlobalPrefix('api/v1');
 
   await app.init();

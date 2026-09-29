@@ -52,7 +52,10 @@
     ],
     "overrides": {
       "postcss": "^8.5.6",
-      "deepmerge-ts": "^8.0.0"
+      "deepmerge-ts": "^8.0.0",
+      "fastify": "^5.12.1",
+      "fast-uri@3": "^3.1.7",
+      "fast-uri@4": "^4.1.4"
     }
   },
   "license": "UNLICENSED",

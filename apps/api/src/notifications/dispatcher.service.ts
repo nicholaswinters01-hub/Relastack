@@ -10,6 +10,7 @@ import { EVENT_TYPES, type EventType } from '@platform/shared';
 import { SERVER_ENV } from '../config.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from './email.service';
+import { OpsAlertsService, describeError } from './ops-alerts.service';
 
 /** How a handler describes the message it wants delivered. */
 interface Delivery {
@@ -55,6 +56,7 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
     private readonly prisma: PrismaService,
     private readonly email: EmailService,
     @Inject(SERVER_ENV) private readonly env: ServerEnv,
+    private readonly alerts: OpsAlertsService,
   ) {}
 
   private get enabled(): boolean {
@@ -109,7 +111,13 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
   private schedule(delay: number, onFire: () => void): NodeJS.Timeout {
     const timer = setTimeout(() => {
       onFire();
-      void this.drain().catch((error) => this.logger.error('Dispatch failed', error));
+      void this.drain().catch((error) => {
+        this.logger.error('Dispatch failed', error);
+        this.alerts.report({
+          where: 'background: sending notifications',
+          what: describeError(error),
+        });
+      });
     }, delay);
 
     // Never hold the process open on our account.
@@ -175,6 +183,14 @@ export class DispatcherService implements OnModuleInit, OnModuleDestroy {
           );
 
           this.logger.warn(`Event ${event.id} (${event.type}) failed: ${message}`);
+          if (event.attempts + 1 >= MAX_ATTEMPTS) {
+            // Nobody will be told now unless a person looks.
+            this.alerts.report({
+              where: `background: ${event.type}`,
+              what: `gave up after ${MAX_ATTEMPTS} attempts (${describeError(error)})`,
+              reference: event.id,
+            });
+          }
         }
       }
 

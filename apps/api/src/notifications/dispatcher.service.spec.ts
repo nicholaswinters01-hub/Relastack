@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ServerEnv } from '@platform/config';
 import { DispatcherService } from './dispatcher.service';
+import type { OpsAlertsService } from './ops-alerts.service';
 import type { EmailService } from './email.service';
 import type { PrismaService } from '../prisma/prisma.service';
 
@@ -19,6 +20,7 @@ function makeService(interval: number) {
     {} as PrismaService,
     {} as EmailService,
     { DISPATCH_INTERVAL_SECONDS: interval } as ServerEnv,
+    { report: () => undefined } as unknown as OpsAlertsService,
   );
   const drain = vi.spyOn(service, 'drain').mockResolvedValue(0);
 

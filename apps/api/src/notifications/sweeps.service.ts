@@ -11,6 +11,7 @@ import { SERVER_ENV } from '../config.provider';
 import { PrismaService } from '../prisma/prisma.service';
 import { JobSeriesService } from '../scheduling/job-series.service';
 import { DispatcherService } from './dispatcher.service';
+import { OpsAlertsService, describeError } from './ops-alerts.service';
 
 /**
  * The work that has to happen on a clock rather than in a request.
@@ -39,6 +40,7 @@ export class SweepsService implements OnModuleInit, OnModuleDestroy {
     private readonly series: JobSeriesService,
     private readonly dispatcher: DispatcherService,
     @Inject(SERVER_ENV) private readonly env: ServerEnv,
+    private readonly alerts: OpsAlertsService,
   ) {}
 
   onModuleInit(): void {
@@ -49,7 +51,10 @@ export class SweepsService implements OnModuleInit, OnModuleDestroy {
     // The only background timer in the process. One wake-up an hour is what
     // lets a database that sleeps when idle actually sleep.
     this.timer = setInterval(() => {
-      void this.run().catch((error) => this.logger.error('Sweep failed', error));
+      void this.run().catch((error) => {
+        this.logger.error('Sweep failed', error);
+        this.alerts.report({ where: 'background: hourly sweep', what: describeError(error) });
+      });
     }, this.env.DISPATCH_INTERVAL_SECONDS * 1000);
 
     this.timer.unref?.();

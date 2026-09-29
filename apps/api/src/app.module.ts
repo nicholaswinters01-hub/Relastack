@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { AlertingExceptionFilter } from './common/alerting-exception.filter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { AuthModule } from './auth/auth.module';
 import { AuthGuard } from './auth/auth.guard';
@@ -127,6 +128,10 @@ import { PerformanceModule } from './performance/performance.module';
     // running this after the others means the more specific failures — not
     // signed in, wrong organization, module not enabled — are reported first.
     { provide: APP_GUARD, useClass: ReadOnlyGuard },
+
+    // An unexpected error is logged with a reference, reported to whoever runs
+    // RelaStack, and answered with that reference and nothing else.
+    { provide: APP_FILTER, useClass: AlertingExceptionFilter },
   ],
 })
 export class AppModule {}
