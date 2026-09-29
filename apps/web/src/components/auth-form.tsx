@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { loginRequestSchema, registerRequestSchema, PASSWORD_MIN_LENGTH } from '@platform/shared';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/brand';
 
 type Mode = 'login' | 'register';
 
@@ -206,6 +207,18 @@ export function AuthForm({ mode, notice }: { mode: Mode; notice?: string }) {
         >
           {isRegister ? 'Sign in' : 'Create one'}
         </Link>
+      </p>
+
+      <p className="mt-8 text-xs text-[var(--color-muted)]">
+        {isRegister && 'By creating an account you agree to the '}
+        <a href={TERMS_URL} className="underline underline-offset-4">
+          {isRegister ? 'terms of service' : 'Terms'}
+        </a>
+        {isRegister ? ' and the ' : ' · '}
+        <a href={PRIVACY_URL} className="underline underline-offset-4">
+          {isRegister ? 'privacy notice' : 'Privacy'}
+        </a>
+        {isRegister && '.'}
       </p>
     </main>
   );

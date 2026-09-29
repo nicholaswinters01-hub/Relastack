@@ -48,6 +48,12 @@ export const BRAND = {
 } as const;
 
 /**
+ * When the privacy notice and terms last changed. A fixed date, not the build
+ * date: a notice that claims to change every deploy tells a reader nothing.
+ */
+export const LEGAL_UPDATED = '2026-09-28';
+
+/**
  * The logo's colours live in globals.css as `--color-brand` and
  * `--color-accent`, not here. Defining them in both places is how a brand
  * drifts: one gets updated, the other does not, and nobody notices until the

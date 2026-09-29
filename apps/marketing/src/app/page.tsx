@@ -154,9 +154,14 @@ export default async function HomePage({ searchParams }: Props) {
         <span>
           © {new Date().getFullYear()} {BRAND.legalEntity}
         </span>
-        <Link href="/privacy" className="underline underline-offset-4">
-          Privacy
-        </Link>
+        <span className="flex gap-4">
+          <Link href="/privacy" className="underline underline-offset-4">
+            Privacy
+          </Link>
+          <Link href="/terms" className="underline underline-offset-4">
+            Terms
+          </Link>
+        </span>
       </footer>
     </main>
   );

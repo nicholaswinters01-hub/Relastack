@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { PASSWORD_MIN_LENGTH, type InvitationPreview } from '@platform/shared';
+import { PRIVACY_URL, TERMS_URL } from '@/lib/brand';
 
 type State =
   { status: 'loading' } | { status: 'invalid' } | { status: 'ready'; preview: InvitationPreview };
@@ -163,6 +164,18 @@ export function AcceptInvitationForm({ token }: { token: string }) {
           {busy ? 'Joining…' : `Join ${preview.organizationName}`}
         </button>
       </form>
+
+      <p className="mt-8 text-xs text-[var(--color-muted)]">
+        By joining you agree to the{' '}
+        <a href={TERMS_URL} className="underline underline-offset-4">
+          terms of service
+        </a>{' '}
+        and the{' '}
+        <a href={PRIVACY_URL} className="underline underline-offset-4">
+          privacy notice
+        </a>
+        .
+      </p>
     </main>
   );
 }
